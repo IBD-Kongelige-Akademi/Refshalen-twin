@@ -6,18 +6,21 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 - Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph.
 - The Limfjord at sea level with quay walls along the harbour front, the city's lakes and parks.
 - Four ways to move: on foot, by car, by bicycle (city or cargo bike) and by helicopter; six teleports and scenic cameras.
+- A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
 
 Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
-**Status: phases 0–4 of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md). Still to come: Skråfoto facade photos, vegetation, entrances and shopfronts (phase 5), street furniture (6), publishing (7), the whole city (8).
+**Status: phases 0–5 and 4b of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation). Still to come: the drone (4d), street furniture (6), publishing (7), the whole city (8).
 
 ## Run it
 
 You need a browser with WebGPU (current Chrome or Edge) and Python 3 for a static file server. The tile data is generated and gitignored: build it first (below).
 
 ```sh
-python3 -m http.server           # then open http://localhost:8000/
+python3 tools/hosting/serve_range.py --port 8010   # then open http://127.0.0.1:8010/
 ```
+
+`serve_range.py` keeps connections alive; `python3 -m http.server` opens one per file and can stall the page load on Windows.
 
 | Query | Behaviour |
 |---|---|

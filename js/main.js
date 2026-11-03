@@ -15,6 +15,7 @@ import { LightingSystem } from './lighting.js';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
 import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.js';
+import { OverviewMap } from './overview-map.js';
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
@@ -251,7 +252,9 @@ async function initApp() {
       const nextMode = modes[(modes.indexOf(activeMode) + step + modes.length) % modes.length];
       selectMode(nextMode === 'cyclist' ? lastBikeMode : nextMode);
     },
-    onCycleCamera: cycleCamera
+    onCycleCamera: cycleCamera,
+    onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
+    onCloseMap: () => mapSystem.toggleFullMap(false)
   });
 
   // Keyboard guide for each mode: [keys, action]
@@ -501,6 +504,27 @@ async function initApp() {
     });
   }
 
+  // Radar minimap & full map ([M], js/overview-map.js): streets from the road graph at once, the ground (data/city/map.json) when it arrives
+  const mapSystem = new OverviewMap({
+    controllerManager,
+    cameraSystem,
+    trafficSystem,
+    roadGraph: world.geo?.roadGraph || null,
+    places: TELEPORT_LOCATIONS,
+    locate: world.locationLabel,
+    onToggle: (open) => {
+      controllerManager.resetInput();
+      touchControls.setEnabled(!open);
+      gamepadControls.setEnabled(!open);
+      const mapHint = document.getElementById('fullmap-hover-info');
+      if (open && touchControls.available && mapHint) mapHint.textContent = 'Tap to teleport · Drag to pan · Use + / − to zoom';
+    },
+    onTeleport: (x, z) => teleportTo(x, z)
+  });
+  world.fetchCityJson?.('map.json').then((doc) => mapSystem.setData(doc)).catch((e) => console.info('[map] no data/city/map.json:', e?.message || e));
+  const openMapBtn = document.getElementById('btn-open-map');
+  if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
+
   // Global keyboard shortcuts for modes (1-4), cameras (V / 6-0), and HUD (H)
   window.addEventListener('keydown', (e) => {
     if (isTypingInField(e)) return;
@@ -542,7 +566,7 @@ async function initApp() {
         if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) audioSystem.setEnabled(!audioSystem.enabled);
         break;
       case 'KeyB':
-        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) audioSystem.honk(controllerManager.getActiveEntity());
+        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !mapSystem.isFullMapOpen) audioSystem.honk(controllerManager.getActiveEntity());
         break;
     }
   });
@@ -551,6 +575,10 @@ async function initApp() {
     cameraSystem.onResize(window.innerWidth, window.innerHeight);
     renderer.setSize(window.innerWidth, window.innerHeight);
     placeModeIndicator();
+    if (mapSystem.isFullMapOpen) {
+      mapSystem.resizeFullCanvas();
+      mapSystem.renderFullMap();
+    }
   });
 
   // Initialize the UI and chase camera around the restored player, or the default car on a first visit.
@@ -658,7 +686,7 @@ async function initApp() {
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
     const updateCamera = cameraSystem.update.bind(cameraSystem);
-    Object.assign(globalThis.__twin, { THREE, trafficSystem, freeCam: null, frozen: false, stream: world.stream || null });
+    Object.assign(globalThis.__twin, { THREE, trafficSystem, mapSystem, freeCam: null, frozen: false, stream: world.stream || null });
     cameraSystem.update = (dt, time) => {
       updateCamera(dt, time);
       const f = globalThis.__twin.freeCam;
@@ -703,6 +731,7 @@ async function initApp() {
     world.update(cameraSystem.currentPos.x, cameraSystem.currentPos.z, lightingSystem.uNightFactor.value);
     const T2 = frameProbe ? performance.now() : 0;
     lightingSystem.update(cameraSystem.currentPos);
+    mapSystem.update(now);
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
 

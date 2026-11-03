@@ -1001,7 +1001,9 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     agents,
     pool,
     /** True when the tile index has a tile at this local point (the citywide teleport presets use it). */
-    tileExists: (x, z) => !!index.tiles[tileOfLocal(x, z)]
+    tileExists: (x, z) => !!index.tiles[tileOfLocal(x, z)],
+    /** A data/city/<rel> JSON file through the tile store (packed or not), e.g. the overview map's map.json. */
+    fetchCityJson: (rel) => store.fetchCityJson(rel)
   };
 }
 

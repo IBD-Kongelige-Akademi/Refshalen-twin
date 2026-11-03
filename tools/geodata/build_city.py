@@ -771,13 +771,20 @@ def stage_index(a, tiles, cells) -> None:
     for part in sorted((WORK / "meta_parts").glob("*.json")) if (WORK / "meta_parts").exists() else []:
         meta[part.stem] = _load_json(part)  # surfaces, furniture, vegetation, entrances, groundfloor: citywide headers
     S.atomic_write(CITY_DIR / "meta.json", dump(meta))
+    # the overview map's ground (js/overview-map.js), from the tiles as they are now
+    import city_map
+
+    water_header = CITY_DIR / "water.json"
+    map_doc = city_map.build(TILES_DIR, _load_json(water_header) if water_header.exists() else None)
+    S.atomic_write(CITY_DIR / "map.json", dump(map_doc))
     total = sum(e["bytes"] for e in idx_tiles.values())
     index = {"version": T.VERSION, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tileSize": frame.TILE_SIZE,
              "frame": {"epsg": 25832, "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": bbox},
              "city": {"meta": "../city/meta.json",
                       "roadgraph": "../city/roadgraph.json" if (CITY_DIR / "roadgraph.json").exists() else None,
                       "streets": "../city/streets.json" if (CITY_DIR / "streets.json").exists() else None,
-                      "lakes": "../city/lakes.json" if (CITY_DIR / "lakes.json").exists() else None},
+                      "lakes": "../city/lakes.json" if (CITY_DIR / "lakes.json").exists() else None,
+                      "map": "../city/map.json"},
              "tiles": idx_tiles, "bytes": total}
     S.atomic_write(TILES_DIR / "index.json", dump(index))
     log(f"[index] {len(idx_tiles)} tiles, {total / 1e6:.1f} MB; meta.json {(CITY_DIR / 'meta.json').stat().st_size / 1e6:.2f} MB")

@@ -106,6 +106,7 @@ NATURE_LEISURE = ("nature_reserve",)
 HARBOUR_MIN_M2 = 40000.0  # a sea-level body this big is harbour
 NATURAL_NEAR_M = 30.0  # a shore vertex this close to natural land is natural coast
 MOAT_NAME = ("stadsgrav", "kastelsgrav", "voldgrav")
+SEA_NAME = "Limfjorden"  # the sea body's name (else it takes the name of the largest basin it absorbs)
 FETCH_MARGIN_M = 500.0  # the raw layers reach this far beyond the tiles (coast and harbour basins that run out of them)
 
 
@@ -685,7 +686,7 @@ def build(args) -> int:
                    for _, t, g in osm_w if g.intersects(p))
         pond = p.area < POND_MAX_M2 and not is_sea
         kind = "pond" if pond else classify_kind([s[1] for s in hits], is_sea, p.area)
-        bodies.append({"id": f"w:{k}", "poly": p, "level": round(float(lvl), 2), "pond": pond, "kind": kind, "name": named[0][1] if named else "", "sea": is_sea, "moat": moat})
+        bodies.append({"id": f"w:{k}", "poly": p, "level": round(float(lvl), 2), "pond": pond, "kind": kind, "name": SEA_NAME if is_sea and SEA_NAME else named[0][1] if named else "", "sea": is_sea, "moat": moat})
     lakes_b = [b for b in bodies if not b["pond"]]
     cut_water = unary_union([b["poly"] for b in lakes_b])
     all_water = unary_union([cut_water] + [b["poly"] for b in bodies if b["pond"]])
