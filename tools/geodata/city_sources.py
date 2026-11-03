@@ -62,7 +62,7 @@ def request(method: str, url: str, tries: int = 7, what: str = "", **kw) -> requ
 def atomic_write(path: Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_name(path.name + f".tmp{os.getpid()}")
-    tmp.write_text(text)
+    tmp.write_text(text, encoding="utf-8")
     tmp.replace(path)
 
 
@@ -158,14 +158,14 @@ def fetch_kk(layer: str, bbox, force: bool = False) -> dict:
 
 # ----------------------------------------------------------------------------------------------------------- Overpass
 
-def fetch_overpass(key: str, body: str, force: bool = False) -> dict:
+def fetch_overpass(key: str, body: str, force: bool = False, attempts: int = 8) -> dict:
     path = RAW_CITY / f"osm_{key}.json"
     if path.exists() and not force:
         return {"cached": True}
     q = f"[out:json][timeout:300][bbox:{OSM_BBOX}];{body}"
     last = None
     t0 = time.time()
-    for attempt in range(8):
+    for attempt in range(attempts):
         url = OVERPASS[attempt % len(OVERPASS)]
         try:
             r = request("POST", url, tries=2, what=f"overpass:{key}", data={"data": q}, timeout=420)

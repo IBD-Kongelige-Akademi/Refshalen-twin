@@ -690,14 +690,38 @@ def road_strip_polygons(items, cycles):
 
 
 # ---------------------------------------------------------------------------------------------------- pavements
+DERIVED_PAVE_W = 3.0  # m beyond the carriageway and its cycle strip; cut back to the building line by clean_sidewalks
+
+
+def derive_sidewalks(items, by_id):
+    """Pavement candidates where no pavement register exists (Aalborg): every vehicular road piece buffered by its measured
+    half width, its wider cycle strip and DERIVED_PAVE_W, unioned. Holes are kept (block interiors and courtyards stay out);
+    clean_sidewalks then removes the carriageways, cycle strips, footprints and water, leaving the strip up to the building line."""
+    bufs = []
+    for it in items:
+        if by_id.get(it["base"], {}).get("class") not in VEHICULAR:
+            continue
+        pts, rec = it["pts"], it["rec"]
+        if len(pts) < 4:
+            continue
+        ln = LineString([(pts[i], pts[i + 1]) for i in range(0, len(pts), 2)])
+        reach = (rec["hl"] + rec["hr"]) / 2 + max(rec.get("cl", 0.0), rec.get("cr", 0.0)) + DERIVED_PAVE_W
+        bufs.append(ln.buffer(reach, cap_style="flat", join_style="mitre", mitre_limit=2.0))
+    out = []
+    for k, g in enumerate(polys_of(unary_union(bufs)) if bufs else []):
+        out.append({"id": f"derived:{k}", "ring": _flat(g.exterior.coords), "holes": [_flat(h.coords) for h in g.interiors],
+                    "src": ["derived:carriageway+cycle+3m-to-building-line"], "conf": "inferred"})
+    return out
+
+
 def clean_sidewalks(geo, carriage, strips, ctx):
-    """KK pavement polygons minus carriageways, cycle strips, building footprints and water."""
+    """Pavement polygons (a register, or derive_sidewalks) minus carriageways, cycle strips, building footprints and water."""
     cutters = [g for g in carriage.values()] + [p for _, _, p in strips] + ctx.bpolys + ([ctx.water_poly] if not ctx.water_poly.is_empty else [])
     tree = STRtree(cutters)
     out = []
     dropped = 0
     for sw in geo["sidewalks"]:
-        p = poly_of(sw["ring"])
+        p = poly_of(sw["ring"], sw.get("holes", ()))
         if p is None:
             continue
         cut = unary_union([cutters[j] for j in tree.query(p)]) if len(tree.query(p)) else Polygon()
@@ -1060,6 +1084,8 @@ def build_doc(geo, lakes, vejkant, extra=None, surfaces=None):
             items.append({"id": rid if k == 0 else f"{rid}#{k}", "base": rid, "pts": pts, "rec": rec_k})
     cycles, carriage = compile_cycles(items, ctx)
     strips = road_strip_polygons(items, cycles)
+    if not geo["sidewalks"]:  # no pavement register: derive them beside the carriageways
+        geo = {**geo, "sidewalks": derive_sidewalks(items, by_id)}
     sidewalks, dropped_sw = clean_sidewalks(geo, carriage, strips, ctx)
     cycle_tracks, kk_stats = dedupe_kk_cycle_lines(geo, strips, carriage, ctx)
     roads, extra_roads = {}, []

@@ -213,4 +213,8 @@ def main():
 
 
 if __name__ == "__main__":
+    if os.name == "nt" and not sys.flags.utf8_mode:  # read and write UTF-8 on Windows too (see build_city.py)
+        import subprocess
+
+        sys.exit(subprocess.call([sys.executable, "-X", "utf8", *sys.argv]))
     main()

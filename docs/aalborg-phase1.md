@@ -14,7 +14,7 @@ Phase 1 of the Aalborg plan: Copenhagen removed, Aalborg frame set. The viewer b
 
 Everything else imports these values: `terrain.py`, `streets.py`, `appearance.py`, `tree_canopy.py`, `skraafoto_prefetch.py`, `far_lod.py`, `city_water.py`, `ortho.py` and `vegetation_cir.py` in Python, and `city-config.js` plus the water and far-LoD modules in JS. The sea level follows the origin height (`SEA = -ORIGIN[2]`, `SEA_LEVEL_LOCAL`). To change it, edit `frame.py` and `js/tile-grid.js` and nothing else, then rerun `build_city.py --stage cells --force cells`.
 
-Teleports (`js/city-config.js`, `index.html`, `js/cameras.js`, `tools/check-collisions.py`) are converted from approximate map positions, and all face north. Snap them to the road graph and set headings once phase 3 has built it.
+Teleports (`js/city-config.js`, `index.html`, `js/cameras.js`, `tools/check-collisions.py`) were snapped to the road graph in phase 3 (docs/aalborg-phase3.md).
 
 ## Tests
 

@@ -277,11 +277,24 @@ def stage_fetch(a, tiles) -> None:
             raise SystemExit(f"fetch incomplete: {errors}")
         mark_done("fetch-dg", snapshots=DG.snapshots())
     if a.force_stage("fetch") or not is_done("fetch-osm"):
-        for key, body in OSM_QUERIES.items():
-            run(f"osm:{key}", lambda key=key, body=body: S.fetch_overpass(key, body, force=a.force_fetch))
+        source = "overpass"
+        if a.osm_source in ("auto", "overpass"):
+            for key, body in OSM_QUERIES.items():
+                run(f"osm:{key}", lambda key=key, body=body: S.fetch_overpass(key, body, force=a.force_fetch,
+                                                                             attempts=2 if a.osm_source == "auto" else 8))
+        if a.osm_source == "api" or (a.osm_source == "auto" and errors):
+            import osm_api
+
+            log(f"[fetch] Overpass {'skipped' if a.osm_source == 'api' else 'failed'}; reading the OSM API (api/0.6/map) instead")
+            errors.clear()
+            s, w, n, e = (float(v) for v in S.OSM_BBOX.split(","))
+            elements = osm_api.fetch_map(s, w, n, e, force=a.force_fetch)
+            for key in OSM_QUERIES:
+                S.atomic_write(RAW_CITY / f"osm_{key}.json", json.dumps(osm_api.emulate(key, elements), ensure_ascii=False, separators=(",", ":")))
+            source = "osm-api"
         if errors:
             raise SystemExit(f"fetch incomplete (Overpass; datagrundlag.dk is done, rerun to retry): {errors}")
-        mark_done("fetch-osm", bbox=S.OSM_BBOX)
+        mark_done("fetch-osm", bbox=S.OSM_BBOX, source=source)
 
 
 # --------------------------------------------------------------------------------------- buildings: merge + slice
@@ -387,7 +400,9 @@ def _osm_cached(key):
 
 def stage_geo(a, tiles, cells) -> None:
     """Everything sparse, compiled once for the whole city: roads (so the graph is connected across tiles), roadGraph,
-    cycle tracks, sidewalks, water, parks, signals, trees, bike racks, benches, street lights."""
+    water, parks, signals, street lights. Aalborg publishes no municipal layers, so roads, one-way, speed, lanes, cycle lanes
+    and signals come from OSM alone; kerbs, cycle tracks and pavements come later from GeoDanmark Vejkant (stage streets),
+    trees, racks and benches in phase 6. The compiler functions take None where upstream passed a KK layer."""
     if is_done("geo") and not a.force_stage("geo"):
         return
     import fetch
@@ -397,9 +412,9 @@ def stage_geo(a, tiles, cells) -> None:
     t0 = time.time()
     frame.set_area(city_bbox_utm(tiles))
     fetch.cache_dir = lambda: RAW_CITY  # noqa: E731 - the compiler modules read their raw layers from the citywide cache
-    kk = {n: _kk_cached(n) for n in KK_BASE + KK_POINTS}
+    kk = {n: None for n in KK_BASE + KK_POINTS}  # no municipal layers in Aalborg
     osm = {k: _osm_cached(k) for k in OSM_QUERIES}
-    missing = [f"kk:{n}" for n, v in kk.items() if v is None] + [f"osm:{k}" for k, v in osm.items() if v is None]
+    missing = [f"osm:{k}" for k, v in osm.items() if v is None]
     if missing:
         raise SystemExit(f"geo: missing raw layers {missing}; run --stage fetch")
     allowed = set(tiles)
@@ -433,18 +448,6 @@ def stage_geo(a, tiles, cells) -> None:
            "bikeRacks": P.bike_racks(kk["cykelstativ"], kk["dp_byinventar_l"]), "benches": P.benches(kk["baenke_borde_puma"]),
            "lights": P.lights(osm["nodes"])}
     lap("points " + str({k: len(v) for k, v in pts.items()}))
-    if (RAW_CITY / "frb" / "_status.json").exists():
-        import frb
-
-        pts, rows = frb.apply_points(pts, _osm_cached("street_nodes"))
-        sw = frb.sidewalk_rings(geo["sidewalks"])
-        geo["sidewalks"] += sw
-        rows.append({"item": "pavements (sidewalks)", "source": "GC2 stab.fortovsareal (staff schema, provenance unclear)", "count": len(sw),
-                     "note": "polygons as published; KK fortovsmatrikel is KK-only"})
-        add_substitutions(rows)
-    else:
-        log("[geo] no Frederiksberg GC2 tables yet (run --stage fetch2): Frederiksberg trees/racks/benches/pavements are missing")
-
     for key in T.GEO_LINES:
         for i, it in enumerate(geo[key]):
             L.add(T.owner_of_line(it), "roads", key, it, i)
@@ -812,6 +815,8 @@ def main(argv=None):
     ap.add_argument("--veg-rasters-only", action="store_true", help="vegetation: derive the rasters (LiDAR classes, NDVI) but do not compile yet")
     ap.add_argument("--streets-workers", type=int, default=3, help="parallel cells for the streets stage")
     ap.add_argument("--force-fetch", action="store_true", help="refetch raw source layers")
+    ap.add_argument("--osm-source", choices=("auto", "overpass", "api"), default="auto",
+                    help="OSM via Overpass, the OSM API (small areas only, osm_api.py), or Overpass with the API as fallback")
     a = ap.parse_args(argv)
     a.workers = max(1, min(6, a.workers))
     a.veg_workers = max(1, min(6, a.veg_workers))
@@ -857,4 +862,10 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
+    if os.name == "nt" and not sys.flags.utf8_mode:
+        # the compiler reads and writes its JSON with the platform default encoding (upstream ran on macOS: UTF-8); on Windows
+        # that is cp1252, which breaks æ/ø/å in the tiles. Rerun in UTF-8 mode; spawned workers inherit the flag.
+        import subprocess
+
+        sys.exit(subprocess.call([sys.executable, "-X", "utf8", *sys.argv]))
     main()

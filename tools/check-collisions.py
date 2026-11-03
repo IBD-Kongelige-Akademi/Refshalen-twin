@@ -76,12 +76,12 @@ def parse_args() -> argparse.Namespace:
 # the district ones are js/city-config.js TELEPORT_LOCATIONS.
 CITY_SPOTS = {}
 DISTRICT_SPOTS = {
-    "torv": (-77.0, -73.0, 3.14159),
-    "budolfi": (-234.0, -49.0, 3.14159),
-    "jomfru": (-157.0, -161.0, 3.14159),
-    "aalborghus": (-25.0, -263.0, 3.14159),
-    "limfjord": (52.0, -398.0, 3.14159),
-    "utzon": (266.0, -345.0, 3.14159),
+    "torv": (-186.2, -24.9, -1.79),
+    "budolfi": (-222.1, -16.1, -0.04),
+    "jomfru": (-256.4, -236.5, 2.94),
+    "aalborghus": (109.8, -126.4, -2.64),
+    "limfjord": (-313.2, -566.7, 2.62),
+    "utzon": (157.9, -165.7, 2.17),
 }
 PROBE_JS = pathlib.Path(__file__).resolve().with_name("collision-probe.js")
 COLLISION_FILES = ("city-collisions.js", "static-colliders.js", "collision-shapes.js")

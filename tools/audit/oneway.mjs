@@ -4,7 +4,7 @@
 // Cars: the road network's edges are judged against the one-way roads (static), and `tools/shoot-m2.py --oneway` runs the live
 // traffic with these same checks (carCheck). Cyclists: the lane graph is judged lane by lane, then 96 riders ride `--minutes`
 // simulated minutes and every rider-step is judged by bikeCheck (position + heading against the road data only).
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildRoadIndex, bikeCheck, edgeCheck, laneRule } from './oneway-check.mjs';
@@ -21,8 +21,30 @@ const { buildCyclistNetwork, createCyclists } = await import(pathToFileURL(resol
 const { buildRoadNetwork } = await import(pathToFileURL(resolve(engine, 'road-network.js')));
 
 const read = (p) => JSON.parse(readFileSync(resolve(root, p), 'utf8'));
-const geo = read('data/cph-geodata.json');
-applyStreets(geo, read('data/cph-streets.json'));
+// the monolithic district files when they exist, else the tiled build (build_city.py): every tile's roads layer, the citywide road
+// graph and street layout
+function loadGeo() {
+  if (existsSync(resolve(root, 'data/cph-geodata.json'))) {
+    const g = read('data/cph-geodata.json');
+    applyStreets(g, read('data/cph-streets.json'));
+    return g;
+  }
+  const index = read('data/tiles/index.json');
+  const g = { roads: [], cycleTracks: [], sidewalks: [], points: { signals: [] }, roadGraph: read('data/city/roadgraph.json'),
+    meta: read('data/city/meta.json').geodata?.meta };
+  for (const tid of Object.keys(index.tiles).sort()) {
+    const p = `data/tiles/${tid}/roads.json`;
+    if (!existsSync(resolve(root, p))) continue;
+    const d = read(p);
+    g.roads.push(...(d.roads || []));
+    g.cycleTracks.push(...(d.cycleTracks || []));
+    g.sidewalks.push(...(d.sidewalks || []));
+    g.points.signals.push(...(d['points.signals'] || []));
+  }
+  if (existsSync(resolve(root, 'data/city/streets.json'))) applyStreets(g, read('data/city/streets.json'));
+  return g;
+}
+const geo = loadGeo();
 const idx = buildRoadIndex(geo);
 const VEH = new Set(['primary', 'secondary', 'residential', 'service']);
 const vehicular = geo.roads.filter((r) => VEH.has(r.class) && r.pts?.length >= 4 && !r.drop);

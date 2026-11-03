@@ -60,16 +60,16 @@ export function setCityBounds(bbox, { frame = null } = {}) {
 /** The current playable / loaded extent as [minX, minZ, maxX, maxZ]. */
 export const getCityBounds = () => [ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ];
 
-// Teleport presets (local frame; forward is (sin h, cos h), so heading PI faces north towards the Limfjord). Positions are
-// converted from approximate map positions: snap them to the road graph centrelines once phase 2 has built the streets.
-// The scenic cameras (cameras.js) frame the same places.
+// Teleport presets (local frame; forward is (sin h, cos h), so heading PI faces north towards the Limfjord). Each lies on a link of
+// the road graph (data/city/roadgraph.json) next to the landmark's OSM position; streets face along the street, the bridge north
+// across the fjord, the buildings' presets face the building. The scenic cameras (cameras.js) frame the same places.
 const TELEPORT_LOCATIONS = {
-  torv: { name: 'Gammel Torv', sub: 'Old town · start', x: -77, z: -73, heading: Math.PI },
-  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -234, z: -49, heading: Math.PI },
-  jomfru: { name: 'Jomfru Ane Gade', sub: 'Old town · nightlife street', x: -157, z: -161, heading: Math.PI },
-  aalborghus: { name: 'Aalborghus', sub: 'Harbour front · the castle', x: -25, z: -263, heading: Math.PI },
-  limfjord: { name: 'Limfjordsbroen', sub: 'Harbour front · the bridge', x: 52, z: -398, heading: Math.PI },
-  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 266, z: -345, heading: Math.PI }
+  torv: { name: 'Gammel Torv', sub: 'Old town · start', x: -186.2, z: -24.9, heading: -1.79 },
+  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -222.1, z: -16.1, heading: -0.04 },
+  jomfru: { name: 'Jomfru Ane Gade', sub: 'Old town · nightlife street', x: -256.4, z: -236.5, heading: 2.94 },
+  aalborghus: { name: 'Aalborghus', sub: 'Harbour front · the castle', x: 109.8, z: -126.4, heading: -2.64 },
+  limfjord: { name: 'Limfjordsbroen', sub: 'Harbour front · the bridge', x: -313.2, z: -566.7, heading: 2.62 },
+  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 157.9, z: -165.7, heading: 2.17 }
 };
 
 function isTypingInField(event) {

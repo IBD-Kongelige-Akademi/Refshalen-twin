@@ -401,34 +401,32 @@ def streets_cell_job(cell: str, tids: list[str]) -> dict:
 
 
 def stage_streets(a, tiles, cells) -> None:
-    """data/city/streets.json: streets.py's measured cross-sections for the whole city (Vejkant ray casting). KK Vejkant covers
-    Koebenhavn; Frederiksberg's comes from GeoDanmark Vejkant (same type domain). Per cell, merged by ownership."""
+    """data/city/streets.json: streets.py's measured cross-sections for the whole city (Vejkant ray casting) from GeoDanmark
+    Vejkant (datagrundlag.dk, stage fetch). Per cell, merged by ownership."""
     if BC.is_done("streets") and not a.force_stage("streets"):
         return
     import multiprocessing as mp
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
     t0 = time.time()
-    BC.ensure_secrets("DATAFORDELER_USERNAME", "DATAFORDELER_PASSWORD")
     _citywide(tiles)
     vk_path = BC.WORK / "vejkant_city.json"
-    if not vk_path.exists():
-        info = S.fetch_geodk_vejkant((719500.0, 6173500.0, 724500.0, 6178500.0))  # Frederiksberg + margin
-        kk = json.loads((BC.RAW_CITY / "kk_vejkant.json").read_text())["features"]
-        frb_feats = json.loads((BC.RAW_CITY / "geodk_vejkant_frb.json").read_text())["features"]
-        from shapely.geometry import shape
-        from shapely.strtree import STRtree
-
-        tree = STRtree([shape(f["geometry"]) for f in kk])  # KK first; GeoDanmark lines only where KK has none (Frederiksberg)
-        extra = []
-        for f in frb_feats:
-            if len(tree.query(shape(f["geometry"]).buffer(1.0))) == 0:
-                geom = f["geometry"]
-                if geom["type"] == "LineString":  # the KK layer holds MultiLineStrings
-                    f = {**f, "geometry": {"type": "MultiLineString", "coordinates": [geom["coordinates"]]}}
-                extra.append(f)
-        S.atomic_write(vk_path, BC.dump({"type": "FeatureCollection", "features": kk + extra}))
-        log(f"[streets] vejkant: {len(kk)} KK + {len(extra)} GeoDanmark (Frederiksberg) lines; {info}")
+    if not vk_path.exists() or a.force_stage("streets"):
+        src = BC.DG.cache_path("geodanmark", "vejkant")
+        if not src.exists():
+            raise SystemExit("streets: no GeoDanmark Vejkant; run --stage fetch")
+        feats = []
+        for f in json.loads(src.read_text(encoding="utf-8"))["features"]:
+            geom = f["geometry"]
+            if geom is None:
+                continue
+            if geom["type"] == "LineString":  # streets.py iterates MultiLineString parts
+                geom = {"type": "MultiLineString", "coordinates": [geom["coordinates"]]}
+            p = f["properties"]
+            feats.append({"type": "Feature", "geometry": geom,
+                          "properties": {"fot_id": p.get("id_lokalid"), "vejtype": p.get("type"), "src": "geodanmark:vejkant"}})
+        S.atomic_write(vk_path, BC.dump({"type": "FeatureCollection", "features": feats}))
+        log(f"[streets] vejkant: {len(feats)} GeoDanmark lines")
     order = [c for c in sorted(cells) if (not a.cells or c in a.cells)]
     todo = [c for c in order if not BC.is_done(f"streets-cell-{c}")]
     log(f"[streets] {len(todo)} of {len(order)} cells to do, {a.streets_workers} workers")

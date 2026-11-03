@@ -308,11 +308,11 @@ class CameraSystem {
         const radius = 380.0 + Math.sin(elapsed * 0.23) * 90.0;
         const alt = 230.0 + Math.cos(elapsed * 0.19) * 60.0;
         desiredPos.set(
-          Math.cos(angle) * radius + 20.0,
+          Math.cos(angle) * radius - 120.0,
           alt,
-          Math.sin(angle) * radius - 220.0
+          Math.sin(angle) * radius - 250.0
         );
-        desiredLook.set(20.0, 10.0, -220.0);
+        desiredLook.set(-120.0, 10.0, -250.0);
         break;
       }
     }
