@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = ["requests", "shapely>=2", "pyproj", "numpy", "rasterio", "scipy", "pillow", "laspy[lazrs]", "pyshp",
-#                 "geopandas", "pyogrio", "duckdb"]
+#                 "geopandas", "pyogrio", "duckdb", "mapbox-earcut"]
 # ///
 """Citywide compiler (milestone C1/C5 of docs/citywide-plan.md): Aalborg Kommune (the tiles of data/city/tiles.json) -> 500 m tiles.
 
@@ -798,7 +798,7 @@ def stage_index(a, tiles, cells) -> None:
     log(f"[index] {len(idx_tiles)} tiles, {total / 1e6:.1f} MB; meta.json {(CITY_DIR / 'meta.json').stat().st_size / 1e6:.2f} MB")
 
 
-STAGES = ["fetch", "fetch2", "buildings0", "geo", "cells", "surfaces", "furniture", "groundfloor", "streets", "entrances", "cellsinput", "vegetation", "lod2", "index", "report"]
+STAGES = ["fetch", "fetch2", "buildings0", "geo", "cells", "surfaces", "furniture", "groundfloor", "streets", "entrances", "vegetation", "lod2", "index", "report"]
 
 
 def main(argv=None):
@@ -843,7 +843,7 @@ def main(argv=None):
             import city_layers
 
             getattr(city_layers, f"stage_{s}")(a, tiles, cells)
-        elif s in ("entrances", "vegetation", "cellsinput", "lod2"):
+        elif s in ("entrances", "vegetation", "lod2"):
             import city_layers2
 
             getattr(city_layers2, f"stage_{s}")(a, tiles, cells)

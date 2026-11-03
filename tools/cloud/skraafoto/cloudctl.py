@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Operate the cph-skraafoto Cloud Run Job (REST + ADC, like tools/cloud/roofer/cloudctl.py, whose helpers and infra it reuses unmodified).
+"""Operate the cph-skraafoto Cloud Run Job (REST + ADC; the shared helpers and infra are tools/cloud/gcp.py).
 
     python3 tools/cloud/skraafoto/cloudctl.py build                       # stage -> Cloud Build -> image digest
     python3 tools/cloud/skraafoto/cloudctl.py inputs                      # data/tiles/*/{buildings,terrain,streets,lod2}.json + lod2.bin + index.json + data/cph-geodata.json -> gs://.../skraafoto/input
@@ -28,9 +28,9 @@ import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-_spec = importlib.util.spec_from_file_location("roofer_cloudctl", ROOT / "tools/cloud/roofer/cloudctl.py")
+_spec = importlib.util.spec_from_file_location("gcp", ROOT / "tools/cloud/gcp.py")
 R = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(R)  # shared helpers only: token, call, gcs_*, wait_op, constants (the roofer job is never touched)
+_spec.loader.exec_module(R)  # shared helpers: token, call, gcs_*, wait_op, cmd_infra, constants
 
 JOB, IMAGE_NAME, P = "cph-skraafoto", "cph-skraafoto", "skraafoto/"
 CPU, MEM, TIMEOUT, RETRIES = "4", "16Gi", "10800s", 1

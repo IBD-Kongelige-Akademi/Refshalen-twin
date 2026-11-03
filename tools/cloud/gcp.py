@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
-"""Operate the cph-roofer Cloud Run Job with REST + Application Default Credentials (the gcloud CLI is not used).
+"""Google Cloud helpers over REST + Application Default Credentials (the gcloud CLI is not used): token, call, gcs_*, wait_op,
+cmd_infra (bucket + Artifact Registry repo) and the project constants (TWIN_GCP_PROJECT, TWIN_GCS_BUCKET, ...).
 
-    python3 tools/cloud/roofer/cloudctl.py infra                # bucket (lifecycle, labels) + Artifact Registry repo: idempotent
-    python3 tools/cloud/roofer/cloudctl.py build                # stage context -> GCS -> Cloud Build (linux/amd64) -> prints the image digest
-    python3 tools/cloud/roofer/cloudctl.py inputs               # data/city/cells-input/*.json -> gs://.../cells-input + config/cells.txt
-    python3 tools/cloud/roofer/cloudctl.py deploy [--digest sha256:...]   # create/update the job
-    python3 tools/cloud/roofer/cloudctl.py run [--cells 6176_723 ...] [--force]   (parallelism is set by `deploy --parallelism N`)
-    python3 tools/cloud/roofer/cloudctl.py status [EXECUTION]   # task counts of the last (or given) execution
-    python3 tools/cloud/roofer/cloudctl.py report               # DONE / FAILED markers: counts, task-hours, LAZ sources (R2 vs published)
-    python3 tools/cloud/roofer/cloudctl.py sync [--cells ...]   # cells/<cell>/{manifest.json,out,veg} -> data/raw/lod2-out, data/raw/veg
-    python3 tools/cloud/roofer/cloudctl.py cancel               # cancel running executions of the job
-    python3 tools/cloud/roofer/cloudctl.py delete --yes         # job, repo, bucket (with its objects)
+tools/cloud/skraafoto/cloudctl.py loads this file for them. It began as the cloudctl of upstream's roofer job (point cloud ->
+LoD2), which the Aalborg twin dropped in phase 2b (the LoD2 model comes as CityJSON, tools/lod2/from_cityjson.py); the
+roofer-specific commands below (build, inputs, deploy, run, sync, ...) have no job to run any more.
 """
 from __future__ import annotations
 
@@ -28,7 +22,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
+ROOT = Path(__file__).resolve().parents[2]
 PROJECT = os.environ.get("TWIN_GCP_PROJECT", "")  # your Google Cloud project (and its number below)
 REGION = "europe-west1"
 BUCKET = os.environ.get("TWIN_GCS_BUCKET", "")

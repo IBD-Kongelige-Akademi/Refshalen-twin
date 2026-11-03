@@ -173,7 +173,7 @@ function describeBuilding(b, lod2Info = null) {
     conf: b.conf,
     confFields: conf,
     src: b.src,
-    roofSource: lod2Info?.conf === 'measured' ? `LoD2.2 from the ${lod2Info.scan_date} point cloud${lod2Info.roof_type ? ` (${lod2Info.roof_type})` : ''}` : (lod2Info?.reason ? `flat extrusion (${lod2Info.reason})` : null),
+    roofSource: lod2Info?.conf === 'measured' ? `LoD2.2 ${lod2Info.scan_date ? `from the ${lod2Info.scan_date} point cloud` : 'model'}${lod2Info.roof_type ? ` (${lod2Info.roof_type})` : ''}${lod2Info.rmse != null ? `, fit ${lod2Info.rmse.toFixed(2)} m` : ''}` : (lod2Info?.reason ? `flat extrusion (${lod2Info.reason})` : null),
     heightText: Number.isFinite(b.eave) ? `${metres(b.eave - b.ground)} to eave${b.ridge > b.eave + 0.3 ? `, ${metres(b.ridge - b.ground)} to ridge` : ''}` : 'unknown'
   };
 }

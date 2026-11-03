@@ -67,6 +67,35 @@ def building_coverage(tiles: dict) -> dict:
             "by_kommune": {k: {"geodanmark": inside[k], "missing": miss[k]} for k in inside}, "heights": dict(heights)}
 
 
+def lod2_coverage(tiles: dict) -> dict:
+    """Measured / rejected / missing LoD2 records over the compiled buildings, rejection reasons (grouped), roof fit."""
+    import re
+
+    compiled = measured = inferred = closed = 0
+    reasons, rmse = Counter(), []
+    for tid in tiles:
+        p, q = BC.TILES_DIR / tid / "buildings.json", BC.TILES_DIR / tid / "lod2.json"
+        if p.exists():
+            compiled += len(json.loads(p.read_text())["buildings"])
+        if not q.exists():
+            continue
+        for e in json.loads(q.read_text())["buildings"].values():
+            if "offset" in e:
+                measured += 1
+                closed += bool(e.get("closed"))
+                if e.get("rmse") is not None:
+                    rmse.append(e["rmse"])
+            else:
+                inferred += 1
+                reasons[re.sub(r"\d+(\.\d+)?%", "N%", e.get("reason") or "?")] += 1
+    if not measured and not inferred:
+        return {}
+    rmse.sort()
+    pct = lambda q: rmse[min(len(rmse) - 1, int(q * len(rmse)))] if rmse else 0.0  # noqa: E731
+    return {"compiled": compiled, "measured": measured, "inferred": inferred, "none": compiled - measured - inferred, "closed": closed,
+            "reasons": reasons.most_common(5), "rmse_p50": pct(0.5), "rmse_p90": pct(0.9)}
+
+
 def graph_stats(g: dict) -> dict:
     import roadgraph as RG
 
@@ -173,6 +202,18 @@ def write_report(tiles: dict, cells: dict) -> None:
             w(f"- Footprint source: GeoDanmark Bygning {b0.get('geodanmark_in_tiles', 0):,} in the tiles, joined to BBR bygning "
               f"(bbruuid = id_lokalid, {b0.get('bbr_records', 0):,} BBR records of kommune {BC.KOMMUNE}); "
               f"{b0.get('geodanmark_without_bbr', 0):,} footprints have no BBR record. BBR status of the matches: {b0.get('bbr_status', {})}.")
+        w("")
+    lc = lod2_coverage(tiles)
+    if lc:
+        w("## LoD2 roofs (`lod2` layer)\n")
+        tot = max(1, lc["compiled"])
+        w(f"- Of {lc['compiled']:,} compiled buildings: **{lc['measured']:,} ({100 * lc['measured'] / tot:.1f} %) have a measured LoD2.2 roof and walls**, "
+          f"{lc['inferred']:,} have a model that the quality gate rejected, {lc['none']:,} have no model; all of these keep the extruded "
+          f"flat / eave-ridge roof.")
+        if lc["reasons"]:
+            w("- Rejected: " + "; ".join(f"{k} ({v:,})" for k, v in lc["reasons"]))
+        w(f"- Roof fit (mesh error of the LoD2.2 surface to the points): median {lc['rmse_p50']:.2f} m, 90th percentile {lc['rmse_p90']:.2f} m; "
+          f"closed solids {lc['closed']:,} of {lc['measured']:,}.")
         w("")
     rg = BC.CITY_DIR / "roadgraph.json"
     if rg.exists():

@@ -35,7 +35,7 @@ A case-insensitive grep for `copenhagen` still finds about 80 files. These are k
 | What | Goes in |
 |---|---|
 | KK / Frederiksberg fetchers and KK WFS layers in `tools/geodata` (`build_city.py`, `city_sources.py`, `city_layers*.py`, `furniture.py`, `surfaces.py`, `entrances.py`, `city_tiles.py` DAGI) | phases 2, 3, 5 and 6 (datagrundlag.dk) |
-| roofer / point-cloud LoD2 path (`tools/cloud/roofer`, `tools/lod2/run.py`) and its README with the author's GCP resources | phase 2b |
+| ~~roofer / point-cloud LoD2 path~~ | done in phase 2b (docs/aalborg-phase2.md) |
 | Copenhagen-only scenery: `bridge-dlb*`, `goboat*`, `swan-*`, Irma sign, `lake-furniture.js`, Søerne lakes and water override, Københavnerfortov paving, hero loader (`hero-cache.js`, `heroesEnabled`) | phase 4 |
 | `index.html` credits, the rest of the README, `tools/shoot-m2.py` camera views, `CITY_TELEPORT_LOCATIONS` | phase 4 |
 | Comments ("Copenhagen's short links…") and identifiers (`CPH_FRAME`, `CopenhagenGround`, `cph-*` data format ids) | kept: renaming them buys nothing and makes upstream cherry-picks harder |

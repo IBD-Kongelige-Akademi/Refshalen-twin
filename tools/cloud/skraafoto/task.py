@@ -34,7 +34,7 @@ sys.path.insert(0, str(APP / "tools" / "geodata"))
 
 from google.cloud import storage  # noqa: E402
 
-BUCKET = os.environ.get("BUCKET", "")  # set on the Cloud Run job (tools/cloud/roofer/cloudctl.py TWIN_GCS_BUCKET)
+BUCKET = os.environ.get("BUCKET", "")  # set on the Cloud Run job (tools/cloud/gcp.py TWIN_GCS_BUCKET)
 P = "skraafoto/"
 bkt = storage.Client().bucket(BUCKET)
 WORK = Path(os.environ["APPEARANCE_WORK"])
