@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { readFileSync, readdirSync, existsSync } = require('node:fs');
-const { join, normalize } = require('node:path');
+const { join, posix } = require('node:path');
 const test = require('node:test');
 const { loadModule } = require('./helpers/module.cjs');
 
@@ -21,7 +21,7 @@ function reachable() {
     seen.add(file);
     const source = read(file);
     for (const m of source.matchAll(/(?:\bfrom\s*|\bimport\s*\(\s*|^\s*import\s*|\bnew\s+URL\(\s*)['"](\.[^'"]+)['"]/gm)) {
-      visit(normalize(join('js', m[1])));
+      visit(posix.normalize(posix.join('js', m[1])));
     }
   };
   visit('js/main.js');

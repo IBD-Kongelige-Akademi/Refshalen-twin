@@ -6,10 +6,10 @@ import { buildLakeArrays, inLake } from '../js/lakes-cph.js';
 import { createTerrain, FLAT_TERRAIN } from '../js/terrain-cph.js';
 
 const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
-const geo = read('../data/cph-geodata.json');
-const lakes = read('../data/cph-lakes.json');
-const furniture = read('../data/cph-furniture.json');
-const terrain = createTerrain(read('../data/cph-terrain.json'));
+const geo = read('./fixtures/cph/cph-geodata.json');
+const lakes = read('./fixtures/cph/cph-lakes.json');
+const furniture = read('./fixtures/cph/cph-furniture.json');
+const terrain = createTerrain(read('./fixtures/cph/cph-terrain.json'));
 
 function cross(a, b, c) {
   const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];

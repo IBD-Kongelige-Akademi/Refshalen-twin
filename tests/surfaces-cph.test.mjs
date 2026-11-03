@@ -82,7 +82,7 @@ test('polygon holes are carved out by the triangulation', () => {
 });
 
 test('every KK register surface and marking triangulates to its polygon area (+-0.5%)', () => {
-  const doc = JSON.parse(readFileSync(new URL('../data/cph-surfaces.json', import.meta.url), 'utf8'));
+  const doc = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-surfaces.json', import.meta.url), 'utf8'));
   let withHoles = 0;
   const bad = [];
   for (const s of [...doc.surfaces, ...doc.markings]) {

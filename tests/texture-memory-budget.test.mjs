@@ -6,7 +6,7 @@ import { replayPhotoLoop, tierReversals, tierOscillations } from './helpers/phot
 
 const readJson = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const budget = readJson('../tools/perf/texture-memory-budget.json');
-const geodata = readJson('../data/cph-geodata.json');
+const geodata = readJson('./fixtures/cph/cph-geodata.json');
 
 function ringCentre(ring) {
   let x = 0;

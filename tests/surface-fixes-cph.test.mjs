@@ -6,8 +6,8 @@ import { findMouths } from '../js/junction-mouths-cph.js';
 import { createBuildingEdgeIndex, facadeStrips } from '../js/pavement-cph.js';
 import { pointInRing } from '../js/polygon-cph.js';
 
-const geoReal = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
-const surfaces = JSON.parse(readFileSync(new URL('../data/cph-surfaces.json', import.meta.url), 'utf8'));
+const geoReal = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
+const surfaces = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-surfaces.json', import.meta.url), 'utf8'));
 
 // A through road along x with a vertex at the origin, a side street leaving it to the south (right of travel)
 const mk = (id, cls, pts, extra = {}) => ({ id, name: id, class: cls, pts, width: 8, lanesFwd: 1, lanesBack: 1, oneway: false, cycleTrack: 'none', ...extra });

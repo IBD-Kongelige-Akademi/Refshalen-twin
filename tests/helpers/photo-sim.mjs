@@ -20,7 +20,7 @@ let districtCache = null;
 /** The district's photo candidates (data/cph-geodata.json), as tests/texture-memory-budget.test.mjs builds them. */
 export function districtCandidates() {
   if (districtCache) return districtCache;
-  const geodata = readJson('../../data/cph-geodata.json');
+  const geodata = readJson('../fixtures/cph/cph-geodata.json');
   districtCache = geodata.buildings
     .filter((b) => b.wall_material !== 'glas' && b.ring?.length >= 6 && b.observed?.atlas?.size && b.observed?.atlas?.walls?.length)
     .map((b) => {

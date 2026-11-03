@@ -100,8 +100,8 @@ test('turns at a junction respect the directions: a rider cannot leave a one-way
 });
 
 // ---- the real district ---------------------------------------------------------------------------------------------------------
-const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
-applyStreets(geo, JSON.parse(readFileSync(new URL('../data/cph-streets.json', import.meta.url), 'utf8')));
+const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
+applyStreets(geo, JSON.parse(readFileSync(new URL('./fixtures/cph/cph-streets.json', import.meta.url), 'utf8')));
 const idx = buildRoadIndex(geo);
 const log = console.info;
 

@@ -27,8 +27,8 @@ test('default mixes are probability vectors and the pick is stable', () => {
 });
 
 test('real data: the Soerne avenues are lime / horse chestnut, no tree stays generic, every genus has a style', () => {
-  const fur = read('../data/cph-furniture.json');
-  const lakes = read('../data/cph-lakes.json');
+  const fur = read('./fixtures/cph/cph-furniture.json');
+  const lakes = read('./fixtures/cph/cph-lakes.json');
   const field = groundField(lakes, []);
   const lakeDistance = lakeDistanceFrom(field);
   const plan = mapTrees(fur.trees, null, { resolve: (t) => resolveGenus(t, { lakeDistance }) });

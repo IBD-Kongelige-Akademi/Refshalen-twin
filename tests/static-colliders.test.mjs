@@ -171,7 +171,7 @@ test('dedup state and order belong to each static index, even when they share co
 });
 
 test('the real Copenhagen building layer indexes the reported building without scanning the city', () => {
-  const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
+  const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
   const colliders = buildStaticColliders(geo);
   assert.ok(colliders.length > 2000, `real building count was ${colliders.length}`);
   const target = colliders.find((item) => item.id === 'building:gdk:1064712244');
@@ -187,8 +187,8 @@ test('the real Copenhagen building layer indexes the reported building without s
 });
 
 test('real terrain collider bottoms match the rendered cleaned building wall skirt', () => {
-  const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
-  const terrain = createTerrain(JSON.parse(readFileSync(new URL('../data/cph-terrain.json', import.meta.url), 'utf8')));
+  const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
+  const terrain = createTerrain(JSON.parse(readFileSync(new URL('./fixtures/cph/cph-terrain.json', import.meta.url), 'utf8')));
   const building = geo.buildings.find((item) => item.id === 'gdk:1064716175');
   assert.ok(building, 'the fixture retains the surveyed Copenhagen outline that exposed the cleanup difference');
 

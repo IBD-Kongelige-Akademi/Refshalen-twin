@@ -105,8 +105,8 @@ test('kerb frame: pavement behind a strip starts after the strip, elsewhere at t
 });
 
 test('the shipped layout: one cross-section, pavements clear of the carriageway', () => {
-  const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
-  const doc = JSON.parse(readFileSync(new URL('../data/cph-streets.json', import.meta.url), 'utf8'));
+  const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
+  const doc = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-streets.json', import.meta.url), 'utf8'));
   const st = applyStreets(geo, doc);
   assert.ok(st.roads > 900 && st.dropped > 10 && st.nodes > 500);
   const veh = geo.roads.filter((r) => r.cs && !r.drop);
@@ -142,8 +142,8 @@ test('applyStreets resolves footprint errors: drops, clips (older loses the over
 });
 
 test('the shipped layout: no overlapping footprints, nothing in the lake, no surface over a carriageway', () => {
-  const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
-  const doc = JSON.parse(readFileSync(new URL('../data/cph-streets.json', import.meta.url), 'utf8'));
+  const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
+  const doc = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-streets.json', import.meta.url), 'utf8'));
   const n0 = geo.buildings.length;
   const st = applyStreets(geo, doc);
   assert.equal(geo.buildings.length, n0 - st.buildingsDropped + (doc.buildings.clip.reduce((a, c) => a + c.pieces.length - 1, 0)));

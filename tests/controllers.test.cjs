@@ -16,7 +16,7 @@ test.before(async () => {
     import('../js/swan-navigation.js'), import('../js/collision-shapes.js'), import('../js/static-colliders.js')
   ]);
   goBoatNavigationModule = await import('../js/goboat-navigation.js');
-  cphLakes = JSON.parse(readFileSync(join(__dirname, '../data/cph-lakes.json'), 'utf8'));
+  cphLakes = JSON.parse(readFileSync(join(__dirname, './fixtures/cph/cph-lakes.json'), 'utf8'));
 });
 
 function eventTarget() {

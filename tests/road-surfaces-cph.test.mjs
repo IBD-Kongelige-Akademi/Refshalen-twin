@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildRoadSurfaceArrays, ROAD_PAINT } from '../js/road-surfaces-cph.js';
 
-const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
+const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
 
 test('road surface geometry is finite and inside the district', () => {
   const layers = buildRoadSurfaceArrays(geo);

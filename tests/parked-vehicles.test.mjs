@@ -33,7 +33,7 @@ test('parked near and far cars contain no taxi signs or shared taxi material', (
 });
 
 test('Ravnsborggade keeps at least 60% of its bays occupied after instancing and both LODs', () => {
-  const read = (name) => JSON.parse(readFileSync(new URL(`../data/${name}.json`, import.meta.url)));
+  const read = (name) => JSON.parse(readFileSync(new URL(`./fixtures/cph/${name}.json`, import.meta.url)));
   const geo = read('cph-geodata');
   applyStreets(geo, read('cph-streets'));
   const roads = createRoadIndex(geo), zones = createZoneMap({ geo, lakes: read('cph-lakes'), surfaces: read('cph-surfaces') });

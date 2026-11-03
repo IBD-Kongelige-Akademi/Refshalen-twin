@@ -5,7 +5,7 @@ import { buildRoadNetwork } from '../js/road-network.js';
 import { buildCyclistNetwork, createCyclists, lanePoint } from '../js/cyclist-network.js';
 import { bikePhase, vehiclePhase, walkPhase, signalOffset, CYCLE, GREEN, BIKE_LEAD } from '../js/signal-plan.js';
 
-const geo = JSON.parse(readFileSync(new URL('../data/cph-geodata.json', import.meta.url), 'utf8'));
+const geo = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url), 'utf8'));
 const log = console.info;
 console.info = () => {};
 const network = buildRoadNetwork(geo.points.signals, { cph: true, roadGraph: geo.roadGraph });

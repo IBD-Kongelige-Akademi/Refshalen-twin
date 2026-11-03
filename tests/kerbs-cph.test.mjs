@@ -10,8 +10,8 @@ import { kerbIntrusions, classify } from '../tools/audit/kerbs-lib.mjs';
 
 const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
 const realGeo = () => {
-  const geo = read('../data/cph-geodata.json');
-  applyStreets(geo, read('../data/cph-streets.json'));
+  const geo = read('./fixtures/cph/cph-geodata.json');
+  applyStreets(geo, read('./fixtures/cph/cph-streets.json'));
   return geo;
 };
 const mk = (id, cls, pts, extra = {}) => ({ id, name: id, class: cls, pts, width: 8, lanesFwd: 1, lanesBack: 1, oneway: false, cycleTrack: 'none', ...extra });

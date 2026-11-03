@@ -233,10 +233,10 @@ test('the shipped furniture, placed on the shipped layout, has no item on the wr
   const { readFileSync } = await import('node:fs');
   const { applyStreets } = await import('../js/layout-cph.js');
   const read = (p) => JSON.parse(readFileSync(new URL(`../${p}`, import.meta.url), 'utf8'));
-  const geo = read('data/cph-geodata.json');
-  applyStreets(geo, read('data/cph-streets.json'));
-  const zones = createZoneMap({ geo, lakes: read('data/cph-lakes.json'), surfaces: null });
-  const { doc, report } = placeFurniture(read('data/cph-furniture.json'), { zones, geo });
+  const geo = read('tests/fixtures/cph/cph-geodata.json');
+  applyStreets(geo, read('tests/fixtures/cph/cph-streets.json'));
+  const zones = createZoneMap({ geo, lakes: read('tests/fixtures/cph/cph-lakes.json'), surfaces: null });
+  const { doc, report } = placeFurniture(read('tests/fixtures/cph/cph-furniture.json'), { zones, geo });
   assert.ok(doc.parkingBays.length > 1000 && doc.trees.length > 4500);
   assert.ok(doc.streetBikes.length > 500, 'the real facade network receives clustered street parking');
   for (const bike of doc.streetBikes) {

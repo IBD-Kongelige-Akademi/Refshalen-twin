@@ -10,7 +10,7 @@ test.before(async () => {
   ({ TELEPORT_LOCATIONS, ISLAND_BOUNDS } = await import('../js/city-config.js'));
   ({ CITY_TELEPORT_LOCATIONS } = await import('../js/city-teleports.js'));
   swanNavigationModule = await import('../js/swan-navigation.js');
-  lakeDoc = JSON.parse(read('data/cph-lakes.json'));
+  lakeDoc = JSON.parse(read('tests/fixtures/cph/cph-lakes.json'));
 });
 
 // Distance from (x, z) to the nearest roadGraph link carrying `name`
@@ -69,7 +69,7 @@ test('the citywide presets are finite, hidden until a tile covers them, and lie 
 });
 
 test('street teleports land on the street they name', () => {
-  const geo = JSON.parse(read('data/cph-geodata.json'));
+  const geo = JSON.parse(read('tests/fixtures/cph/cph-geodata.json'));
   const streets = {
     dlb: 'Dronning Louises Bro', peblinge: 'Peblinge Dossering', nbro: 'Nørrebrogade', blaag: 'Blågårds Plads'
   };

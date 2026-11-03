@@ -27,8 +27,8 @@ test('benches and rescue posts face the water, lake lights face the path', () =>
 
 test('real data: most benches within 9 m of the Soerne face the water after alignment', () => {
   const read = (p) => JSON.parse(readFileSync(new URL(p, import.meta.url), 'utf8'));
-  const fur = read('../data/cph-furniture.json');
-  const d = lakeDistanceFrom(groundField(read('../data/cph-lakes.json'), []));
+  const fur = read('./fixtures/cph/cph-furniture.json');
+  const d = lakeDistanceFrom(groundField(read('./fixtures/cph/cph-lakes.json'), []));
   const plan = buildFurniturePlan(fur, null);
   const c = alignLakeFurniture(plan, d);
   assert.ok(c.benches > 30 && c.lakeLights > 100, JSON.stringify(c));

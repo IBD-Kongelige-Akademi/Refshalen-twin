@@ -52,7 +52,7 @@ test('light assignment: the nearest lamps get the real lights, capped, stable, n
 });
 
 test('real data: every lamp class has a sensible pool, wire lamps hang higher than lake lights', () => {
-  const fur = JSON.parse(readFileSync(new URL('../data/cph-furniture.json', import.meta.url), 'utf8'));
+  const fur = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-furniture.json', import.meta.url), 'utf8'));
   const lamps = mapLamps(fur.lamps, null);
   const photos = lamps.map(lampPhotometry);
   assert.ok(photos.every((p) => p.lux > 1 && p.lux < 60 && p.radius >= 1.5 && p.radius <= 18), 'pools within range');

@@ -135,7 +135,7 @@ test('quadtree index returns the items within a radius', () => {
   assert.equal(near.length, brute.length);
 });
 
-const FURNITURE = new URL('../data/cph-furniture.json', import.meta.url);
+const FURNITURE = new URL('./fixtures/cph/cph-furniture.json', import.meta.url);
 test('the compiled data maps to a plan with the expected categories and provenance', { skip: !existsSync(FURNITURE) }, () => {
   const doc = JSON.parse(readFileSync(FURNITURE, 'utf8'));
   assert.ok(doc.version.startsWith('cph-furniture/'));

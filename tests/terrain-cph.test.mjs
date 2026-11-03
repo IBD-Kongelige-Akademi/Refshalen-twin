@@ -130,7 +130,7 @@ test('buildings take the terrain ground; eave and ridge stay the measured absolu
 });
 
 test('the shipped terrain agrees with the DHM terrain model at open spots (checked against the source rasters)', () => {
-  const t = createTerrain(JSON.parse(readFileSync(new URL('../data/cph-terrain.json', import.meta.url), 'utf8')));
+  const t = createTerrain(JSON.parse(readFileSync(new URL('./fixtures/cph/cph-terrain.json', import.meta.url), 'utf8')));
   // local (x, z) on road centrelines -> mean of the 4 x 4 source pixels around it (rasterio over
   // data/raw/dhm_dtm_*.tif, minus the origin height 6.84)
   for (const [x, z, h] of [[148.9, 291.73, 0.21], [451.46, -365.13, 1.85], [-55.37, 141.94, -0.35], [273.13, -70.14, 0.98], [215.78, 423.38, 1.71]]) {

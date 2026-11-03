@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { WATER, extendBeyondBbox, buildLakeArrays, groundWithHoles, inLake, shoreDistanceField, applySurfaceCuts } from '../js/lakes-cph.js';
 import { trianglesArea, ringArea } from '../js/polygon-cph.js';
 
-const doc = JSON.parse(readFileSync(new URL('../data/cph-lakes.json', import.meta.url), 'utf8'));
+const doc = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-lakes.json', import.meta.url), 'utf8'));
 const BBOX = [-750, -750, 750, 750];
 // a 40 x 40 lake (counter-clockwise seen from above: negative shoelace in x/z)
 const SQUARE = { lakes: [{ id: 't', ring: [0, 0, 0, 40, 40, 40, 40, 0] }] };
@@ -104,7 +104,7 @@ test('surface cuts replace or drop surface polygons', () => {
 
 // ---- water level / terrain consistency (data/cph-terrain.json + data/cph-lakes.json) ----
 import { createTerrain } from '../js/terrain-cph.js';
-const terrainDoc = JSON.parse(readFileSync(new URL('../data/cph-terrain.json', import.meta.url), 'utf8'));
+const terrainDoc = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-terrain.json', import.meta.url), 'utf8'));
 const realTerrain = createTerrain(terrainDoc);
 
 test('Sortedams Sø and Peblinge Sø are separate basins with their own measured level (0.84 m apart)', () => {

@@ -8,7 +8,7 @@ import { treeCapacities, originalTreeBudget, selectTreeDraws, treeVertexBufferCo
 import { groundField, lakeDistanceFrom } from '../js/ground-field-cph.js';
 import { loadTreeGeometry, loadTreeShadow } from './helpers/tree-geometry.cjs';
 
-const read = name => JSON.parse(readFileSync(new URL(`../data/${name}.json`, import.meta.url)));
+const read = name => JSON.parse(readFileSync(new URL(`./fixtures/cph/${name}.json`, import.meta.url)));
 const doc = read('cph-furniture');
 const T = loadTreeGeometry(data, season);
 const median = values => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];

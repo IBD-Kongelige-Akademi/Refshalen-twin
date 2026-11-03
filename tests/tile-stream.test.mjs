@@ -336,7 +336,7 @@ test('district: streamed terrain equals the monolithic grid; per-tile road surfa
   const data = createTileData({ index: store.index, meta: city.meta, streets: city.streets, lakes: city.lakes, geo, roadsByTile, terrain });
   for (const id of tiles) for (const layer of ['buildings', 'terrain', 'surfaces', 'vegetation']) data.setLayer(id, layer, await store.fetchLayer(id, layer));
 
-  const mono = JSON.parse(fs.readFileSync(path.join(ROOT, 'data/cph-terrain.json'), 'utf8'));
+  const mono = JSON.parse(fs.readFileSync(path.join(ROOT, 'tests/fixtures/cph/cph-terrain.json'), 'utf8'));
   const ref = createTerrain(mono);
   for (let i = 0; i < 400; i++) {
     const x = ((i * 7919) % 1700) - 850;

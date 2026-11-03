@@ -3,7 +3,7 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { createWalkSpace } from '../js/walk-space-cph.js';
 
-const lakes = JSON.parse(readFileSync(new URL('../data/cph-lakes.json', import.meta.url), 'utf8'));
+const lakes = JSON.parse(readFileSync(new URL('./fixtures/cph/cph-lakes.json', import.meta.url), 'utf8'));
 const ringCentre = (ring) => {
   let x = 0, z = 0;
   for (let i = 0; i < ring.length; i += 2) { x += ring[i]; z += ring[i + 1]; }

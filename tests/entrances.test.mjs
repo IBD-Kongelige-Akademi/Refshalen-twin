@@ -76,10 +76,10 @@ test('addDoors makes closed boxes with outward normals and the door height', () 
   assert.ok(Math.min(...ys) >= 0);
 });
 
-const REAL = fs.existsSync(new URL('../data/cph-entrances.json', import.meta.url)) && fs.existsSync(new URL('../data/cph-geodata.json', import.meta.url));
+const REAL = fs.existsSync(new URL('./fixtures/cph/cph-entrances.json', import.meta.url)) && fs.existsSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url));
 test('real data: engine door count matches the data and NS37 doors are on courtyard walls only', { skip: !REAL }, () => {
-  const geo = JSON.parse(fs.readFileSync(new URL('../data/cph-geodata.json', import.meta.url)));
-  const doc = JSON.parse(fs.readFileSync(new URL('../data/cph-entrances.json', import.meta.url)));
+  const geo = JSON.parse(fs.readFileSync(new URL('./fixtures/cph/cph-geodata.json', import.meta.url)));
+  const doc = JSON.parse(fs.readFileSync(new URL('./fixtures/cph/cph-entrances.json', import.meta.url)));
   const index = createEntranceIndex(doc);
   const ground = createContext({ roads: geo.roads, buildings: geo.buildings, venues: [], entrances: index });
   let placed = 0;
