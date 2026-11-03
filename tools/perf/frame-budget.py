@@ -8,6 +8,7 @@ import argparse
 import functools
 import http.server
 import json
+import os
 from pathlib import Path
 import subprocess
 import threading
@@ -18,7 +19,7 @@ from playwright.sync_api import sync_playwright
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument('--data', default='https://pub-d3c994d177d048d5b64ecfc3df496b48.r2.dev')
+    ap.add_argument('--data', default=os.environ.get('DATA_URL', './data'), help='data base URL (default: $DATA_URL, else the local ./data)')
     ap.add_argument('--query', default='')
     ap.add_argument('--out', default='.context/fps/current')
     ap.add_argument('--baseline-ref', default=None)

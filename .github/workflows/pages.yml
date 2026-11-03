@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   deploy:
+    # Nothing to publish until the packed Aalborg data has a host: set the repository variable DATA_URL (phase 7)
+    if: ${{ vars.DATA_URL != '' }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -27,22 +29,17 @@ jobs:
         uses: actions/configure-pages@v5
       - name: Stage site files
         env:
-          # Citywide data (tiles, city, facade atlases) lives on Cloudflare R2, not in the Pages artifact (1 GB limit), packed
-          # (tools/hosting/build_packs.py, upload_packs.py): manifest.json (no-cache) + content-hashed packs, so republishing only
-          # replaces the manifest and no version prefix is needed. Override with the repository variable CPH_DATA_URL.
-          CPH_DATA_URL: ${{ vars.CPH_DATA_URL || 'https://pub-d3c994d177d048d5b64ecfc3df496b48.r2.dev' }}
+          # Citywide data (tiles, city, facade atlases) lives on a static host with HTTP Range (Cloudflare R2 with a custom domain),
+          # not in the Pages artifact (1 GB limit), packed (tools/hosting/build_packs.py, upload_packs.py): manifest.json (no-cache)
+          # + content-hashed packs, so republishing only replaces the manifest and no version prefix is needed.
+          DATA_URL: ${{ vars.DATA_URL }}
         run: |
           set -euo pipefail
-          mkdir -p _site/data
+          mkdir -p _site
           cp index.html _site/
           cp -R css js _site/
-          # The citywide boot reads everything through js/data-config.js (R2, packed). The monolithic district files under ./data
-          # are what the engine falls back to when the tile index is unreachable (or ?debug=notiles): keep publishing the
-          # tracked JSON documents and the district LoD2 roofs (small). The facade atlases (data/tex-look) come from R2.
-          cp data/*.json _site/data/
-          cp -R data/lod2 _site/data/
-          # point the engine's data base (js/data-config.js BUILD_DATA_BASE) at R2
-          sed -i "s|^export const BUILD_DATA_BASE = .*|export const BUILD_DATA_BASE = '${CPH_DATA_URL%/}';|" _site/js/data-config.js
+          # Pages serves code only: the engine reads everything through js/data-config.js; point its data base at DATA_URL
+          sed -i "s|^export const BUILD_DATA_BASE = .*|export const BUILD_DATA_BASE = '${DATA_URL%/}';|" _site/js/data-config.js
           grep -q "BUILD_DATA_BASE = 'https://" _site/js/data-config.js
           touch _site/.nojekyll
       - name: Upload Pages artifact

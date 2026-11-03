@@ -26,7 +26,7 @@ Pipeline (all resumable: every step writes a done marker under the work dir, `--
                      raw images and the JPEG intermediate are deleted per cell. Atlas descriptors are merged into appearance.json.
   report             data/city/appearance-coverage.md + QA contact sheet.
 
-    export GSEARCH_TOKEN="$(tools/adc-secret.sh gsearch-token)"
+    # GSEARCH_TOKEN from the environment or .env (envsecret.py, .env.example)
     uv run tools/cph-geodata/appearance_city.py tones all --workers 4
 """
 from __future__ import annotations

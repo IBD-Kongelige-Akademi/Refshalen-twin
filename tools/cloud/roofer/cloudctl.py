@@ -18,6 +18,7 @@ import argparse
 import concurrent.futures as cf
 import io
 import json
+import os
 import subprocess
 import sys
 import tarfile
@@ -28,17 +29,16 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-PROJECT = "lun-integrations-dev"
-PROJECT_NUMBER = "368722833767"
+PROJECT = os.environ.get("TWIN_GCP_PROJECT", "")  # your Google Cloud project (and its number below)
 REGION = "europe-west1"
-BUCKET = "lun-integrations-dev-cph-twin"
+BUCKET = os.environ.get("TWIN_GCS_BUCKET", "")
 REPO = "cph-twin"
 JOB = "cph-roofer"
 IMAGE_NAME = "cph-roofer"
 SA = f"{PROJECT_NUMBER}-compute@developer.gserviceaccount.com"  # default compute SA: already secretAccessor on the Datafordeler key
 LABELS = {"app": "cph-twin"}
 CPU, MEM, TIMEOUT, RETRIES = "4", "16Gi", "10800s", 2  # pilot at 8 vCPU / 32 GiB: peak RSS 1.7 GB, download-bound (roofer ~1 min)
-R2_ENV = {"R2_ACCOUNT_ID": "691682f9ad7a2e6378c27998ceffaaf9", "R2_LIDAR_BUCKET": "dk-lidar-cache", "R2_SECRET_PROJECT": "integrations-484814"}
+R2_ENV = {k: os.environ.get(k, "") for k in ("R2_ACCOUNT_ID", "R2_LIDAR_BUCKET", "R2_SECRET_PROJECT")}
 # Cloud Run Jobs list prices, europe-west1 (tier 1): https://cloud.google.com/run/pricing  (checked 2026-10; re-check before relying on it)
 PRICE_VCPU_S, PRICE_GIB_S = 0.000024, 0.0000025
 

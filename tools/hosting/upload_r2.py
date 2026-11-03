@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Publish the citywide data of the Copenhagen twin to Cloudflare R2 (bucket cph-twin-data) under a version prefix.
+"""Publish the citywide data of the twin to Cloudflare R2 (bucket $R2_BUCKET) under a version prefix.
 
     python3 tools/hosting/upload_r2.py [--version v1] [--only tiles,city,tex-look] [--dry-run] [--workers 24]
 
 Layout in the bucket (the engine's data base is  <public url>/<version>,  js/data-config.js):
     <version>/tiles/index.json, <version>/tiles/<id>/<layer>.json|bin     from data/tiles
     <version>/city/*                                                    the files data/tiles/index.json and data/city/post.json name
-    <version>/tex-look/*.webp                                           copied from gs://lun-integrations-dev-cph-twin/skraafoto/tex-look
+    <version>/tex-look/*.webp                                           copied from gs://$TWIN_GCS_BUCKET/skraafoto/tex-look
 
 Idempotent: the bucket is listed first and an object whose size and MD5 already match is skipped, so the tool can be rerun after
 the tiles or the atlases were regenerated. Order is chosen so a half finished run never publishes an inconsistent set: every
@@ -28,7 +28,7 @@ import glob, base64, concurrent.futures as cf, gzip, hashlib, json, os, subproce
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CFG = os.path.expanduser(os.environ.get('CPH_R2_CONFIG', '~/.config/cph-twin/r2-ingest.json'))
-GCS_BUCKET, GCS_PREFIX = 'lun-integrations-dev-cph-twin', 'skraafoto/tex-look/'
+GCS_BUCKET, GCS_PREFIX = os.environ.get('TWIN_GCS_BUCKET', ''), 'skraafoto/tex-look/'
 IMMUTABLE = 'public, max-age=31536000, immutable'
 REVALIDATE = 'no-cache'
 TYPES = {'.json': 'application/json', '.bin': 'application/octet-stream', '.webp': 'image/webp', '.jpg': 'image/jpeg', '.md': 'text/markdown'}

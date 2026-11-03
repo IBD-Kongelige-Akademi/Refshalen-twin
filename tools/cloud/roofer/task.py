@@ -181,7 +181,7 @@ def datafordeler_key() -> str:
     if key:
         return key
     from google.cloud import secretmanager  # noqa: PLC0415
-    name = os.environ.get("DATAFORDELER_SECRET", "projects/lun-integrations-dev/secrets/datafordeler-graphql-api-key/versions/latest")
+    name = os.environ.get("DATAFORDELER_SECRET", "")
     return secretmanager.SecretManagerServiceClient().access_secret_version(request={"name": name}).payload.data.decode().strip()
 
 
@@ -390,7 +390,7 @@ def process_cell(cell: str, store: Store, work: Path, jobs: int, force: bool) ->
 
 
 def main() -> int:
-    bucket = os.environ.get("BUCKET", "lun-integrations-dev-cph-twin")
+    bucket = os.environ["BUCKET"]
     store = Store(os.environ.get("STORE_DIR") or f"gs://{bucket}")
     cell = os.environ.get("CELL")
     if not cell:

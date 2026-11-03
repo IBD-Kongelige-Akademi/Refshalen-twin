@@ -15,6 +15,9 @@ from pathlib import Path
 
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW_CITY = ROOT / "data" / "raw" / "city"
 UA = "cph-twin-geodata/0.2 (open-data compiler; contact martin@lun.energy)"
@@ -33,10 +36,7 @@ def log(*a):
 
 
 def env(name: str) -> str:
-    v = os.environ.get(name, "").strip()
-    if not v:
-        raise SystemExit(f"{name} is not set (export it from tools/adc-secret.sh; never print it)")
-    return v
+    return envsecret.require(name)
 
 
 def request(method: str, url: str, tries: int = 7, what: str = "", **kw) -> requests.Response:

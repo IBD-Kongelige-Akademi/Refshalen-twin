@@ -39,7 +39,6 @@ import base64
 import json
 import math
 import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -52,6 +51,7 @@ from shapely.geometry.polygon import orient
 from shapely.ops import polygonize, unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
 import frame  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -114,14 +114,7 @@ def read_json(path: Path):
 # ------------------------------------------------------------------------------------------------------------- fetch
 
 def _secret(name: str, secret: str) -> str:
-    v = os.environ.get(name, "").strip()
-    if not v:
-        out = subprocess.run([str(ROOT / "tools" / "adc-secret.sh"), secret], capture_output=True, text=True)
-        if out.returncode != 0 or not out.stdout.strip():
-            raise SystemExit(f"secret {secret} not available (tools/adc-secret.sh)")
-        v = out.stdout.strip()
-        os.environ[name] = v
-    return v
+    return envsecret.require(name)
 
 
 def fetch_shore(force: bool = False) -> None:
@@ -143,7 +136,7 @@ def fetch_shore(force: bool = False) -> None:
 
 def fetch(force: bool = False) -> None:
     """GeoDanmark (Datafordeler GEODKV WFS) soe / bassin / rekreativtomraade / begravelsesomraade / skov for the city bbox and the OSM
-    extras (landuse, waterway) into data/raw/city/water/. Credentials come from tools/adc-secret.sh and are never printed."""
+    extras (landuse, waterway) into data/raw/city/water/. Credentials come from the environment or .env (envsecret.py) and are never printed."""
     import city_sources as S
 
     RAW_WATER.mkdir(parents=True, exist_ok=True)

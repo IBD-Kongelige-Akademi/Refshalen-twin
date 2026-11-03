@@ -14,26 +14,25 @@ $DHM_TERRAIN_TOKEN) goes in a header and is never printed.
 from __future__ import annotations
 
 import io
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
 import requests
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
+import frame  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw" / "veg"
 WMS = "https://api.dataforsyningen.dk/orto_foraar_DAF"
-BBOX = (723130, 6175730, 724670, 6177270)  # district + 20 m margin, whole metres
+BBOX = tuple(round(v + d) for v, d in zip(frame.DISTRICT_UTM_BBOX, (-20, -20, 20, 20)))  # district + 20 m margin, whole metres
 PX = 0.5
 
 
 def token() -> str:
-    for k in ("GSEARCH_TOKEN", "DHM_TERRAIN_TOKEN"):
-        if os.environ.get(k):
-            return os.environ[k].strip()
-    return subprocess.run([str(ROOT / "tools" / "adc-secret.sh"), "gsearch-token"], capture_output=True, text=True, check=True).stdout.strip()
+    return envsecret.require("GSEARCH_TOKEN", "DHM_TERRAIN_TOKEN")
 
 
 def main():

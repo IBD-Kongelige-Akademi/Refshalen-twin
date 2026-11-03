@@ -3,7 +3,7 @@
 // facade atlases (data/tex-look, data/tex). Pure (no three.js, no fetch), so it runs in node.
 //
 //   default      BUILD_DATA_BASE below: './data' in the repo (local dev, unpacked); the Pages workflow rewrites it to the published
-//                packed data (https://pub-d3c994d177d048d5b64ecfc3df496b48.r2.dev, see README, "Hosting the citywide data").
+//                packed data (the repository variable DATA_URL, see README, "Hosting the citywide data").
 //   ?data=<url>  per-session override (an absolute URL or a path; a trailing slash is ignored).
 //   ?tiles=<url> still overrides the tile directory alone (js/main.js).
 //

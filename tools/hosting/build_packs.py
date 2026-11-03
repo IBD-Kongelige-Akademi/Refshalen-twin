@@ -25,7 +25,7 @@ chunks? }, payloads. JSON and binary entries are gzip'd inside the pack (the hos
 Names are the first 20 hex digits of the SHA-256 of the pack, so packs are immutable (Cache-Control: immutable) and an unchanged pack keeps
 its name across builds: an upload only adds what changed, and the old manifest's packs stay valid until they are pruned.
 
-Atlases come from gs://lun-integrations-dev-cph-twin/skraafoto/tex-look (only the ones a tile's appearance.json describes), cached in
+Atlases come from gs://$TWIN_GCS_BUCKET/skraafoto/tex-look when that variable is set (only the ones a tile's appearance.json describes), cached in
 ~/.cache/cph-twin/tex-look (by GCS md5); atlases only the local data/tex-look has are taken from there (GCS wins on a clash, as in
 upload_r2.py). GCS is read over REST with an ADC token (`gcloud auth application-default print-access-token`), never the gcloud CLI.
 """
@@ -34,7 +34,7 @@ import argparse, base64, concurrent.futures as cf, gzip, hashlib, json, os, re, 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.join(ROOT, 'tools/overrides'))
 import publish as overrides_publish  # noqa: E402
-GCS_BUCKET, GCS_PREFIX = 'lun-integrations-dev-cph-twin', 'skraafoto/tex-look/'
+GCS_BUCKET, GCS_PREFIX = os.environ.get('TWIN_GCS_BUCKET', ''), 'skraafoto/tex-look/'  # no bucket: data/tex-look and the cache only
 MAGIC = b'CPHPACK1'
 PACK_FORMAT, MANIFEST_FORMAT = 'cph-pack/1', 'cph-packs/1'
 HASH_LEN = 20
@@ -144,8 +144,8 @@ class AtlasSource:
         self.cache, self.local = cache, os.path.join(ROOT, 'data/tex-look')
         os.makedirs(cache, exist_ok=True)
         self.gcs = {}
-        if offline:
-            log('atlases: --offline, using the cache and data/tex-look only')
+        if offline or not GCS_BUCKET:
+            log('atlases: ' + ('--offline' if offline else 'no TWIN_GCS_BUCKET') + ', using the cache and data/tex-look only')
         else:
             self.token, self.t_token, self.lock = adc_token(), time.time(), threading.Lock()
             log(f'listing gs://{GCS_BUCKET}/{GCS_PREFIX} ...')

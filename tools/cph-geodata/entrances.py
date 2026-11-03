@@ -18,8 +18,8 @@ point, usually surveyed at the door) and a `vejpunkt` (where the access road is 
 
     uv run tools/cph-geodata/entrances.py            # cached raw responses under data/raw/dar/ make reruns offline
 
-Credentials come only from `tools/adc-secret.sh` (datafordeler-username/-password/-graphql-api-key) or the
-DATAFORDELER_USERNAME / DATAFORDELER_PASSWORD / DATAFORDELER_GRAPHQL_API_KEY environment; they are never printed.
+Credentials (DATAFORDELER_USERNAME / DATAFORDELER_PASSWORD / DATAFORDELER_GRAPHQL_API_KEY) come from the environment or
+.env (envsecret.py, .env.example); they are never printed.
 """
 from __future__ import annotations
 
@@ -28,13 +28,13 @@ import json
 import math
 import os
 import re
-import subprocess
 import sys
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
 import frame  # noqa: E402
 from frame import area_local, to_local  # noqa: E402
 
@@ -173,10 +173,7 @@ def entry_for(hn: dict, b: dict, how: str, opgang_ids: set[str]):
 
 
 def _secret(name: str, env: str) -> str:
-    if os.environ.get(env):
-        return os.environ[env].strip()
-    out = subprocess.run([str(ROOT / "tools" / "adc-secret.sh"), name], capture_output=True, text=True, check=True)
-    return out.stdout.strip()
+    return envsecret.require(env)
 
 
 def _atomic_write(path: Path, text: str) -> None:

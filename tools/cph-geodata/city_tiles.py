@@ -35,6 +35,9 @@ from shapely.geometry import LineString, Point, Polygon, box, mapping, shape
 from shapely.ops import polygonize, unary_union
 from shapely.prepared import prep
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw" / "city"
 OUT = ROOT / "data" / "city"
@@ -68,9 +71,7 @@ def load_dagi(refresh: bool) -> dict:
     p = RAW / "dagi_kommuner.json"
     if p.exists() and not refresh:
         return json.loads(p.read_text())
-    user, pw = os.environ.get("DATAFORDELER_USERNAME"), os.environ.get("DATAFORDELER_PASSWORD")
-    if not (user and pw):
-        raise SystemExit("set DATAFORDELER_USERNAME/PASSWORD (tools/adc-secret.sh datafordeler-username|password)")
+    user, pw = envsecret.require("DATAFORDELER_USERNAME"), envsecret.require("DATAFORDELER_PASSWORD")
     r = requests.get(DAGI_WFS, params={
         "username": user, "password": pw, "service": "WFS", "version": "2.0.0", "request": "GetFeature",
         "typeNames": "dagi_v001:kommuneinddeling_current", "outputFormat": "application/json",

@@ -17,14 +17,13 @@ from __future__ import annotations
 
 import io
 import json
-import os
-import subprocess
 import sys
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import envsecret  # noqa: E402
 import frame  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -38,16 +37,13 @@ TILE = 1000  # px per WMS request
 
 # (E0, N0, E1, N1, pixel m). test: Dronning Louises Bro + Peblinge Soe + Blaagaards Plads; district: the playable bbox.
 WINDOWS = {
-    "test": (723460, 6176780, 724060, 6177180, 0.10),
+    "test": (frame.ORIGIN[0] - 300, frame.ORIGIN[1] - 200, frame.ORIGIN[0] + 300, frame.ORIGIN[1] + 200, 0.10),  # 600 x 400 m at the origin
     "district": (*frame.DISTRICT_UTM_BBOX, 0.25),
 }
 
 
 def token() -> str:
-    for k in ("GSEARCH_TOKEN", "DHM_TERRAIN_TOKEN", "DATAFORSYNINGEN_TOKEN"):
-        if os.environ.get(k):
-            return os.environ[k].strip()
-    return subprocess.run([str(ROOT / "tools" / "adc-secret.sh"), "gsearch-token"], capture_output=True, text=True, check=True).stdout.strip()
+    return envsecret.require("GSEARCH_TOKEN", "DHM_TERRAIN_TOKEN", "DATAFORSYNINGEN_TOKEN")
 
 
 # ---------------------------------------------------------------------------------------------------------------- fetch

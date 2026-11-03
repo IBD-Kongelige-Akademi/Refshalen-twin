@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Upload a pack directory (tools/hosting/build_packs.py) to an R2 bucket with wrangler.
 
-    python3 tools/hosting/upload_packs.py --dir .context/packs/<v> [--bucket cph-twin-data] [--public-url https://pub-....r2.dev]
+    python3 tools/hosting/upload_packs.py --dir .context/packs/<v> [--bucket $R2_BUCKET] [--public-url $R2_PUBLIC_URL]
                                           [--prefix ''] [--jobs 8] [--dry-run]
 
 The pack directory is host-agnostic (any static host that serves files, ideally with HTTP Range, works: sync the directory there, serve
@@ -12,15 +12,15 @@ manifest.json with `Cache-Control: no-cache` and the packs with `public, max-age
   * packs go first, manifest.json last, so a half finished run never publishes a manifest whose packs are missing;
   * Content-Type application/octet-stream for packs (no Content-Encoding: they are gzip'd inside), application/json for the manifest.
 
-wrangler runs with XDG_CONFIG_HOME=--wrangler-config (default ~/.config/wrangler-personal: the personal Cloudflare account that owns
-the cph-twin-data bucket; never the default login). The old unpacked layout keeps its own uploader (tools/hosting/upload_r2.py).
+wrangler runs with XDG_CONFIG_HOME=--wrangler-config (default ~/.config/wrangler-personal: the Cloudflare account that owns
+the bucket; never the default login). Bucket, account id and public URL default to R2_BUCKET, R2_ACCOUNT_ID and R2_PUBLIC_URL. The old unpacked layout keeps its own uploader (tools/hosting/upload_r2.py).
 """
 import argparse, concurrent.futures as cf, json, os, subprocess, threading, time, urllib.parse, urllib.request
 
 IMMUTABLE = 'public, max-age=31536000, immutable'
 REVALIDATE = 'no-cache'
-DEFAULT_PUBLIC = 'https://pub-d3c994d177d048d5b64ecfc3df496b48.r2.dev'
-DEFAULT_ACCOUNT = 'a5f130bfd0d34de38f8e77f6a0f40a27'  # the personal Cloudflare account that owns cph-twin-data
+DEFAULT_PUBLIC = os.environ.get('R2_PUBLIC_URL', '')  # a custom domain on the bucket: r2.dev is rate limited and not CDN-cached
+DEFAULT_ACCOUNT = os.environ.get('R2_ACCOUNT_ID', '')  # the Cloudflare account that owns the bucket
 lock = threading.RLock()
 
 
@@ -64,9 +64,9 @@ def put(bucket, key, path, ctype, cache, env, dry):
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--dir', required=True)
-    ap.add_argument('--bucket', default='cph-twin-data')
-    ap.add_argument('--public-url', default=DEFAULT_PUBLIC)
-    ap.add_argument('--account', default=DEFAULT_ACCOUNT, help='Cloudflare account id of the bucket (for listing it)')
+    ap.add_argument('--bucket', default=os.environ.get('R2_BUCKET') or None, required=not os.environ.get('R2_BUCKET'))
+    ap.add_argument('--public-url', default=DEFAULT_PUBLIC or None, required=not DEFAULT_PUBLIC)
+    ap.add_argument('--account', default=DEFAULT_ACCOUNT or None, required=not DEFAULT_ACCOUNT, help='Cloudflare account id of the bucket (for listing it)')
     ap.add_argument('--prefix', default='', help='key prefix inside the bucket (the data base is <public url>/<prefix>)')
     ap.add_argument('--jobs', type=int, default=8)
     ap.add_argument('--wrangler-config', default=os.path.expanduser(os.environ.get('CPH_WRANGLER_CONFIG', '~/.config/wrangler-personal')))

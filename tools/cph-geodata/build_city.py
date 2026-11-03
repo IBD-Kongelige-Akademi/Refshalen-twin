@@ -29,7 +29,7 @@ Stages, in order (default: all that exist):
     report      data/city/coverage.md
 
 Secrets are read from the environment (DATAFORDELER_USERNAME / _PASSWORD / _GRAPHQL_API_KEY, GSEARCH_TOKEN) or, if unset,
-from tools/adc-secret.sh; they are never printed or written. The script aborts a step when free disk space falls below
+from the environment or .env (envsecret.py, .env.example); they are never printed or written. The script aborts a step when free disk space falls below
 MIN_FREE_GB.
 """
 from __future__ import annotations
@@ -40,7 +40,6 @@ import json
 import math
 import os
 import shutil
-import subprocess
 import sys
 import time
 import traceback
@@ -51,6 +50,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import city_sources as S  # noqa: E402
+import envsecret  # noqa: E402
 import frame  # noqa: E402
 import tile_split as T  # noqa: E402
 
@@ -132,16 +132,9 @@ def dump(o) -> str:
 
 
 def ensure_secrets(*names: str) -> None:
-    """Fill os.environ from tools/adc-secret.sh for names that are unset (never printed)."""
-    table = {"DATAFORDELER_USERNAME": "datafordeler-username", "DATAFORDELER_PASSWORD": "datafordeler-password",
-             "DATAFORDELER_GRAPHQL_API_KEY": "datafordeler-graphql-api-key", "GSEARCH_TOKEN": "gsearch-token"}
+    """Fill os.environ from the environment or .env (envsecret.py) for names that are unset (never printed)."""
     for n in names:
-        if os.environ.get(n):
-            continue
-        out = subprocess.run([str(ROOT / "tools" / "adc-secret.sh"), table[n]], capture_output=True, text=True)
-        if out.returncode != 0 or not out.stdout.strip():
-            raise SystemExit(f"secret {table[n]} not available (tools/adc-secret.sh)")
-        os.environ[n] = out.stdout.strip()
+        envsecret.require(n)
 
 
 # ------------------------------------------------------------------------------------------------------- tiles/cells
