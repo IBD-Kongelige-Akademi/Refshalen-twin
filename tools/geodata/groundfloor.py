@@ -2,7 +2,8 @@
 """Ground-floor venues -> data/cph-groundfloor.json (cph-groundfloor/1).
 
 Shops, food/drink and service venues from OSM (Overpass: shop=*, amenity in cafe/restaurant/bar/pub/fast_food/...,
-craft, office with a public front) and the KK `bevillinger` (serveringsbevillinger) WFS layer, in the twin's local frame.
+craft, office with a public front), in the twin's local frame; `--kk` adds the Copenhagen `bevillinger` (serveringsbevillinger)
+WFS layer (Aalborg publishes no such register).
 The engine (js/groundfloor.js) assigns each venue to the street-facing wall of the building it stands in or beside; only
 walls with a venue get a shopfront, everything else is a residential ground floor.
 
@@ -52,6 +53,7 @@ def main() -> None:
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
+    ap.add_argument("--kk", action="store_true", help="also read the Københavns Kommune serving permits (Copenhagen only)")
     frame.add_area_args(ap)
     args = ap.parse_args()
     frame.apply_area_args(args)
@@ -75,7 +77,11 @@ def main() -> None:
         out.append({"x": round(x, 2), "z": round(z, 2), "kind": kind_of(tags), "name": tags.get("name"),
                     "level": tags.get("level"), "src": [f"osm:{el['type']}/{el['id']}"], "conf": "observed"})
     n_osm = len(out)
+    attribution = ["© OpenStreetMap contributors (ODbL)"]
     try:
+        if not args.kk:
+            raise LookupError("KK only")
+        attribution.append("Københavns Kommune, bevillinger (open data)")
         for f in kk_layer("bevillinger").get("features", []):
             g = f.get("geometry") or {}
             c = g.get("coordinates")
@@ -91,9 +97,7 @@ def main() -> None:
                         "koncept": p.get("koncept"), "night": bool(p.get("nattilladelse")), "src": ["kk:bevillinger"], "conf": "observed"})
     except Exception as exc:  # noqa: BLE001 - KK layer is optional
         print(f"[groundfloor] kk bevillinger skipped: {exc}", file=sys.stderr)
-    doc = {"version": "cph-groundfloor/1", "frame": "cph-geodata local (x east, z south)",
-           "attribution": ["© OpenStreetMap contributors (ODbL)", "Københavns Kommune, bevillinger (open data)"],
-           "venues": out}
+    doc = {"version": "cph-groundfloor/1", "frame": "cph-geodata local (x east, z south)", "attribution": attribution, "venues": out}
     out_path.write_text(json.dumps(doc, ensure_ascii=False, separators=(",", ":")))
     print(f"venues: {len(out)} (osm {n_osm}, kk {len(out) - n_osm}) -> {out_path}")
 

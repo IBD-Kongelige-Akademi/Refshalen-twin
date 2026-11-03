@@ -128,6 +128,8 @@ def main():
     ap.add_argument("--streets", default=str(ROOT / "data" / "cph-streets.json"))
     ap.add_argument("--ndvi", default="ndvi.tif", help="NDVI raster (name under the raster folder, covering the area + 20 m)")
     ap.add_argument("--veg-dir", default=None, help="folder of the class / NDVI rasters (default data/raw/veg)")
+    ap.add_argument("--heights", choices=("punktsky", "ndsm"), default="punktsky",
+                    help="what the class rasters are: DHM point-cloud counts, or the DSM - DTM stand-in (city_layers2.ndsm_class_rasters)")
     frame.add_area_args(ap)
     args = ap.parse_args()
     global RAW
@@ -218,15 +220,18 @@ def main():
                 out.append(rec)
         return out
 
+    ndsm = args.heights == "ndsm"
+    hi, lo = ("dhm:ndsm>2.5m", "dhm:ndsm0.3-2.5m") if ndsm else ("dhm:class5", "dhm:class3-4")
     grass = []
-    for kind, src, conf in (("lawn", "cir:ndvi+dhm:class5", "measured"), ("planting", "cir:ndvi+dhm:class3-4", "measured"), ("parkfloor", "kk:parkregister+dhm:class5", "inferred")):
+    for kind, src, conf in (("lawn", f"cir:ndvi+{hi}", "measured"), ("planting", f"cir:ndvi+{lo}", "measured" if not ndsm else "inferred"),
+                            ("parkfloor", f"parks+{hi}", "inferred")):
         recs = records(kind, vectorise(masks[kind], T, kind), unary_union([cut, paths]) if kind == "parkfloor" else cut)
         for r in recs:
             r.update(cls="grass", src=[src], conf=conf)
         grass += recs
     canopy = records("canopy", vectorise(masks["canopy"], T, "canopy"))
     for g in canopy:
-        g.update(src=["dhm:punktsky:class5"], conf="measured")
+        g.update(src=["dhm:ndsm>2.5m" if ndsm else "dhm:punktsky:class5"], conf="measured")
 
     area = lambda recs, k: round(sum(g["area_m2"] for g in recs if g["kind"] == k))  # noqa: E731
     stats = {"lawn_m2": area(grass, "lawn"), "planting_m2": area(grass, "planting"), "parkfloor_m2": area(grass, "parkfloor"),
@@ -234,9 +239,11 @@ def main():
     doc = {
         "version": "cph-vegetation/1",
         "frame": {"epsg": 25832, "origin": list(ORIGIN), "axes": "x=east, z=south, y=up", "bbox": list(area_local())},
-        "attribution": ["Indeholder data fra Klimadatastyrelsen (DHM Punktsky)", "GeoDanmark ortofoto (Styrelsen for Dataforsyning og Infrastruktur)"],
-        "method": f"NDVI of the CIR orthophoto > hard-ground p97 (>= {NDVI_MIN}); lawn / planting split by DHM class 3/4 returns (>= {PLANTING_MIN}/m2); "
-                  f"crown floor inside KK parks; {SMOOTH}x{SMOOTH} mean, open/close, min {MIN_AREA:.0f} m2, cut by buildings, KK pavements and lakes",
+        "attribution": [f"Indeholder data fra Klimadatastyrelsen (DHM {'Overflade og Terræn' if ndsm else 'Punktsky'})",
+                        "GeoDanmark ortofoto (Styrelsen for Dataforsyning og Infrastruktur)"],
+        "method": f"NDVI of the CIR orthophoto > hard-ground p97 (>= {NDVI_MIN}); lawn / planting split by "
+                  + ("DSM - DTM 0.3-2.5 m (no point cloud), crowns above 2.5 m; " if ndsm else f"DHM class 3/4 returns (>= {PLANTING_MIN}/m2); ")
+                  + f"crown floor inside parks; {SMOOTH}x{SMOOTH} mean, open/close, min {MIN_AREA:.0f} m2, cut by buildings, pavements and water",
         "stats": stats,
         "surfaces": grass,
         "canopy": canopy,

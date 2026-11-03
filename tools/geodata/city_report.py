@@ -1,5 +1,6 @@
 """data/city/coverage.md for build_city.py: per-layer tile coverage and feature counts, GeoDanmark building coverage,
-height-source coverage, road-graph connectivity, Frederiksberg substitutions, queued work and sizes on disk."""
+height-source coverage, road-graph connectivity, the realism layers (photo facades, windows, entrances, vegetation), source
+substitutions, queued work and sizes on disk."""
 from __future__ import annotations
 
 import json
@@ -10,7 +11,7 @@ from pathlib import Path
 import build_city as BC
 import tile_split as T
 
-LAYERS = ["buildings", "roads", "terrain", "surfaces", "furniture", "entrances", "groundfloor", "vegetation", "lod2"]
+LAYERS = ["buildings", "roads", "terrain", "surfaces", "furniture", "entrances", "groundfloor", "vegetation", "lod2", "appearance", "windows"]
 
 
 def _dir_size(p: Path) -> int:
@@ -151,6 +152,63 @@ def district_comparison(tiles: dict) -> dict:
     return out
 
 
+def realism_sections(tiles: dict, cells: dict, idx: dict) -> list[str]:
+    """Photo facades (appearance_city*.py), measured windows (facade_layout.py), entrances and vegetation: coverage per building / area."""
+    L = []
+    n_b = walls = observed = atlas = 0
+    conf: Counter = Counter()
+    for tid in tiles:
+        p, q = BC.TILES_DIR / tid / "buildings.json", BC.TILES_DIR / tid / "appearance.json"
+        if p.exists():
+            n_b += len(json.loads(p.read_text())["buildings"])
+        if q.exists():
+            for b in json.loads(q.read_text()).get("buildings", {}).values():
+                observed += 1
+                atlas += "atlas" in b
+                for wl in b.get("walls", []):
+                    walls += 1
+                    conf[wl.get("conf", "?")] += 1
+    if observed:
+        seen = walls - conf.get("inferred", 0)
+        L.append("## Photo facades (`appearance` layer, Skråfoto 2025 + 2023)\n")
+        L.append(f"- Buildings with a photo-derived wall / roof tone: **{observed:,} of {n_b:,} ({100 * observed / max(1, n_b):.1f} %)**; of their "
+                 f"{walls:,} walls {seen:,} ({100 * seen / max(1, walls):.0f} %) were seen in a photo, the rest take the building's or a neighbour's "
+                 f"tone (`fallback`). Wall conf: {dict(conf)}.")
+        L.append(f"- Buildings with a rectified photo atlas (`data/tex-look/<id>.webp`): **{atlas:,} ({100 * atlas / max(1, n_b):.1f} %)**; the others keep "
+                 f"their measured tone on the procedural facade.")
+        L.append("")
+    win = [e for e in idx.values() if "windows" in e["layers"]]
+    if win:
+        agg: Counter = Counter()
+        for e in win:
+            agg.update(e["counts"].get("windows", {}))
+        L.append("## Measured windows (`windows` layer)\n")
+        L.append(f"- Window grids fitted to the photo atlases (`tools/geodata/facade_layout.py`) in {len(win)} tiles: "
+                 + (", ".join(f"{k} {v:,}" for k, v in sorted(agg.items())) or "-") + "; walls without a plausible grid keep the procedural guess.")
+        L.append("")
+    ent = BC.read_done("entrances")
+    if ent:
+        L.append("## Entrances (`entrances` layer)\n")
+        L.append(f"- {ent.get('entrances', 0):,} DAR adgangspunkter (datagrundlag.dk `dar.husnummer` + `dar.adressepunkt`, BBR `opgang` for stairwells) "
+                 f"snapped to the wall of their building, on {ent.get('buildings', 0):,} buildings >= 20 m2; `conf` is the snap distance "
+                 f"(measured <= 1.5 m, observed <= 3 m, else inferred: the point lies inside the footprint and the door side is a guess).")
+        L.append("")
+    veg = [BC.read_done(f"veg-cell-{c}") for c in cells if BC.is_done(f"veg-cell-{c}")]
+    if veg:
+        st: Counter = Counter()
+        for v in veg:
+            st.update({k: v2 for k, v2 in v.get("stats", {}).items() if k.endswith("_m2") or k == "polygons"})
+        heights = Counter(BC.read_done(f"veg-raster-{c}").get("heights", "?") for c in cells if BC.is_done(f"veg-raster-{c}"))
+        src = {"ndsm": "DHM DSM - DTM (no point cloud: set DATAFORDELER_GRAPHQL_API_KEY and rerun `--stage vegetation --force vegetation` for the LiDAR classes)",
+               "punktsky": "DHM Punktsky class counts"}
+        L.append("## Vegetation (`vegetation` layer)\n")
+        L.append(f"- {len(veg)} of {len(cells)} cells; heights from " + "; ".join(f"{src.get(k, k)}: {v} cells" for k, v in heights.items()) + ".")
+        L.append(f"- Lawn {st['lawn_m2'] / 1e4:.1f} ha, planting {st['planting_m2'] / 1e4:.2f} ha, park floor under crowns {st['parkfloor_m2'] / 1e4:.1f} ha "
+                 f"({st['polygons']:,} polygons); tree canopy {st['canopy_m2'] / 1e4:.1f} ha (audit only). Green = NDVI of the CIR orthophoto.")
+        L.append("")
+    return L
+
+
 def write_report(tiles: dict, cells: dict) -> None:
     t0 = time.time()
     idx = BC.scan_tiles(tiles)
@@ -230,8 +288,8 @@ def write_report(tiles: dict, cells: dict) -> None:
           f"{d['second']} nodes each (private yards, car parks and cul-de-sacs mapped without a junction to the network) and "
           f"hold {d['outside_largest']:,} nodes in total.")
         w(f"- Vehicles and agents can therefore reach "
-          f"{100 * d['largest_share']:.1f} % of the carriageway nodes from any other; no kommune part (Amager, Vestamager, Frederiksberg, Nordhavn, Valby) "
-          f"is cut off: {d['islands_over_20']} carriageway components have more than 20 nodes.")
+          f"{100 * d['largest_share']:.1f} % of the carriageway nodes from any other; "
+          f"{d['islands_over_20']} carriageway components have more than 20 nodes.")
         w("")
     cmp_ = district_comparison(tiles)
     if cmp_:
@@ -249,10 +307,12 @@ def write_report(tiles: dict, cells: dict) -> None:
         w(f"- Photo-measured wall tones (`observed`) were carried over to {cmp_['observed']:,} of the identical buildings (same footprint); "
           f"{cmp_['footprint_changed']:,} had a changed footprint and keep none.")
         w("")
-    sub = BC.WORK / "frb_substitutions.json"
+    for line in realism_sections(tiles, cells, idx):
+        w(line)
+    sub = BC.WORK / "substitutions.json"
     if sub.exists():
-        w("## Frederiksberg substitutions\n")
-        w("The KK WFS layers are empty in Frederiksberg Kommune; these sources replace them (`src`/`conf` mark every item):\n")
+        w("## Source substitutions\n")
+        w("Aalborg Kommune publishes no open registers like Copenhagen's KK layers; these sources stand in (`src`/`conf` mark every item):\n")
         w("| item | source used | count | note |")
         w("|---|---|---:|---|")
         for r in json.loads(sub.read_text()):

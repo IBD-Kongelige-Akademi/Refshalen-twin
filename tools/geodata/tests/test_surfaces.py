@@ -23,7 +23,9 @@ def test_register_materials_map_to_twin_classes():
 def test_osm_squares():
     assert classify_osm({"surface": "sett"}) == ("setts", "observed")
     assert classify_osm({"surface": "paving_stones"})[0] == "raadhus"
-    assert classify_osm({"place": "square"}) == ("cobbles", "inferred")
+    assert classify_osm({"place": "square"}) == ("raadhus", "inferred")
+    assert classify_osm({"surface": "asphalt"}) == ("asphalt_road", "observed")
+    assert classify_osm({"surface": "fine_gravel"}) == ("gravel", "observed")
 
 
 def test_marking_kinds_cover_every_kk_type():

@@ -29,17 +29,16 @@ out = args.out if os.path.isabs(args.out) else os.path.join(root, args.out)
 W, H = (int(v) for v in args.size.split('x'))
 TILES = os.path.join(root, 'data/tiles')
 
-PLACES = {  # name: (lat, lon) of a point on the street
-    'frederiksberg-alle': (55.67437, 12.54130),
-    'istedgade': (55.66920, 12.55400),
-    'stroget': (55.67830, 12.57520),
-    'osterbrogade-trianglen': (55.69960, 12.57720),
-    'norrebrogade': (55.68700, 12.55900),
-    'christianshavn': (55.67290, 12.59180),
-    'nyhavn-north': (55.67985, 12.58960),
+PLACES = {  # name: (lat, lon) of a point on the street: the teleports of js/city-config.js (the stop is the nearest measured wall)
+    'gammel-torv': (57.04818, 9.91998),
+    'budolfi': (57.04810, 9.91939),
+    'jomfru-ane-gade': (57.05009, 9.91887),
+    'aalborghus': (57.04905, 9.92488),
+    'limfjordsbroen': (57.05306, 9.91801),
+    'utzon': (57.04940, 9.92569),
 }
-PERF_AT = ('stroget-street', 'nyhavn-north-street')
-FADE_AT = ('nyhavn-north', 'frederiksberg-alle', 'stroget')
+PERF_AT = ('gammel-torv-street', 'jomfru-ane-gade-street')
+FADE_AT = ('jomfru-ane-gade', 'gammel-torv', 'budolfi')
 
 
 def to_local(lat, lon):

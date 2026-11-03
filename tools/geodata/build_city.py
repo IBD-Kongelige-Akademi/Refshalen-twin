@@ -202,44 +202,42 @@ class Layers:
 # ----------------------------------------------------------------------------------------------------------- fetch
 
 def stage_fetch2(a, tiles) -> None:
-    """Sources of stage 2 (surfaces, furniture, groundfloor) and the Frederiksberg GC2 tables, fetched citywide once."""
+    """OSM sources of stage 2 (surfaces, furniture, groundfloor), fetched once for the tiles' bbox: Overpass, else the OSM API.
+    Aalborg has no municipal layers (no KK / Frederiksberg equivalents); entrances read datagrundlag.dk in their own stage."""
     if is_done("fetch2") and not a.force_stage("fetch2"):
         return
-    ensure_secrets("DATAFORDELER_USERNAME", "DATAFORDELER_PASSWORD", "DATAFORDELER_GRAPHQL_API_KEY")
-    from concurrent.futures import ThreadPoolExecutor
-
     import groundfloor as GF
-    import frb
 
-    bbox = city_bbox_utm(tiles)
+    S.OSM_BBOX = osm_bbox(city_bbox_utm(tiles))
     q2 = dict(OSM_QUERIES2)
     q2["groundfloor"] = GF.QUERY
+    source = fetch_osm(a, q2, "fetch2")
+    mark_done("fetch2", bbox=S.OSM_BBOX, source=source)
+
+
+def fetch_osm(a, queries: dict, label: str) -> str:
+    """Cache the Overpass answers to `queries` under data/raw/city/osm_<key>.json; when Overpass fails (--osm-source auto) or is
+    skipped (api), rebuild them from the OSM API map of S.OSM_BBOX instead (osm_api.py). Returns the source used."""
     errors = {}
+    if a.osm_source in ("auto", "overpass"):
+        for key, body in queries.items():
+            try:
+                S.fetch_overpass(key, body, force=a.force_fetch, attempts=2 if a.osm_source == "auto" else 8)
+            except Exception as e:  # noqa: BLE001
+                errors[key] = str(e)[:200]
+                log(f"[{label}] osm:{key} FAILED: {e}")
+        if not errors:
+            return "overpass"
+    if a.osm_source == "api" or (a.osm_source == "auto" and errors):
+        import osm_api
 
-    def run(label, fn):
-        try:
-            fn()
-        except Exception as e:  # noqa: BLE001
-            errors[label] = str(e)[:200]
-            log(f"[fetch2] {label} FAILED: {e}")
-
-    def kk_all():
-        for layer in KK_LAYERS2:
-            run(f"kk:{layer}", lambda layer=layer: S.fetch_kk(layer, bbox, force=a.force_fetch))
-
-    def osm_all():
-        for key, body in q2.items():
-            run(f"osm:{key}", lambda key=key, body=body: S.fetch_overpass(key, body, force=a.force_fetch))
-
-    with ThreadPoolExecutor(3) as ex:
-        fs = [ex.submit(kk_all), ex.submit(osm_all), ex.submit(run, "frb:gc2", lambda: frb.fetch_all(force=a.force_fetch))]
-        for f in fs:
-            f.result()
-    if errors:
-        log(f"[fetch2] incomplete: {errors}")
-        mark_done("fetch2-partial", errors=errors)
-        raise SystemExit(f"fetch2 incomplete: {errors}")
-    mark_done("fetch2")
+        log(f"[{label}] Overpass {'skipped' if a.osm_source == 'api' else 'failed'}; reading the OSM API (api/0.6/map) instead")
+        s, w, n, e = (float(v) for v in S.OSM_BBOX.split(","))
+        elements = osm_api.fetch_map(s, w, n, e, force=a.force_fetch)
+        for key in queries:
+            S.atomic_write(RAW_CITY / f"osm_{key}.json", json.dumps(osm_api.emulate(key, elements), ensure_ascii=False, separators=(",", ":")))
+        return "osm-api"
+    raise SystemExit(f"{label} incomplete (Overpass; rerun to retry): {errors}")
 
 
 def osm_bbox(utm_bbox) -> str:
@@ -277,23 +275,7 @@ def stage_fetch(a, tiles) -> None:
             raise SystemExit(f"fetch incomplete: {errors}")
         mark_done("fetch-dg", snapshots=DG.snapshots())
     if a.force_stage("fetch") or not is_done("fetch-osm"):
-        source = "overpass"
-        if a.osm_source in ("auto", "overpass"):
-            for key, body in OSM_QUERIES.items():
-                run(f"osm:{key}", lambda key=key, body=body: S.fetch_overpass(key, body, force=a.force_fetch,
-                                                                             attempts=2 if a.osm_source == "auto" else 8))
-        if a.osm_source == "api" or (a.osm_source == "auto" and errors):
-            import osm_api
-
-            log(f"[fetch] Overpass {'skipped' if a.osm_source == 'api' else 'failed'}; reading the OSM API (api/0.6/map) instead")
-            errors.clear()
-            s, w, n, e = (float(v) for v in S.OSM_BBOX.split(","))
-            elements = osm_api.fetch_map(s, w, n, e, force=a.force_fetch)
-            for key in OSM_QUERIES:
-                S.atomic_write(RAW_CITY / f"osm_{key}.json", json.dumps(osm_api.emulate(key, elements), ensure_ascii=False, separators=(",", ":")))
-            source = "osm-api"
-        if errors:
-            raise SystemExit(f"fetch incomplete (Overpass; datagrundlag.dk is done, rerun to retry): {errors}")
+        source = fetch_osm(a, OSM_QUERIES, "fetch")
         mark_done("fetch-osm", bbox=S.OSM_BBOX, source=source)
 
 
@@ -492,8 +474,8 @@ def graph_components(graph: dict) -> dict:
 
 
 def add_substitutions(rows: list) -> None:
-    """Rows of the 'Frederiksberg substitutions' table in coverage.md (keyed by `item`; a re-run replaces its rows)."""
-    p = WORK / "frb_substitutions.json"
+    """Rows of the 'Source substitutions' table in coverage.md (keyed by `item`; a re-run replaces its rows)."""
+    p = WORK / "substitutions.json"
     cur = json.loads(p.read_text()) if p.exists() else []
     have = {r["item"] for r in rows}
     S.atomic_write(p, dump([r for r in cur if r["item"] not in have] + rows))

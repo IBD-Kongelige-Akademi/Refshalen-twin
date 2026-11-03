@@ -25,8 +25,8 @@ VEG = BC.DATA / "raw" / "veg"
 LAZ_DIR = BC.DATA / "raw" / "lazwork"
 CLASSES = (2, 3, 4, 5, 6, 9, 17)
 WMS = "https://api.dataforsyningen.dk/orto_foraar_DAF"
-# inner city first: Indre By, Christianshavn, Vesterbro, Oesterbro, Noerrebro, Frederiksberg (UTM, metres)
-INNER = (718000, 6172000, 727000, 6178500)
+# inner city first: the district (frame.py, UTM metres)
+INNER = (555000, 6322000, 557000, 6324000)
 
 
 def cell_priority(cells: dict) -> list[str]:
@@ -127,22 +127,93 @@ def ndvi_raster(cell: str, token: str, out_dir) -> None:
         d.write(n1m.astype("float32"), 1)
 
 
+NDSM_LOW, NDSM_HIGH = 0.3, 2.5  # m above the terrain model: low / medium vegetation, then tree crowns
+
+
+def ndsm_class_rasters(cell: str, token: str, out_dir) -> dict:
+    """Stand-ins for the LiDAR class counts from the DHM height models (WCS, the Dataforsyningen token) when no Datafordeler key is
+    set: nDSM = DSM - DTM at 1 m over the cell; under a building footprint of the tiles class 6, else < NDSM_LOW ground (2),
+    NDSM_LOW..NDSM_HIGH low/medium vegetation (4) and above NDSM_HIGH high vegetation (5). The "counts" are the smallest that pass
+    vegetation.classify (planting >= PLANTING_MIN, canopy >= 2); vegetation.py's NDVI test still decides what is green, so a car
+    or a wall is not a shrub. Water and bridges (9, 17) stay empty: the NDVI of water is negative."""
+    import shutil
+
+    import numpy as np
+    import rasterio
+    from rasterio.features import geometry_mask
+    from rasterio.transform import from_origin
+    from shapely.geometry import Polygon
+
+    import vegetation
+
+    e0, n0, e1, n1 = BC.cell_bbox_utm(cell)
+    work = out_dir / f"dhm_{cell}"
+    work.mkdir(parents=True, exist_ok=True)
+    rasters, _ = BC.dhm_cell(work, (e0, n0, e1, n1), token)
+    size = 1000
+    T = from_origin(e0, n1, 1.0, 1.0)
+
+    def grid(r):  # the cell's 1 m grid out of the margin-grown block
+        r0, c0 = int(round(r.t.f - n1)), int(round(e0 - r.t.c))
+        return r.arr[r0:r0 + size, c0:c0 + size].astype("float32")
+
+    ndsm = grid(rasters["dsm"]) - grid(rasters["dtm"])
+    ndsm = np.where(np.isfinite(ndsm), ndsm, 0.0)
+    polys = []
+    for tid in frame.tiles_for_bbox((e0, n0, e1, n1), margin=50.0):
+        p = BC.TILES_DIR / tid / "buildings.json"
+        if p.exists():
+            for b in json.loads(p.read_text())["buildings"]:
+                pts = [frame.to_utm(b["ring"][i], b["ring"][i + 1]) for i in range(0, len(b["ring"]), 2)]
+                if len(pts) >= 3:
+                    polys.append(Polygon(pts).buffer(0))
+    roof = geometry_mask([p for p in polys if not p.is_empty], (size, size), T, invert=True) if polys else np.zeros((size, size), bool)
+    z = np.zeros((size, size), "float32")
+    classes = {2: np.where(~roof & (ndsm < NDSM_LOW), 1.0, 0.0), 3: z, 4: np.where(~roof & (ndsm >= NDSM_LOW) & (ndsm < NDSM_HIGH), float(vegetation.PLANTING_MIN), 0.0),
+               5: np.where(~roof & (ndsm >= NDSM_HIGH), 2.0, 0.0), 6: np.where(roof, 1.0, 0.0), 9: z, 17: z}
+    for c, a in classes.items():
+        with rasterio.open(out_dir / f"c{c}_{cell}.tif", "w", driver="GTiff", height=size, width=size, count=1, dtype="float32", crs="EPSG:25832",
+                           transform=T, compress="deflate", nodata=0) as d:
+            d.write(a.astype("float32"), 1)
+    shutil.rmtree(work, ignore_errors=True)
+    (out_dir / f"heights_{cell}.txt").write_text("ndsm\n")  # vegetation.py labels its sources from this
+    return {"heights": "ndsm", "canopy_m2": int((classes[5] > 0).sum()), "low_m2": int((classes[4] > 0).sum())}
+
+
+def heights_of(cell: str) -> str:
+    """'ndsm' when the cell's class rasters are the DSM - DTM stand-in, else 'punktsky'."""
+    return "ndsm" if (VEG / f"heights_{cell}.txt").exists() else "punktsky"
+
+
 def veg_raster_job(cell: str) -> dict:
-    """NDVI for a cell (CIR WMS, local). The LiDAR class rasters (c<class>_<cell>.tif) are made by the cloud job and synced into
-    data/raw/veg/; this machine does not download point clouds. A cell is 'raster done' when both exist."""
+    """NDVI (CIR WMS) and the height classes for a cell: the DHM point cloud's class counts (LAZ from Datafordeler, deleted after
+    the pass) when DATAFORDELER_GRAPHQL_API_KEY is set, else the DSM - DTM stand-in (ndsm_class_rasters). Upstream synced the
+    LiDAR rasters from a cloud job; rasters already in data/raw/veg/ are used as they are. A cell is 'raster done' when both exist."""
+    import envsecret
+
     name = f"veg-raster-{cell}"
     if BC.is_done(name):
         return {"cell": cell, "skipped": True}
     t0 = time.time()
     try:
         VEG.mkdir(parents=True, exist_ok=True)
+        BC.ensure_secrets("GSEARCH_TOKEN")
+        info = {}
         if not all((VEG / f"c{c}_{cell}.tif").exists() for c in CLASSES):
-            return {"cell": cell, "waiting": "LiDAR class rasters not synced yet"}
+            key = envsecret.first("DATAFORDELER_GRAPHQL_API_KEY")
+            if key:
+                laz = download_laz(cell, key)
+                try:
+                    info = class_rasters(laz, cell, VEG)
+                finally:
+                    laz.unlink(missing_ok=True)
+                (VEG / f"heights_{cell}.txt").unlink(missing_ok=True)
+            else:
+                info = ndsm_class_rasters(cell, envsecret.first("DHM_TERRAIN_TOKEN", "GSEARCH_TOKEN"), VEG)
         if not (VEG / f"ndvi_{cell}.tif").exists():
-            BC.ensure_secrets("GSEARCH_TOKEN")
             ndvi_raster(cell, os.environ["GSEARCH_TOKEN"], VEG)
-        res = {"cell": cell, "seconds": round(time.time() - t0, 1)}
-        BC.mark_done(name, seconds=res["seconds"])
+        res = {"cell": cell, "seconds": round(time.time() - t0, 1), **info, "heights": heights_of(cell)}
+        BC.mark_done(name, **{k: v for k, v in res.items() if k != "cell"})
         return res
     except Exception as e:  # noqa: BLE001
         return {"cell": cell, "error": f"{type(e).__name__}: {e}", "trace": traceback.format_exc()[-400:]}
@@ -179,7 +250,14 @@ def veg_compile_job(cell: str, tids: list[str], neighbours_ready: bool) -> dict:
                 surf["surfaces"] += json.loads(p.read_text()).get("surfaces", [])
         e0, n0, e1, n1 = core
         x0, z0, x1, z1 = frame.utm_bbox_to_local((e0 - 100, n0 - 100, e1 + 100, n1 + 100))
-        lakes_doc = json.loads((BC.CITY_DIR / "lakes.json").read_text()) if (BC.CITY_DIR / "lakes.json").exists() else {"lakes": []}
+        if (BC.CITY_DIR / "lakes.json").exists():
+            lakes_doc = json.loads((BC.CITY_DIR / "lakes.json").read_text())
+        else:  # the citywide water layers (city_water.py): every body's polygons, the fjord included
+            lakes_doc = {"lakes": []}
+            for t in around:
+                p = BC.TILES_DIR / t / "water.json"
+                if p.exists():
+                    lakes_doc["lakes"] += [{"ring": q["ring"]} for b in json.loads(p.read_text()).get("bodies", []) for q in b.get("polys", [])]
         lakes = {"lakes": [l for l in lakes_doc["lakes"] if max(l["ring"][0::2]) > x0 and min(l["ring"][0::2]) < x1
                            and max(l["ring"][1::2]) > z0 and min(l["ring"][1::2]) < z1]}
         inp = BC.WORK / "veg_in" / cell
@@ -191,7 +269,8 @@ def veg_compile_job(cell: str, tids: list[str], neighbours_ready: bool) -> dict:
         out = inp / "vegetation.json"
         argv = sys.argv
         sys.argv = ["vegetation.py", "--bbox", *map(str, core), "--out", str(out), "--geodata", str(files["geodata"]), "--surfaces", str(files["surfaces"]),
-                    "--lakes", str(files["lakes"]), "--streets", str(files["streets"]), "--ndvi", f"ndvi_{cell}.tif", "--veg-dir", str(VEG)]
+                    "--lakes", str(files["lakes"]), "--streets", str(files["streets"]), "--ndvi", f"ndvi_{cell}.tif", "--veg-dir", str(VEG),
+                    "--heights", heights_of(cell)]
         try:
             vegetation.main()
         finally:
@@ -227,8 +306,13 @@ def stage_vegetation(a, tiles, cells) -> None:
     import multiprocessing as mp
     from concurrent.futures import ProcessPoolExecutor, as_completed
 
-    BC.ensure_secrets("DATAFORDELER_GRAPHQL_API_KEY", "GSEARCH_TOKEN")
+    BC.ensure_secrets("GSEARCH_TOKEN")  # DATAFORDELER_GRAPHQL_API_KEY is optional (veg_raster_job)
     order = cell_priority(cells)
+    if a.force_stage("vegetation"):  # redo the cells' rasters (e.g. the point cloud once a key is set) and their compile
+        for c in (a.cells or order):
+            for p in [BC.done_path(f"veg-raster-{c}"), BC.done_path(f"veg-cell-{c}"), VEG / f"heights_{c}.txt",
+                      *(VEG / f"c{k}_{c}.tif" for k in CLASSES)]:
+                p.unlink(missing_ok=True)
     if a.cells:
         order = [c for c in order if c in a.cells]
     todo = [c for c in order if not BC.is_done(f"veg-raster-{c}")]
@@ -252,7 +336,7 @@ def stage_vegetation(a, tiles, cells) -> None:
                 elif r.get("waiting"):
                     waiting.append(c)
                 else:
-                    log(f"[vegetation] rasters {n}/{len(todo)} {c}: ndvi {r.get('seconds', '-')}s; {BC.free_gb():.1f} GB free")
+                    log(f"[vegetation] rasters {n}/{len(todo)} {c} ({r.get('heights', '-')}): {r.get('seconds', '-')}s; {BC.free_gb():.1f} GB free")
     if waiting:
         log(f"[vegetation] {len(waiting)} cells wait for the cloud LiDAR rasters: {waiting[:8]}")
     if a.veg_rasters_only:
@@ -300,12 +384,11 @@ def _neighbour_cells(cell: str, cells: dict) -> list[str]:
 # ---------------------------------------------------------------------------------------------------------- entrances
 
 def stage_entrances(a, tiles, cells) -> None:
-    """DAR husnumre + BBR opgange for the city (entrances.py on the buildings of the tiles >= 20 m2), cut into tiles by the building
-    each entrance belongs to."""
+    """DAR husnumre + BBR opgange for the city (entrances.py on the buildings of the tiles >= 20 m2, from datagrundlag.dk), cut into
+    tiles by the building each entrance belongs to."""
     if BC.is_done("entrances") and not a.force_stage("entrances"):
         return
     t0 = time.time()
-    BC.ensure_secrets("DATAFORDELER_USERNAME", "DATAFORDELER_PASSWORD", "DATAFORDELER_GRAPHQL_API_KEY")
     dar_dir, dar_tgz = BC.DATA / "raw" / "dar", BC.DATA / "raw" / "dar.tar.gz"
     if not dar_dir.exists() and dar_tgz.exists():  # the DAR response cache is kept as one archive (100k small files cost 1.4 GB of blocks)
         subprocess.run(["tar", "xzf", str(dar_tgz), "-C", str(dar_dir.parent)], check=True)
@@ -330,7 +413,7 @@ def stage_entrances(a, tiles, cells) -> None:
     out = BC.WORK / "entrances_city.json"
     log(f"[entrances] {len(blds)} buildings >= 20 m2 of {len(owner)}; DAR lookups (cached under data/raw/dar)")
     argv = sys.argv
-    sys.argv = ["entrances.py", "--bbox", *map(str, BC.city_bbox_utm(tiles)), "--out", str(out), "--geodata", str(src)]
+    sys.argv = ["entrances.py", "--bbox", *map(str, BC.city_bbox_utm(tiles)), "--out", str(out), "--geodata", str(src), "--kommune", BC.KOMMUNE]
     try:
         entrances.main()
     finally:

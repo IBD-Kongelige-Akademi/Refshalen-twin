@@ -66,7 +66,6 @@ def stage_surfaces(a, tiles, cells) -> None:
         return
     t0 = time.time()
     _citywide(tiles)
-    import frb
     import surfaces
 
     out = BC.WORK / "surfaces_city.json"
@@ -77,9 +76,6 @@ def stage_surfaces(a, tiles, cells) -> None:
     finally:
         sys.argv = argv
     doc = json.loads(out.read_text())
-    crossings = frb.crossing_markings()
-    doc["markings"] += crossings
-    doc["attribution"] = doc.get("attribution", []) + ["Frederiksberg Kommune GC2: fodgængerfelter", "© OpenStreetMap contributors (ODbL)"]
     L = BC.Layers(set(tiles))
     for i, s in enumerate(doc["surfaces"]):
         L.add(T.owner_of_ring(s), "surfaces", "surfaces", s, i)
@@ -90,10 +86,10 @@ def stage_surfaces(a, tiles, cells) -> None:
     meta["frame"] = {"epsg": 25832, "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": BC.city_local_bbox(tiles)}
     _put_meta("surfaces", meta)
     _add_subst([
-        {"item": "surface materials (paving classes)", "source": "none (KK dp_belaegninger is KK-only); OSM place=square / pedestrian areas citywide",
-         "count": 0, "note": "Frederiksberg pavements are drawn from the sidewalk polygons with the engine's default Københavnerfortov; roads default asphalt"},
-        {"item": "pedestrian crossings (markings)", "source": "GC2 vej.fodgaengerfelt", "count": len(crossings),
-         "note": "line buffered to a 3 m strip (width inferred); no other marking register exists (no lane paint, arrows, bays, blue cycle fields)"},
+        {"item": "surface materials (paving classes)", "source": "none open in Aalborg; OSM place=square / pedestrian areas",
+         "count": len(doc["surfaces"]), "note": "pavements are the derived sidewalk polygons with the engine's default slab paving; roads default asphalt"},
+        {"item": "road markings", "source": "none open in Aalborg", "count": 0,
+         "note": "no lane paint, crossings, arrows, bays or cycle fields; the engine's procedural centre and edge lines remain"},
     ])
     BC.mark_done("surfaces", seconds=round(time.time() - t0, 1), tiles=n, surfaces=len(doc["surfaces"]), markings=len(doc["markings"]))
     log(f"[surfaces] {len(doc['surfaces'])} surfaces + {len(doc['markings'])} markings in {n} tiles ({time.time() - t0:.0f}s)")
@@ -263,23 +259,10 @@ def stage_groundfloor(a, tiles, cells) -> None:
         L.add(T.owner_of_point(v), "groundfloor", "venues", v, i)
     n = _write_tiles(L, "groundfloor", tiles)
     _put_meta("groundfloor", T._without(doc, ("venues",)))
-    _add_subst([{"item": "ground-floor venues", "source": "OSM shops/amenities citywide (KK bevillinger is KK-only)", "count": sum(
-        1 for v in doc["venues"] if any(s.startswith("osm:") for s in v.get("src", [])) and frb_contains(v)), "note": "no serving-permit layer for Frederiksberg"}])
+    _add_subst([{"item": "ground-floor venues", "source": "OSM shops/amenities (no open serving-permit register in Aalborg)",
+                 "count": len(doc["venues"]), "note": "only walls with a mapped venue get a shopfront"}])
     BC.mark_done("groundfloor", seconds=round(time.time() - t0, 1), tiles=n, venues=len(doc["venues"]))
     log(f"[groundfloor] {len(doc['venues'])} venues in {n} tiles ({time.time() - t0:.0f}s)")
-
-
-def frb_contains(v) -> bool:
-    import frb
-    from shapely.geometry import Point
-
-    global _FRB
-    try:
-        _FRB
-    except NameError:
-        _FRB = frb.frb_polygon()
-    e, n = frame.to_utm(v["x"], v["z"])
-    return _FRB.contains(Point(e, n))
 
 
 # ------------------------------------------------------------------------------------------------------------ streets

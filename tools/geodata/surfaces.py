@@ -2,9 +2,11 @@
 # requires-python = ">=3.10"
 # dependencies = ["requests", "pyproj"]
 # ///
-"""Ground-surface and road-marking compiler for the Copenhagen twin -> data/cph-surfaces.json.
+"""Ground-surface and road-marking compiler -> data/cph-surfaces.json.
 
-Sources (Københavns Kommune open WFS, CC BY 4.0 / Open Data DK licens, no auth):
+Aalborg has no open surface or marking register: by default only the OSM squares and pedestrian areas are read, roads stay asphalt and
+pavements the engine's default slabs. `--kk` adds upstream's Copenhagen sources (Københavns Kommune open WFS, CC BY 4.0 / Open Data DK
+licens, no auth):
   k101:dp_belaegninger   surface material polygons (parks, squares, some streets)
   k101:afmaerkning_total road markings (crossings, arrows, bays, white lines, ...)
   k101:blaa_cykelfelt    blue cycle crossings (merged with the matching afmaerkning type)
@@ -80,7 +82,13 @@ def classify_osm(tags: dict) -> tuple[str, str]:
         return ("setts" if surface == "sett" else "cobbles"), "observed"
     if surface in ("paving_stones", "paved", "concrete:plates"):
         return "raadhus", "inferred"
-    return "cobbles", "inferred"  # an unlabelled Copenhagen square: granite brosten
+    if surface == "asphalt":
+        return "asphalt_road", "observed"
+    if surface in ("gravel", "fine_gravel", "compacted", "pebblestone"):
+        return "gravel", "observed"
+    if surface in ("concrete", "wood", "metal"):
+        return "other", "observed"
+    return "raadhus", "inferred"  # an unlabelled Aalborg square or pedestrian street: slab paving (upstream: Copenhagen's granite brosten)
 
 
 def polygons(geom):
@@ -161,6 +169,7 @@ def main():
     ap.add_argument("--refresh", action="store_true")
     ap.add_argument("--sanitize-existing", action="store_true", help="repair invalid polygons in the committed data file without refetching")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--kk", action="store_true", help="also read the Københavns Kommune surface and marking registers (Copenhagen only)")
     frame.add_area_args(ap)
     args = ap.parse_args()
     frame.apply_area_args(args)
@@ -172,16 +181,19 @@ def main():
         return
     import fetch  # noqa: PLC0415 (needs requests)
 
-    belag = fetch.kk_layer("dp_belaegninger", args.refresh)
-    afm = fetch.kk_layer("afmaerkning_total", args.refresh)
-    blue = fetch.kk_layer("blaa_cykelfelt", args.refresh)
+    surfaces, markings, attribution = [], [], []
+    if args.kk:
+        belag = fetch.kk_layer("dp_belaegninger", args.refresh)
+        afm = fetch.kk_layer("afmaerkning_total", args.refresh)
+        blue = fetch.kk_layer("blaa_cykelfelt", args.refresh)
 
-    def surf(p):
-        cls, conf = classify_surface(p.get("under_element"), p.get("byrumstype"), p.get("underordnet_byrumstype"))
-        return {"cls": cls, "material": p.get("under_element"), "space": p.get("underordnet_byrumstype") or p.get("byrumstype"),
-                "src": ["kk:dp_belaegninger"], "conf": conf}
+        def surf(p):
+            cls, conf = classify_surface(p.get("under_element"), p.get("byrumstype"), p.get("underordnet_byrumstype"))
+            return {"cls": cls, "material": p.get("under_element"), "space": p.get("underordnet_byrumstype") or p.get("byrumstype"),
+                    "src": ["kk:dp_belaegninger"], "conf": conf}
 
-    surfaces = convert(belag, surf, "kk:belaegning")
+        surfaces = convert(belag, surf, "kk:belaegning")
+        attribution.append("Indeholder data fra Københavns Kommune (kbhkort, CC BY 4.0 / Open Data DK licens)")
 
     # OSM squares and pedestrian areas (closed ways only), after the KK register so KK wins where both cover a spot
     from pyproj import Transformer  # noqa: PLC0415
@@ -205,23 +217,26 @@ def main():
                          "src": ["osm:way"], "conf": conf, "id": f"osm:way/{e['id']}", "ring": flat(ring)})
         n_osm += 1
     print("osm squares/pedestrian areas", n_osm)
+    if n_osm:
+        attribution.append("© OpenStreetMap contributors (ODbL)")
 
-    def mark(p):
-        t = p.get("type")
-        return {"kind": MARKING_KIND.get(t, "other"), "src": ["kk:afmaerkning_total"], "conf": "observed"}
+    if args.kk:
+        def mark(p):
+            t = p.get("type")
+            return {"kind": MARKING_KIND.get(t, "other"), "src": ["kk:afmaerkning_total"], "conf": "observed"}
 
-    markings = convert(afm, mark, "kk:afm")
-    # blaa_cykelfelt duplicates most afmaerkning 'Blå cykelfelt' polygons: add only those without a twin within 1.5 m
-    have = [centroid([(ring[i], ring[i + 1]) for i in range(0, len(ring), 2)]) for m in markings if m["kind"] == "bluecycle" for ring in [m["ring"]]]
-    for m in convert(blue, lambda p: {"kind": "bluecycle", "src": ["kk:blaa_cykelfelt"], "conf": "observed"}, "kk:blaa"):
-        c = centroid([(m["ring"][i], m["ring"][i + 1]) for i in range(0, len(m["ring"]), 2)])
-        if not any((c[0] - h[0]) ** 2 + (c[1] - h[1]) ** 2 < 2.25 for h in have):
-            markings.append(m)
+        markings = convert(afm, mark, "kk:afm")
+        # blaa_cykelfelt duplicates most afmaerkning 'Blå cykelfelt' polygons: add only those without a twin within 1.5 m
+        have = [centroid([(ring[i], ring[i + 1]) for i in range(0, len(ring), 2)]) for m in markings if m["kind"] == "bluecycle" for ring in [m["ring"]]]
+        for m in convert(blue, lambda p: {"kind": "bluecycle", "src": ["kk:blaa_cykelfelt"], "conf": "observed"}, "kk:blaa"):
+            c = centroid([(m["ring"][i], m["ring"][i + 1]) for i in range(0, len(m["ring"]), 2)])
+            if not any((c[0] - h[0]) ** 2 + (c[1] - h[1]) ** 2 < 2.25 for h in have):
+                markings.append(m)
 
     doc = {
         "version": "cph-surfaces/1",
         "frame": {"epsg": 25832, "origin": list(ORIGIN), "axes": "x=east, z=south, y=up", "bbox": list(area_local())},
-        "attribution": ["Indeholder data fra Københavns Kommune (kbhkort, CC BY 4.0 / Open Data DK licens)"],
+        "attribution": attribution,
         "classes": list(CLASSES),
         "surfaces": surfaces,
         "markings": markings,

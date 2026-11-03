@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["requests"]
+# dependencies = ["requests", "duckdb", "pyogrio", "geopandas"]
 # ///
 """Building entrances from DAR -> data/cph-entrances.json (cph-entrances/1).
 
@@ -16,9 +16,12 @@ point, usually surveyed at the door) and a `vejpunkt` (where the access road is 
   4. snaps the adgangspunkt to the nearest wall of its building (outer ring or courtyard holes) and records the
      distance. conf: `measured` <= 1.5 m, `observed` <= 3 m, else `inferred`.
 
-    uv run tools/geodata/entrances.py            # cached raw responses under data/raw/dar/ make reruns offline
+By default (`--source datagrundlag`) steps 1 and 3's opgange read datagrundlag.dk instead (DarDG: every husnummer whose adgangspunkt
+lies in the area, no account, cached under data/raw/city/). `--source dar-rest` is upstream's Datafordeler path:
 
-Credentials (DATAFORDELER_USERNAME / DATAFORDELER_PASSWORD / DATAFORDELER_GRAPHQL_API_KEY) come from the environment or
+    uv run tools/geodata/entrances.py --source dar-rest   # cached raw responses under data/raw/dar/ make reruns offline
+
+whose credentials (DATAFORDELER_USERNAME / DATAFORDELER_PASSWORD / DATAFORDELER_GRAPHQL_API_KEY) come from the environment or
 .env (envsecret.py, .env.example); they are never printed.
 """
 from __future__ import annotations
@@ -250,6 +253,78 @@ class Dar:
         return out
 
 
+def _current(col: str) -> str:
+    return f"(\"{col}\" IS NULL OR \"{col}\" = '')"
+
+
+class DarDG:
+    """The same records from datagrundlag.dk (MapCentia's mirror; no account): DAR adressepunkt in the bbox (FlatGeobuf), the gaeldende
+    husnumre whose adgangspunkt is one of them and their navngivenvej names (GeoParquet + DuckDB), and the kommune's BBR opgange.
+    The husnumre come back in the DAR REST shape `normalise` reads; everything is cached under data/raw/city/."""
+
+    def __init__(self, bbox_utm, kommune: str):
+        import datagrundlag as DG
+
+        self.DG, self.bbox, self.kommune = DG, bbox_utm, kommune.zfill(4)
+        self._con = None
+
+    def con(self):
+        if self._con is None:
+            import duckdb
+
+            self._con = duckdb.connect()
+            self._con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='eu-west-1';")
+        return self._con
+
+    def _parquet(self, source: str, table: str, suffix: str, sql: str, params: list, cols: list[str]) -> list[dict]:
+        p = self.DG.cache_path(source, table, suffix)
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+        url, date = self.DG.asset_url(source, table, "data")
+        rows = self.con().execute(sql.format(src=f"read_parquet('{url}')"), params).fetchall()
+        out = [dict(zip(cols, r)) for r in rows]
+        self.DG._write(p, json.dumps(out, ensure_ascii=False, separators=(",", ":")))
+        self.DG.record_snapshot(source, table, date, records=len(out))
+        print(f"[entrances] datagrundlag {source}.{table} ({date}): {len(out)} records", file=sys.stderr)
+        return out
+
+    def husnumre(self) -> list[dict]:
+        fc = self.DG.fetch_features("dar", "adressepunkt", bbox=self.bbox, suffix="_entrances")
+        pts = {}
+        for f in fc["features"]:
+            p, g = f["properties"], f.get("geometry") or {}
+            if g.get("type") == "Point" and not p.get("registreringtil") and not p.get("virkningtil"):
+                pts[p["id_lokalid"]] = {"position": "POINT(%r %r)" % tuple(g["coordinates"][:2]),
+                                        "oprindelse_nøjagtighedsklasse": p.get("oprindelse_nøjagtighedsklasse")}
+        cols = ["id_lokalid", "status", "husnummertekst", "adgangspunkt", "vejpunkt", "geodanmarkbygning", "adgangtilbygning", "vejmidte",
+                "navngivenvej", "registreringfra"]
+        sql = (f"SELECT {', '.join(cols)} FROM {{src}} WHERE status = '3' AND {_current('registreringtil')} AND {_current('virkningtil')} "
+               "AND list_contains(?, adgangspunkt)")
+        rows = self._parquet("dar", "husnummer", "_entrances", sql, [sorted(pts)], cols)
+        latest: dict[str, dict] = {}
+        for r in rows:  # one row per id; a re-registration in the same snapshot keeps the newest
+            if r["id_lokalid"] not in latest or (r["registreringfra"] or "") > (latest[r["id_lokalid"]]["registreringfra"] or ""):
+                latest[r["id_lokalid"]] = r
+        streets = sorted({r["navngivenvej"] for r in latest.values() if r["navngivenvej"]})
+        names = {r["id_lokalid"]: r["vejnavn"] for r in self._parquet(
+            "dar", "navngivenvej", "_entrances",
+            f"SELECT id_lokalid, vejnavn FROM {{src}} WHERE {_current('registreringtil')} AND {_current('virkningtil')} AND list_contains(?, id_lokalid)",
+            [streets], ["id_lokalid", "vejnavn"])}
+        out = []
+        for r in latest.values():
+            out.append({"id_lokalId": r["id_lokalid"], "status": r["status"], "husnummertekst": r["husnummertekst"],
+                        "adgangspunkt": pts.get(r["adgangspunkt"]), "vejpunkt": pts.get(r["vejpunkt"]),
+                        "geoDanmarkBygning": r["geodanmarkbygning"] or None, "adgangTilBygning": r["adgangtilbygning"] or None,
+                        "vejmidte": r["vejmidte"] or None, "navngivenVej": {"vejnavn": names.get(r["navngivenvej"])}})
+        return out
+
+    def opgange(self) -> list[dict]:
+        cols = ["bygning", "adgangfrahusnummer", "status"]
+        sql = (f"SELECT {', '.join(cols)} FROM {{src}} WHERE kommunekode = ? AND {_current('registreringtil')} AND {_current('virkningtil')}")
+        rows = self._parquet("bbr", "opgang", f"_{self.kommune}", sql, [self.kommune], cols)
+        return [{"bygning": r["bygning"], "adgangFraHusnummer": r["adgangfrahusnummer"], "status": r["status"]} for r in rows]
+
+
 def normalise(raw: dict):
     """DAR husnummer record -> flat dict in the local frame, or None when not usable."""
     if str(raw.get("status")) != "3":
@@ -292,6 +367,9 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=None)
     ap.add_argument("--geodata", default=None)
+    ap.add_argument("--source", choices=("datagrundlag", "dar-rest"), default="datagrundlag",
+                    help="datagrundlag.dk (no account) or upstream's Datafordeler DAR REST + BBR GraphQL (credentials)")
+    ap.add_argument("--kommune", default="0851", help="kommunekode of the BBR opgange (datagrundlag)")
     frame.add_area_args(ap)
     args = ap.parse_args()
     frame.apply_area_args(args)
@@ -302,32 +380,45 @@ def main() -> None:
     by_bbr = {b["bbr_id"]: b for b in buildings if b.get("bbr_id")}
     index = BuildingIndex(buildings)
     x0, z0, x1, z1 = area_local()
-    dar = Dar()
-
-    # 1. streets from per-building lookups, then every husnummer of those streets
-    def lookup(b):
-        if b.get("bbr_id"):
-            return dar.husnumre("adgangTilBygning", b["bbr_id"])
-        return dar.husnumre("geoDanmarkBygning", b["id"].split(":")[1])
-
-    with ThreadPoolExecutor(12) as ex:
-        per_building = list(ex.map(lookup, buildings))
-    streets = {h.get("vejmidte") for recs in per_building for h in recs if h.get("vejmidte")}
-    print(f"[entrances] {len(buildings)} buildings -> {len(streets)} streets", file=sys.stderr)
-    with ThreadPoolExecutor(12) as ex:
-        per_street = list(ex.map(lambda v: dar.husnumre("vejmidte", v), sorted(streets)))
     seen: dict[str, dict] = {}
-    for recs in [*per_building, *per_street]:
+
+    def keep(recs):
         for raw in recs:
             n = normalise(raw)
             if n and x0 - MARGIN_M <= n["x"] <= x1 + MARGIN_M and z0 - MARGIN_M <= n["z"] <= z1 + MARGIN_M:
                 seen.setdefault(n["id"], n)
 
-    # 2. BBR opgang (stairwells): which husnumre each building is entered from; fetch husnumre not yet seen
-    bbr_ids = sorted(by_bbr)
-    batches = [bbr_ids[i:i + 100] for i in range(0, len(bbr_ids), 100)]
-    with ThreadPoolExecutor(4) as ex:
-        opg = [o for rows in ex.map(dar.opgange, batches) for o in rows]
+    if args.source == "datagrundlag":
+        # 1. every gaeldende husnummer whose adgangspunkt lies in the area (+ margin); 2. the kommune's opgange
+        e0, n0, e1, n1 = frame.area_utm()
+        dg = DarDG((e0 - MARGIN_M, n0 - MARGIN_M, e1 + MARGIN_M, n1 + MARGIN_M), args.kommune)
+        keep(dg.husnumre())
+        own = set(by_bbr)
+        opg = [o for o in dg.opgange() if o["bygning"] in own]
+        missing = []
+    else:
+        dar = Dar()
+
+        # 1. streets from per-building lookups, then every husnummer of those streets
+        def lookup(b):
+            if b.get("bbr_id"):
+                return dar.husnumre("adgangTilBygning", b["bbr_id"])
+            return dar.husnumre("geoDanmarkBygning", b["id"].split(":")[1])
+
+        with ThreadPoolExecutor(12) as ex:
+            per_building = list(ex.map(lookup, buildings))
+        streets = {h.get("vejmidte") for recs in per_building for h in recs if h.get("vejmidte")}
+        print(f"[entrances] {len(buildings)} buildings -> {len(streets)} streets", file=sys.stderr)
+        with ThreadPoolExecutor(12) as ex:
+            per_street = list(ex.map(lambda v: dar.husnumre("vejmidte", v), sorted(streets)))
+        for recs in [*per_building, *per_street]:
+            keep(recs)
+
+        # 2. BBR opgang (stairwells): which husnumre each building is entered from
+        bbr_ids = sorted(by_bbr)
+        batches = [bbr_ids[i:i + 100] for i in range(0, len(bbr_ids), 100)]
+        with ThreadPoolExecutor(4) as ex:
+            opg = [o for rows in ex.map(dar.opgange, batches) for o in rows]
     opgang_ids: set[str] = set()
     stair: dict[str, int] = Counter()
     for o in opg:
@@ -336,13 +427,11 @@ def main() -> None:
             continue
         opgang_ids.add(h)
         stair[o["bygning"]] += 1
-    missing = sorted(opgang_ids - set(seen))
-    with ThreadPoolExecutor(12) as ex:
-        for recs in ex.map(lambda i: dar.husnumre("id", i), missing):
-            for raw in recs:
-                n = normalise(raw)
-                if n and x0 - MARGIN_M <= n["x"] <= x1 + MARGIN_M and z0 - MARGIN_M <= n["z"] <= z1 + MARGIN_M:
-                    seen.setdefault(n["id"], n)
+    if args.source != "datagrundlag":  # husnumre not yet seen (datagrundlag already has every one whose point is in the area)
+        missing = sorted(opgang_ids - set(seen))
+        with ThreadPoolExecutor(12) as ex:
+            for recs in ex.map(lambda i: dar.husnumre("id", i), missing):
+                keep(recs)
     print(f"[entrances] {len(seen)} gaeldende husnumre in/near the district ({len(missing)} fetched via opgang)", file=sys.stderr)
 
     # 3. link + snap
@@ -360,7 +449,8 @@ def main() -> None:
 
     doc = {
         "version": "cph-entrances/1", "frame": "cph-geodata local (x east, z south)",
-        "attribution": ["Danmarks Adresseregister (DAR), Datafordeler, Klimadatastyrelsen / SDFI"],
+        "attribution": ["Danmarks Adresseregister (DAR) og BBR, Klimadatastyrelsen / SDFI"
+                        + (", via datagrundlag.dk" if args.source == "datagrundlag" else ", Datafordeler")],
         "note": "x,z = DAR adgangspunkt; sx,sz = snapped to the wall (ring 0 outline, >=1 courtyard hole); conf by snap distance d",
         "entrances": entries,
         "stairwells": {k: v for k, v in sorted(stair.items())},

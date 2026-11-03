@@ -2,11 +2,14 @@
 
 A fallback for days when every public Overpass server fails. The bbox is fetched in GRID x GRID requests (each far below the API's
 0.25 deg2 / 50,000-node limits; the API is meant for editor-sized areas, so use this for a district, not a kommune), merged, and
-the answers to build_city.OSM_QUERIES are rebuilt from it with Overpass's `out geom` layout:
+the answers to build_city.OSM_QUERIES and OSM_QUERIES2 are rebuilt from it with Overpass's `out geom` layout:
 
     roads        way["highway"]                                                  -> ways with tags and geometry
     water_parks  natural=water and leisure=park|garden ways and relations        -> ways with geometry, relations with member geometry
     nodes        highway=traffic_signals | street_lamp, crossing=traffic_signals -> nodes with tags
+    squares      place=square, pedestrian areas                                  -> ways with geometry, relations with member geometry
+    groundfloor  shops, venues, crafts, offices, hotels (groundfloor.QUERY)      -> nodes, ways and relations with a `center` (out center)
+    street_nodes benches, bins, bollards, racks, bus stops                       -> nodes with tags
 
 Raw API answers are cached under data/raw/city/osm_api/. Map data © OpenStreetMap contributors (ODbL).
 """
@@ -74,12 +77,26 @@ def _way_out(way, nodes):
     return {"type": "way", "id": way["id"], "tags": way.get("tags", {}), "geometry": _geom(way, nodes)}
 
 
-def select(elements: list[dict], way=None, relation=None, node=None) -> dict:
-    """An Overpass `out geom` answer with the ways / relations / nodes whose tags pass the given predicates (None: none of that kind)."""
+def _center(pts):
+    """Overpass `out center`: the middle of the bounding box."""
+    if not pts:
+        return None
+    lats, lons = [p["lat"] for p in pts], [p["lon"] for p in pts]
+    return {"lat": (min(lats) + max(lats)) / 2, "lon": (min(lons) + max(lons)) / 2}
+
+
+def select(elements: list[dict], way=None, relation=None, node=None, center: bool = False) -> dict:
+    """An Overpass `out geom` answer with the ways / relations / nodes whose tags pass the given predicates (None: none of that kind);
+    `center`: an `out center tags` answer instead (ways and relations carry a `center`, no geometry)."""
     nodes, ways = _index(elements)
     out = []
     if way:
-        out += [_way_out(w, nodes) for w in ways.values() if way(w.get("tags", {}))]
+        for w in ways.values():
+            if way(w.get("tags", {})):
+                o = _way_out(w, nodes)
+                if center:
+                    o["center"] = _center(o.pop("geometry"))
+                out.append(o)
     if relation:
         for el in elements:
             if el["type"] == "relation" and relation(el.get("tags", {})):
@@ -89,7 +106,11 @@ def select(elements: list[dict], way=None, relation=None, node=None) -> dict:
                     if m["type"] == "way" and m["ref"] in ways:
                         mm["geometry"] = _geom(ways[m["ref"]], nodes)
                     members.append(mm)
-                out.append({"type": "relation", "id": el["id"], "tags": el.get("tags", {}), "members": members})
+                if center:
+                    out.append({"type": "relation", "id": el["id"], "tags": el.get("tags", {}),
+                                "center": _center([p for m in members for p in m.get("geometry", [])])})
+                else:
+                    out.append({"type": "relation", "id": el["id"], "tags": el.get("tags", {}), "members": members})
     if node:
         out += [{"type": "node", "id": nd["id"], "lat": nd["lat"], "lon": nd["lon"], "tags": nd.get("tags", {})}
                 for nd in nodes.values() if nd.get("tags") and node(nd["tags"])]
@@ -104,10 +125,37 @@ def _signal_lamp(t):
     return t.get("highway") in ("traffic_signals", "street_lamp") or (t.get("highway") == "crossing" and t.get("crossing") == "traffic_signals")
 
 
-QUERIES = {  # build_city.OSM_QUERIES as select() arguments
+def _square(t):  # build_city.OSM_QUERIES2["squares"]
+    return (t.get("place") == "square" or (t.get("highway") == "pedestrian" and t.get("area") == "yes")
+            or t.get("area:highway") in ("pedestrian", "footway", "living_street") or t.get("landuse") == "pedestrian")
+
+
+def _square_rel(t):
+    return t.get("place") == "square" or t.get("highway") == "pedestrian"
+
+
+GF_AMENITY = {"cafe", "restaurant", "bar", "pub", "fast_food", "ice_cream", "bakery", "biergarten", "nightclub", "pharmacy",
+              "bank", "post_office", "dentist", "doctors", "veterinary", "driving_school", "marketplace", "food_court"}  # groundfloor.AMENITY
+
+
+def _venue(t):  # groundfloor.QUERY
+    return ("shop" in t or t.get("amenity") in GF_AMENITY or "craft" in t or ("office" in t and "addr:housenumber" in t)
+            or t.get("tourism") in ("hotel", "hostel", "gallery"))
+
+
+def _street_node(t):  # build_city.OSM_QUERIES2["street_nodes"]
+    return (t.get("amenity") in ("bench", "waste_basket", "recycling", "bicycle_parking") or t.get("leisure") == "picnic_table"
+            or t.get("barrier") == "bollard" or t.get("highway") == "bus_stop"
+            or (t.get("amenity") == "shelter" and t.get("shelter_type") == "public_transport"))
+
+
+QUERIES = {  # build_city.OSM_QUERIES / OSM_QUERIES2 as select() arguments
     "roads": {"way": lambda t: "highway" in t},
     "water_parks": {"way": _water_park, "relation": _water_park},
     "nodes": {"node": _signal_lamp},
+    "squares": {"way": _square, "relation": _square_rel},
+    "groundfloor": {"way": _venue, "relation": _venue, "node": _venue, "center": True},
+    "street_nodes": {"node": _street_node},
 }
 
 
