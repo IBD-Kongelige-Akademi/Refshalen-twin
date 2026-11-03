@@ -53,7 +53,7 @@ function configureBody(actor) {
       if (Number.isFinite(overrides.offsetForward)) actor.offsetForward = overrides.offsetForward;
     }
   }
-  actor.bottom = Number.isFinite(actor.bodyBottom) ? actor.bodyBottom : actor.mode === 'helicopter' ? -0.25 : 0;
+  actor.bottom = Number.isFinite(actor.bodyBottom) ? actor.bodyBottom : 0;
   if (Number.isFinite(actor.bodyTop)) actor.top = actor.bodyTop;
   else if (actor.mode === 'car' && Number.isFinite(actor.spec?.height)) actor.top = actor.spec.height;
   updateBodyHeading(actor, Number.isFinite(actor.heading) ? actor.heading : 0);
@@ -499,6 +499,7 @@ export function createCityCollisions({ staticIndex = null, groundHeight = null }
       for (let i = 0; i < nearby.length; i++) {
         const collider = nearby[i];
         if (low >= collider.maxY || high <= (collider.minY ?? 0)) continue;
+        if (actor.skipStatic !== null && actor.skipStatic !== undefined && actor.skipStatic(collider)) continue; // the drone: LoD2 heightfields
         if (cx + actor.extX <= collider.minX || cx - actor.extX >= collider.maxX
           || cz + actor.extZ <= collider.minZ || cz - actor.extZ >= collider.maxZ) continue;
         if (!buildingContact(collider, actor.x, actor.y, actor.z, actor, contact)) continue;

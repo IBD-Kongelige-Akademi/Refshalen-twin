@@ -51,7 +51,7 @@ const VEHICLE_RADIUS = 380;
 const NEAR_RADIUS = 350;
 const VEHICLE_SPAWN_DISTANCE = 250;
 const GROUNDED_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike']);
-const COLLIDING_PLAYER_MODES = new Set([...GROUNDED_PLAYER_MODES, 'helicopter']);
+const COLLIDING_PLAYER_MODES = new Set([...GROUNDED_PLAYER_MODES, 'drone']);
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -439,12 +439,13 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       const actor = activePlayerCollisionActor;
       bindPlayerCollisionActor(actor, playerEntity, activeMode);
       actor.spec = playerEntity.bodySpec || null;
-      actor.bodyTop = activeMode === 'helicopter' ? 3.2 : activeMode === 'car' ? playerEntity.bodySpec?.height || 1.8 : 1.9;
-      actor.bodyBottom = activeMode === 'helicopter' ? -0.25 : 0;
+      actor.bodyTop = activeMode === 'drone' ? 0.3 : activeMode === 'car' ? playerEntity.bodySpec?.height || 1.8 : 1.9;
+      actor.bodyBottom = 0;
       actor.radius = activeMode === 'car' ? (playerEntity.bodySpec?.width || 1.72) / 2
-        : activeMode === 'cargobike' ? 0.4 : activeMode === 'helicopter' ? 4.5 : activeMode === 'cyclist' ? 0.38 : 0.32;
+        : activeMode === 'cargobike' ? 0.4 : activeMode === 'drone' ? 0.4 : activeMode === 'cyclist' ? 0.38 : 0.32;
       if (activeMode === 'person') actor.radius = 0.48;
-      actor.mass = activeMode === 'helicopter' ? 2200 : activeMode === 'car' ? 1250 : activeMode === 'cargobike' ? 125 : activeMode === 'cyclist' ? 95 : 72;
+      actor.mass = activeMode === 'drone' ? 0.9 : activeMode === 'car' ? 1250 : activeMode === 'cargobike' ? 125 : activeMode === 'cyclist' ? 95 : 72;
+      actor.skipStatic = playerEntity.staticSkip || null;
       actor.x = playerEntity.position.x; actor.y = playerEntity.position.y; actor.z = playerEntity.position.z;
       actor.heading = playerEntity.heading || 0;
       actor.placed = true;

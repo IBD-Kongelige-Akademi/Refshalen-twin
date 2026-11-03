@@ -132,9 +132,9 @@ test('shelters keep the rendered open entrance, back glass, elevated roof, and h
   assert.deepEqual(at(0, 0, 0.45), [], 'a walker can stand under the roof and enter through the open front');
   assert.ok(at(0, 0, -0.7).some((item) => item.type === 'shelter-glass'), 'the rear glass remains solid');
   assert.deepEqual(at(8, 0, 0.12), [], 'the elevated countdown box does not invent a column to the sidewalk');
-  const helicopter = collisionBody('helicopter', 0.4, 0);
-  assert.ok(colliders.some((c) => c.type === 'shelter-roof' && buildingContact(c, 0, 2.3, 0, helicopter, {})),
-    'an aircraft body that reaches the roof interval still collides');
+  const drone = collisionBody('drone', 0.4, 0);
+  assert.ok(colliders.some((c) => c.type === 'shelter-roof' && buildingContact(c, 0, 2.3, 0, drone, {})),
+    'a drone flying into the roof interval still collides');
 });
 
 test('bench collision follows its visible long axis', () => {

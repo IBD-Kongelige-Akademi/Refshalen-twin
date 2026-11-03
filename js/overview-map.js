@@ -1015,7 +1015,7 @@ class OverviewMap {
     const ent = this.controllerManager.getActiveEntity();
     const px = ent.position.x;
     const pz = ent.position.z;
-    // Ground-level radar shows ~300 m of the city; it zooms out as the player climbs (helicopter)
+    // Ground-level radar shows ~300 m of the city; it zooms out as the player climbs (drone)
     const target = Math.max(0.12, RADAR_SCALE / (1 + Math.max(0, ent.position.y - 20) / 60));
     this.miniScale += (target - this.miniScale) * 0.25;
     const scale = this.miniScale;

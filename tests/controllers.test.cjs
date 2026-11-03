@@ -176,22 +176,23 @@ function advanceWithTouch(mode, strength, reverse) {
     frontWheel: { rotation: { x: 0 } }, rearWheel: { rotation: { x: 0 } },
     pedalPhase: 0, crankPivot: { rotation: { x: 0 } }, pedals: []
   });
-  if (mode === 'Helicopter') Object.assign(entity, {
-    verticalSpeed: 0, pitchAngle: 0, rollAngle: 0,
-    tiltPivot: { rotation: { x: 0, z: 0 }, position: { y: 0 } }
+  if (mode === 'Drone') Object.assign(entity, {
+    position: { x: 0, y: 20, z: 0 }, velX: 0, velZ: 0, verticalSpeed: 0, pitchAngle: 0, rollAngle: 0, motorLoad: 0, landed: false,
+    tiltPivot: { rotation: { x: 0, z: 0 }, position: { y: 0 } }, gimbal: { rotation: { x: 0, z: 0 } }
   });
   controller.entities = { [mode.toLowerCase()]: entity };
   controller.getGroundHeight = () => 0;
+  controller.droneSupportAt = () => 0;
   controller.resolveHorizontalCollision = () => {};
   controller.setTouchInput(reverse ? 'backward' : 'forward', strength);
   controller.setTouchInput(reverse ? 'right' : 'left', strength);
-  if (mode === 'Helicopter') controller.setTouchInput(reverse ? 'down' : 'up', strength);
+  if (mode === 'Drone') controller.setTouchInput(reverse ? 'down' : 'up', strength);
   if (mode === 'Cyclist' || mode === 'Cargobike') controller.updateCyclist(0.1, entity, mode.toLowerCase());
   else controller[`update${mode}`](0.1, 0);
   return entity;
 }
 
-for (const mode of ['Person', 'Car', 'Cyclist', 'Cargobike', 'Helicopter']) {
+for (const mode of ['Person', 'Car', 'Cyclist', 'Cargobike', 'Drone']) {
   test(`analog ${mode.toLowerCase()} input proportionally scales movement and turning`, () => {
     for (const reverse of [false, true]) {
       const full = advanceWithTouch(mode, 1, reverse);
@@ -199,7 +200,7 @@ for (const mode of ['Person', 'Car', 'Cyclist', 'Cargobike', 'Helicopter']) {
       assert.ok(Math.abs(partial.speed - full.speed * 0.4) < 1e-10, 'movement should scale with joystick strength');
       const turn = mode === 'Car' ? 'steerAngle' : 'heading';
       assert.ok(Math.abs(partial[turn] - full[turn] * 0.4) < 1e-10, 'turning should scale with joystick strength');
-      if (mode === 'Helicopter') {
+      if (mode === 'Drone') {
         assert.ok(Math.abs(partial.verticalSpeed - full.verticalSpeed * 0.4) < 1e-10);
       }
     }
@@ -216,10 +217,10 @@ function teleportHarness(mode, colliders = [], shore = () => ({ westX: -500, eas
   const { controller } = harness;
   const position = (x = 0, y = 0, z = 0) => ({ x, y, z, copy(p) { this.x = p.x; this.y = p.y; this.z = p.z; } });
   const pivot = () => ({ position: position(), rotation: { x: 0.1, y: 0, z: -0.2 } });
-  const chase = { person: [4.3, 1.95], car: [6.9, 2.12], cyclist: [4.8, 2.05], cargobike: [6.2, 2.35], helicopter: [11.4, 3.3] };
+  const chase = { person: [4.3, 1.95], car: [6.9, 2.12], cyclist: [4.8, 2.05], cargobike: [6.2, 2.35], drone: [4.0, 1.5] };
   const ent = {
     type: mode, chaseDistance: chase[mode][0], chaseHeight: chase[mode][1],
-    position: position(400, mode === 'helicopter' ? 120 : 0, 400), heading: 1, speed: 20,
+    position: position(400, mode === 'drone' ? 120 : 0, 400), heading: 1, speed: 20,
     mesh: pivot(),
     verticalVel: 5, vx: 3, vz: -4, angularVel: 2, steerAngle: 0.4,
     pitchVel: 3, rollVel: 4, heaveY: 0.1, heaveVel: 2, chassisPivot: pivot(),
@@ -228,7 +229,7 @@ function teleportHarness(mode, colliders = [], shore = () => ({ westX: -500, eas
     leanAngle: 0.3, leanPivot: pivot(), pedalPhase: 0.7, standAmount: 0, bikeFrame: {},
     frontWheel: { rotation: { x: 0 } }, rearWheel: { rotation: { x: 0 } },
     crankPivot: { rotation: { x: 0 } },
-    verticalSpeed: -8, pitchAngle: 0.2, rollAngle: -0.2, tiltPivot: pivot(),
+    verticalSpeed: -8, pitchAngle: 0.2, rollAngle: -0.2, tiltPivot: pivot(), velX: 2, velZ: -1, motorLoad: 0.6, gimbal: pivot(),
     pedals: [],
     rig: { reset(...args) { this.resetArgs = args; } },
     crowd: { begin() {}, add() {}, end() {} }
@@ -241,7 +242,7 @@ function teleportHarness(mode, colliders = [], shore = () => ({ westX: -500, eas
   return { ...harness, ent };
 }
 
-for (const mode of ['person', 'car', 'cyclist', 'cargobike', 'helicopter']) {
+for (const mode of ['person', 'car', 'cyclist', 'cargobike', 'drone']) {
   test(`${mode} teleport stops carried motion and updates its arrival pose immediately`, () => {
     const { controller, ent, key } = teleportHarness(mode);
     key('keydown', 'KeyW');
@@ -271,11 +272,11 @@ for (const mode of ['person', 'car', 'cyclist', 'cargobike', 'helicopter']) {
       assert.equal(ent.leanAngle, 0);
       assert.equal(ent.leanPivot.rotation.z, 0);
     } else {
-      for (const field of ['verticalSpeed', 'pitchAngle', 'rollAngle']) assert.equal(ent[field], 0, field);
+      for (const field of ['verticalSpeed', 'pitchAngle', 'rollAngle', 'velX', 'velZ', 'motorLoad']) assert.equal(ent[field], 0, field);
       assert.equal(ent.tiltPivot.rotation.x, 0);
       assert.equal(ent.tiltPivot.rotation.z, 0);
       assert.equal(ent.tiltPivot.position.y, 0);
-      assert.equal(ent.position.y, 120, 'keep the helicopter altitude when already above the minimum');
+      assert.equal(ent.position.y, 40, 'the drone arrives 40 m above the ground');
     }
     const before = [ent.position.x, ent.position.y, ent.position.z, ent.heading];
     if (mode === 'cyclist' || mode === 'cargobike') controller.updateCyclist(0.1, ent, mode);
@@ -289,17 +290,17 @@ test('teleport checks all overlapping buildings instead of leaving a sequential 
     { minX: 0, maxX: 10, minZ: 0, maxZ: 10, maxY: 200 },
     { minX: 9, maxX: 20, minZ: 0, maxZ: 10, maxY: 200 }
   ];
-  for (const mode of ['person', 'car', 'cyclist', 'helicopter']) {
+  for (const mode of ['person', 'car', 'cyclist', 'drone']) {
     // Reverse order as well: a valid arrival must not rely on collider traversal order.
     for (const list of [colliders, colliders.slice().reverse()]) {
       const { controller, ent } = teleportHarness(mode, list.map(c => ({ ...c })));
       const result = controller.teleportActiveTo(11, 5, 0);
       assert.notDeepEqual({ ...result }, { x: 11, z: 5 });
       const before = [ent.position.x, ent.position.z];
-      const radius = mode === 'helicopter' ? 4.5 : mode === 'person' ? 0.48 : 0.65;
+      const radius = mode === 'drone' ? 0.4 : mode === 'person' ? 0.48 : 0.65;
       controller.resolveHorizontalCollision(ent.position, radius, mode === 'car' ? ent : null);
       assert.deepEqual([ent.position.x, ent.position.z], before, `${mode} must already be collision-free`);
-      assert.equal(ent.position.y, mode === 'helicopter' ? 120 : controller.getGroundHeight(result.x, result.z, mode));
+      assert.equal(ent.position.y, mode === 'drone' ? 40 : controller.getGroundHeight(result.x, result.z, mode));
     }
   }
 });
@@ -307,12 +308,12 @@ test('teleport checks all overlapping buildings instead of leaving a sequential 
 test('teleports use oriented building footprints without rejecting clear corners of their bounds', () => {
   const cs = Math.SQRT1_2;
   const box = { minX: -8, maxX: 8, minZ: -8, maxZ: 8, maxY: 200, obb: { cx: 0, cz: 0, hx: 8, hz: 2, cs, sn: cs } };
-  for (const mode of ['person', 'car', 'cyclist', 'helicopter']) {
+  for (const mode of ['person', 'car', 'cyclist', 'drone']) {
     const { controller, ent } = teleportHarness(mode, [{ ...box }]);
     assert.deepEqual({ ...controller.teleportActiveTo(7, 7, 0.6) }, { x: 7, z: 7 });
     const actual = controller.teleportActiveTo(0, 0, 0.6);
     const before = [actual.x, actual.z];
-    controller.resolveHorizontalCollision(ent.position, mode === 'helicopter' ? 4.5 : mode === 'person' ? 0.48 : 0.65,
+    controller.resolveHorizontalCollision(ent.position, mode === 'drone' ? 0.4 : mode === 'person' ? 0.48 : 0.65,
       mode === 'car' ? ent : null);
     assert.deepEqual([ent.position.x, ent.position.z], before);
   }
@@ -344,19 +345,19 @@ test('corner collision normals follow an oriented building footprint', () => {
   assert.ok(Math.abs(ent.position.z) < 1e-6, 'the correction must not slide sideways along the corner');
 });
 
-test('swept player, car, bicycle, cargo bike, and helicopter motion cannot tunnel through a thin pole', () => {
+test('swept player, car, bicycle, cargo bike, and drone motion cannot tunnel through a thin pole', () => {
   const pole = {
     type: 'lamp', shape: 'circle', radius: 0.06,
     minX: -0.06, maxX: 0.06, minZ: -0.06, maxZ: 0.06, minY: 0, maxY: 4,
     obb: { cx: 0, cz: 0, hx: 0.06, hz: 0.06, cs: 1, sn: 0 }
   };
-  const starts = { person: -4, car: -5, cyclist: -4, cargobike: -4, helicopter: -10 };
-  const radii = { person: 0.48, car: 1.35, cyclist: 0.65, cargobike: 1.4, helicopter: 4.5 };
+  const starts = { person: -4, car: -5, cyclist: -4, cargobike: -4, drone: -4 };
+  const radii = { person: 0.48, car: 1.35, cyclist: 0.65, cargobike: 1.4, drone: 0.4 };
   for (const mode of Object.keys(starts)) {
     const { controller, ent } = teleportHarness(mode, [{ ...pole }]);
     ent.heading = Math.PI / 2;
     ent.position.x = 8;
-    ent.position.y = mode === 'helicopter' ? 0 : 0;
+    ent.position.y = 0;
     ent.position.z = 0;
     controller.resolveHorizontalCollision(ent.position, radii[mode], mode === 'car' ? ent : null, ent,
       { x: starts[mode], z: 0 });
@@ -368,19 +369,19 @@ test('swept player, car, bicycle, cargo bike, and helicopter motion cannot tunne
 
 test('each actual horizontal movement update supplies its previous position to the sweep', () => {
   const wall = { minX: 0, maxX: 0.08, minZ: -20, maxZ: 20, minY: 0, maxY: 30 };
-  for (const mode of ['person', 'car', 'cyclist', 'cargobike', 'helicopter']) {
+  for (const mode of ['person', 'car', 'cyclist', 'cargobike', 'drone']) {
     const { controller, ent } = teleportHarness(mode, [{ ...wall }]);
-    const start = mode === 'helicopter' ? -10 : mode === 'car' ? -4 : -3;
-    Object.assign(ent.position, { x: start, y: mode === 'helicopter' ? 0.25 : 0, z: 0 });
+    const start = mode === 'drone' ? -3 : mode === 'car' ? -4 : -3;
+    Object.assign(ent.position, { x: start, y: 0, z: 0 });
     ent.heading = Math.PI / 2;
     ent.speed = 0;
     if (mode === 'car') ent.vx = ent.vz = 0;
-    if (mode === 'helicopter') ent.verticalSpeed = 0;
+    if (mode === 'drone') Object.assign(ent, { verticalSpeed: 0, velX: 0, velZ: 0, landed: false });
     controller.keys.forward = 1;
     if (mode === 'person') controller.updatePerson(1);
     else if (mode === 'car') controller.updateCar(1);
     else if (mode === 'cyclist' || mode === 'cargobike') controller.updateCyclist(1, ent, mode);
-    else controller.updateHelicopter(1, 0);
+    else controller.updateDrone(1, 0);
     assert.ok(ent.position.x < 0, `${mode} update stopped before the wall at x=${ent.position.x}`);
     assert.equal(controller._lastHorizontalCollisionResolved, true);
   }
@@ -453,52 +454,52 @@ test('teleports preserve clear rounded corners and separated rotated cars', () =
 });
 
 test('movement and teleports pass underneath elevated building sections', () => {
-  for (const mode of ['person', 'car', 'cyclist', 'helicopter']) {
+  for (const mode of ['person', 'car', 'cyclist', 'drone']) {
     const { controller, ent } = teleportHarness(mode, [{ minX: 0, maxX: 10, minZ: 0, maxZ: 10, minY: 4, maxY: 30 }]);
     controller.getGroundHeight = () => 0;
-    const y = mode === 'helicopter' ? 0.25 : 0;
+    const y = 0;
     Object.assign(ent.position, { x: 5, y, z: 5 });
-    controller.resolveHorizontalCollision(ent.position, mode === 'helicopter' ? 4.5 : 0.65, mode === 'car' ? ent : null);
+    controller.resolveHorizontalCollision(ent.position, mode === 'drone' ? 0.4 : 0.65, mode === 'car' ? ent : null);
     assert.deepEqual([ent.position.x, ent.position.z], [5, 5], `${mode} fits below the overhang`);
     assert.deepEqual({ ...controller.teleportActiveTo(5, 5, 0, y) }, { x: 5, z: 5 });
   }
 });
 
 test('building clearance uses the full player height beneath an overhang', () => {
-  for (const [mode, height] of [['person', 1.9], ['car', 1.8], ['cyclist', 1.9], ['helicopter', 3.2]]) {
-    const y = mode === 'helicopter' ? 0.25 : 0;
+  for (const [mode, height] of [['person', 1.9], ['car', 1.8], ['cyclist', 1.9], ['drone', 0.3]]) {
+    const y = 0;
     const { controller, ent } = teleportHarness(mode, [{
       minX: 0, maxX: 10, minZ: 0, maxZ: 10, minY: y + height - 0.1, maxY: 30
     }]);
     controller.getGroundHeight = () => 0;
     Object.assign(ent.position, { x: 5, y, z: 5 });
-    controller.resolveHorizontalCollision(ent.position, mode === 'helicopter' ? 4.5 : 0.65, mode === 'car' ? ent : null);
+    controller.resolveHorizontalCollision(ent.position, mode === 'drone' ? 0.4 : 0.65, mode === 'car' ? ent : null);
     assert.notDeepEqual([ent.position.x, ent.position.z], [5, 5], `${mode} intersects the underside`);
     assert.notDeepEqual({ ...controller.teleportActiveTo(5, 5, 0, y) }, { x: 5, z: 5 });
   }
 });
 
 test('players above a roof are clear once their body bottoms clear it', () => {
-  for (const mode of ['person', 'car', 'cyclist', 'helicopter']) {
+  for (const mode of ['person', 'car', 'cyclist', 'drone']) {
     const { controller, ent } = teleportHarness(mode, [{ minX: 0, maxX: 10, minZ: 0, maxZ: 10, maxY: 10 }]);
     controller.getGroundHeight = () => 10.1;
-    const y = mode === 'helicopter' ? 10.35 : 10.1;
+    const y = 10.1;
     Object.assign(ent.position, { x: 5, y, z: 5 });
-    controller.resolveHorizontalCollision(ent.position, mode === 'helicopter' ? 4.5 : 0.65, mode === 'car' ? ent : null);
+    controller.resolveHorizontalCollision(ent.position, mode === 'drone' ? 0.4 : 0.65, mode === 'car' ? ent : null);
     assert.deepEqual([ent.position.x, ent.position.z], [5, 5], `${mode} clears the visible roof`);
     assert.deepEqual({ ...controller.teleportActiveTo(5, 5, 0, y) }, { x: 5, z: 5 });
   }
 });
 
-test('helicopter skids cannot pass through a roof below the body origin', () => {
-  const { controller, ent } = teleportHarness('helicopter', [{ minX: 0, maxX: 10, minZ: 0, maxZ: 10, maxY: 10 }]);
-  Object.assign(ent.position, { x: 5, y: 10.2, z: 5 });
-  controller.resolveHorizontalCollision(ent.position, 4.5);
+test('the drone cannot sink its feet into a roof it is beside', () => {
+  const { controller, ent } = teleportHarness('drone', [{ minX: 0, maxX: 10, minZ: 0, maxZ: 10, maxY: 10 }]);
+  Object.assign(ent.position, { x: 5, y: 9.9, z: 5 });
+  controller.resolveHorizontalCollision(ent.position, 0.4);
   assert.notDeepEqual([ent.position.x, ent.position.z], [5, 5]);
-  assert.notDeepEqual({ ...controller.teleportActiveTo(5, 5, 0, 10.2) }, { x: 5, z: 5 });
+  assert.notDeepEqual({ ...controller.teleportActiveTo(5, 5, 0, 9.9) }, { x: 5, z: 5 });
 });
 
-test('ground arrivals share movement shoreline limits while helicopters may remain above lower buildings', () => {
+test('ground arrivals share movement shoreline limits while the drone arrives above lower buildings', () => {
   const shore = z => ({ westX: -40 + z * 0.05, eastX: 40 + z * 0.05 });
   const { controller, ent } = teleportHarness('person', [], shore);
   const result = controller.teleportActiveTo(1000, -1000);
@@ -506,10 +507,13 @@ test('ground arrivals share movement shoreline limits while helicopters may rema
   controller.resolveHorizontalCollision(ent.position, 0.48);
   assert.deepEqual([ent.position.x, ent.position.z], [result.x, result.z]);
 
-  const heli = teleportHarness('helicopter', [{ minX: -30, maxX: 30, minZ: -30, maxZ: 30, maxY: 50 }]);
-  heli.ent.position.y = 10;
-  assert.deepEqual({ ...heli.controller.teleportActiveTo(0, 0) }, { x: 0, z: 0 });
-  assert.equal(heli.ent.position.y, 92);
+  const drone = teleportHarness('drone', [{ minX: -30, maxX: 30, minZ: -30, maxZ: 30, maxY: 30 }]);
+  drone.ent.position.y = 10;
+  assert.deepEqual({ ...drone.controller.teleportActiveTo(0, 0) }, { x: 0, z: 0 });
+  assert.equal(drone.ent.position.y, 40, 'a 30 m building is below the 40 m arrival');
+  // a restored altitude is kept, but never above the 120 m ceiling over the ground
+  drone.controller.teleportActiveTo(0, 0, 0, 500);
+  assert.equal(drone.ent.position.y, 120);
 });
 
 test('a displaced pedestrian samples ground and resets its feet at the resolved destination', () => {
@@ -560,16 +564,150 @@ test('successive mode teleports keep parked players out of the arrival and defau
   }
 });
 
-test('player clearance respects altitude and permits a ground arrival under an airborne helicopter', () => {
+test('player clearance respects altitude and permits a ground arrival under an airborne drone', () => {
   const { controller, ent } = teleportHarness('person');
-  const helicopter = teleportHarness('helicopter').ent;
-  helicopter.position.x = helicopter.position.z = 0;
-  helicopter.position.y = 120;
-  controller.entities.helicopter = helicopter;
+  const drone = teleportHarness('drone').ent;
+  drone.position.x = drone.position.z = 0;
+  drone.position.y = 120;
+  controller.entities.drone = drone;
   assert.deepEqual({ ...controller.teleportActiveTo(0, 0) }, { x: 0, z: 0 });
   assert.equal(ent.position.y, 0.22);
-  helicopter.position.y = 1;
-  assert.notDeepEqual({ ...controller.teleportActiveTo(0, 0) }, { x: 0, z: 0 }, 'a helicopter parked at street level must be avoided');
+  drone.position.y = 1;
+  assert.notDeepEqual({ ...controller.teleportActiveTo(0, 0) }, { x: 0, z: 0 }, 'a drone hovering at head height must be avoided');
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// the drone's flight
+
+function droneHarness(colliders = [], ground = 0) {
+  const h = teleportHarness('drone', colliders);
+  h.controller.getGroundHeight = () => ground;
+  Object.assign(h.ent, { heading: 0, speed: 0, velX: 0, velZ: 0, verticalSpeed: 0, pitchAngle: 0, rollAngle: 0, motorLoad: 0, landed: false });
+  h.fly = (seconds, dt = 1 / 60) => { for (let t = 0; t < seconds; t += dt) h.controller.updateDrone(dt, t); };
+  return h;
+}
+
+test('drone: 60 km/h, 75 km/h in sport, the body tilted forward but never more than 25°, level again in a hover', () => {
+  const { ent, key, fly } = droneHarness();
+  Object.assign(ent.position, { x: 0, y: 20, z: 0 });
+  key('keydown', 'KeyW');
+  fly(6);
+  assert.ok(Math.abs(Math.hypot(ent.velX, ent.velZ) * 3.6 - 60) < 0.1, `cruise ${Math.hypot(ent.velX, ent.velZ) * 3.6} km/h`);
+  assert.ok(ent.pitchAngle > 0 && ent.pitchAngle <= 25 * Math.PI / 180 + 1e-9, 'nose down towards the travel direction');
+  key('keydown', 'ShiftLeft');
+  fly(6);
+  assert.ok(Math.abs(Math.hypot(ent.velX, ent.velZ) * 3.6 - 75) < 0.1, 'sport');
+  key('keyup', 'KeyW');
+  key('keyup', 'ShiftLeft');
+  fly(6);
+  assert.ok(Math.hypot(ent.velX, ent.velZ) < 0.05 && Math.abs(ent.pitchAngle) < 0.01 && Math.abs(ent.rollAngle) < 0.01, 'brakes to a level hover');
+  assert.ok(Math.abs(ent.position.y - 20) < 1e-9, 'holds its height without input');
+});
+
+test('drone: the velocity follows the nose in a turn (no momentum lost)', () => {
+  const { ent, key, fly } = droneHarness();
+  Object.assign(ent.position, { x: 0, y: 20, z: 0 });
+  key('keydown', 'KeyW');
+  fly(6);
+  key('keydown', 'KeyA');
+  fly(1);
+  key('keyup', 'KeyA');
+  fly(1.5);
+  const along = ent.velX * Math.sin(ent.heading) + ent.velZ * Math.cos(ent.heading);
+  assert.ok(Math.abs(ent.heading) > 1, 'it turned');
+  assert.ok(along * 3.6 > 59, `full speed along the new heading: ${along * 3.6} km/h`);
+});
+
+test('drone: never more than 120 m over the ground', () => {
+  for (const ground of [0, 35]) {
+    const { ent, key, fly } = droneHarness([], ground);
+    Object.assign(ent.position, { x: 0, y: ground + 100, z: 0 });
+    key('keydown', 'Space');
+    fly(10);
+    assert.ok(Math.abs(ent.position.y - (ground + 120)) < 1e-9, `capped at ${ent.position.y - ground} m over the ground`);
+  }
+});
+
+test('drone: lands on a roof, stands still there and takes off with a climb', () => {
+  const roof = { minX: -10, maxX: 10, minZ: -10, maxZ: 10, maxY: 14 };
+  const { ent, key, fly } = droneHarness([roof]);
+  Object.assign(ent.position, { x: 0, y: 18, z: 0 });
+  key('keydown', 'KeyQ');
+  fly(3);
+  assert.equal(ent.position.y, 14, 'it settles on the roof, not inside the building');
+  assert.equal(ent.landed, true);
+  key('keyup', 'KeyQ');
+  key('keydown', 'KeyW');
+  fly(1);
+  assert.deepEqual([ent.position.x, ent.position.z], [0, 0], 'standing on the roof it does not slide');
+  key('keyup', 'KeyW');
+  key('keydown', 'Space');
+  fly(1);
+  assert.ok(ent.position.y > 15 && !ent.landed, 'a climb takes off again');
+  assert.ok(ent.motorLoad > 0.4, 'the motors work harder in the climb');
+});
+
+// an LoD2 roof sampler over one building: `roof(x, z)` inside its footprint, a record for `id` only
+function lod2Roof(id, roof) {
+  const at = (bid, x, z) => (bid === id ? roof(x, z) : null);
+  at.has = (bid) => bid === id;
+  return at;
+}
+
+test('drone: on an LoD2 roof it stands on the roof as drawn, slopes and lower wings included', () => {
+  const house = { id: 'building:gdk:7', type: 'building', minX: -10, maxX: 10, minZ: -10, maxZ: 10, maxY: 12.45 }; // eave 12 + 0.45
+  const { controller, ent, key, fly } = droneHarness([house]);
+  // a gable along z: 12 m at x = +-10, 16 m on the ridge at x = 0; a 6 m wing at z > 5 with no roof over the strip x > 9.6
+  controller.roofHeightAt = lod2Roof('gdk:7', (x, z) => (x > 9.6 ? null : z > 5 ? 6 : 16 - 0.4 * Math.abs(x)));
+  for (const [x, z, roof] of [[0, 0, 16], [5, 0, 14], [-5, 8, 6], [9.8, 0, 12.45]]) {
+    Object.assign(ent.position, { x, y: 22, z });
+    Object.assign(ent, { velX: 0, velZ: 0, verticalSpeed: 0, landed: false });
+    key('keydown', 'KeyQ');
+    fly(4);
+    key('keyup', 'KeyQ');
+    assert.ok(Math.abs(ent.position.y - roof) < 1e-9 && ent.landed, `(${x}, ${z}): on the roof at ${ent.position.y}, expected ${roof}`);
+    assert.deepEqual([ent.position.x, ent.position.z], [x, z], 'not pushed off by the walls');
+  }
+});
+
+test('drone: a heightfield building stops it at the wall of its higher part and lets it slide along', () => {
+  const house = { id: 'building:gdk:8', type: 'building', minX: 0, maxX: 20, minZ: -50, maxZ: 50, maxY: 10.45 };
+  const { controller, ent, key, fly } = droneHarness([house]);
+  controller.roofHeightAt = lod2Roof('gdk:8', () => 10);
+  Object.assign(ent.position, { x: -5, y: 4, z: 0 });
+  ent.heading = Math.PI / 2 - 0.3; // towards +x, a little towards +z
+  key('keydown', 'KeyW');
+  fly(3);
+  assert.ok(ent.position.x <= -DRONE_RADIUS + 1e-9, `held outside the wall at x ${ent.position.x}`);
+  assert.ok(ent.position.z > 3, 'slid along the facade');
+  key('keyup', 'KeyW');
+  // above the roof it flies across
+  Object.assign(ent.position, { x: -5, y: 11, z: 0 });
+  Object.assign(ent, { velX: 0, velZ: 0, heading: Math.PI / 2 });
+  key('keydown', 'KeyW');
+  fly(2);
+  assert.ok(ent.position.x > 20, 'over the roof');
+});
+const DRONE_RADIUS = 0.4;
+
+test('drone: flying low down a street it stays out of the buildings on either side', () => {
+  const buildings = [
+    { minX: -40, maxX: -4, minZ: 0, maxZ: 120, maxY: 15 }, // the street is x -4..4, z 0..120
+    { minX: 4, maxX: 40, minZ: 0, maxZ: 120, maxY: 15 }
+  ];
+  const { controller, ent, key, fly } = droneHarness(buildings);
+  Object.assign(ent.position, { x: 0, y: 6, z: 2 });
+  ent.heading = 0.12; // a little off the street's axis: it meets the right-hand facade
+  key('keydown', 'KeyW');
+  const body = collisionShapesModule.collisionBody('drone', 0.4, 0);
+  for (let i = 0; i < 240; i++) {
+    fly(1 / 60);
+    for (const b of buildings) {
+      assert.ok(!collisionShapesModule.buildingContact(b, ent.position.x, ent.position.y, ent.position.z, body, {}), `inside a building at ${ent.position.x}, ${ent.position.z}`);
+    }
+  }
+  assert.ok(ent.position.z > 40, 'it slid along the facade instead of stopping');
+  assert.equal(controller._lastHorizontalCollisionResolved, true);
 });
 
 for (const mode of ['cyclist', 'cargobike']) {

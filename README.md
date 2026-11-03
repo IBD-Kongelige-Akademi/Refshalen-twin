@@ -5,12 +5,12 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 - 3,340 buildings at their GeoDanmark footprints with DHM-measured heights and BBR use, year and materials; 91 % with measured LoD2.2 roofs and walls.
 - Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph.
 - The Limfjord at sea level with quay walls along the harbour front, the city's lakes and parks.
-- Four ways to move: on foot, by car, by bicycle (city or cargo bike) and by helicopter; six teleports and scenic cameras.
+- Four ways to move: on foot, by car, by bicycle (city or cargo bike) and by drone (up to 120 m over the ground, lands on roofs); six teleports and scenic cameras.
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
 
 Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
-**Status: phases 0–5 and 4b of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation). Still to come: the drone (4d), street furniture (6), publishing (7), the whole city (8).
+**Status: phases 0–5, 4b and 4d of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase4d.md](docs/aalborg-phase4d.md) (the drone), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation). Still to come: street furniture (6), publishing (7), the whole city (8); the drivable Plusbus (4c) is optional.
 
 ## Run it
 

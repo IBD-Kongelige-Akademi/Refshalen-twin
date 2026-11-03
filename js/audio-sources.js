@@ -14,21 +14,10 @@ function driveLoad(keys, speed, cyclist) {
   return unit(Math.abs(throttle) * (cyclist || keys.boost ? 1 : 0.8));
 }
 
-function helicopterVerticalSpeed(entity) {
-  const speed = Number.isFinite(entity.verticalSpeed) ? entity.verticalSpeed : 0;
-  // The controller clamps altitude without clearing its stored vertical velocity.
-  return (entity.position.y <= 0.25 && speed < 0) || (entity.position.y >= 380 && speed > 0) ? 0 : speed;
-}
-
-function helicopterLoad(entity, keys, verticalSpeed) {
-  const forward = unit(+keys.forward) || -unit(+keys.backward);
-  const collective = unit(+keys.up) || -unit(+keys.down);
-  const grounded = entity.position.y <= 0.35 && verticalSpeed <= 0.03;
-  return unit((grounded ? 0.12 : 0.45)
-    + 0.28 * Math.max(collective, 0) - 0.16 * Math.max(-collective, 0)
-    + 0.15 * unit(verticalSpeed / 16) - 0.08 * unit(-verticalSpeed / 16)
-    + 0.1 * Math.abs(forward) + 0.12 * unit(Math.abs(entity.speed) / 52));
-}
+// The drone's controller keeps its own motor load (0 standing, ~0.45 hovering, up to 1 climbing at full speed) and vertical speed
+const DRONE_RANGE = 120;
+const droneVerticalSpeed = (entity) => (Number.isFinite(entity.verticalSpeed) ? entity.verticalSpeed : 0);
+const droneLoad = (entity) => unit(entity.motorLoad);
 
 function roadLoad(speed, acceleration, maxAcceleration) {
   // Constant speed still needs power against rolling resistance and air drag.
@@ -107,14 +96,14 @@ class CityAudioSources {
     return dx * dx + dy * dy + dz * dz;
   }
 
-  motor(id, kind, x, y, z, speed, load, heading, police, player, seed, blocked, gain = 1, range = kind === 'helicopter' ? 500 : 160, verticalSpeed = 0) {
+  motor(id, kind, x, y, z, speed, load, heading, police, player, seed, blocked, gain = 1, range = kind === 'drone' ? DRONE_RANGE : 160, verticalSpeed = 0) {
     const d2 = this.distanceSq(x, y, z);
     if (!Number.isFinite(d2)) return;
     if (police && d2 <= SIREN_RANGE * SIREN_RANGE) {
       const siren = this.sirens.take(d2);
       if (siren) writeMotor(siren, id, 'siren', x, y, z, speed, load, heading, true, player, seed, blocked, 1, 200);
     }
-    const reach = kind === 'helicopter' ? range : MOTOR_RANGE;
+    const reach = kind === 'drone' ? range : MOTOR_RANGE;
     if (d2 > reach * reach) return;
     const item = this.motors.take(player ? -1 : d2);
     if (!item) return;
@@ -165,7 +154,7 @@ class CityAudioSources {
     const active = this.controllers.getActiveEntity();
     const keys = this.controllers.keys;
     this.snapshot.motion = active.type === 'person' ? active.rig.speed
-      : Math.hypot(active.speed, active.type === 'helicopter' ? helicopterVerticalSpeed(active) : 0);
+      : Math.hypot(active.speed, active.type === 'drone' ? droneVerticalSpeed(active) : 0);
 
     for (let i = 0; i < this.players.length; i++) {
       const entity = this.players[i];
@@ -181,12 +170,13 @@ class CityAudioSources {
         const bicycle = entity.type === 'cyclist' || entity.type === 'cargobike';
         if (!player && bicycle) continue;
         const kind = entity.type === 'car' ? 'sedan' : bicycle ? 'cyclist' : entity.type;
-        const helicopter = kind === 'helicopter';
-        const verticalSpeed = player && helicopter ? helicopterVerticalSpeed(entity) : 0;
-        const load = player ? helicopter ? helicopterLoad(entity, keys, verticalSpeed) : driveLoad(keys, entity.speed, bicycle) : 0;
-        const gain = player ? 1 : helicopter ? 0.22 : 0.5;
-        const range = helicopter ? (player ? 500 : 200) : 160;
-        this.motor(entity, kind, x, y + (helicopter ? 2.66 : 0.7), z, player ? entity.speed : 0, load, entity.heading,
+        const drone = kind === 'drone';
+        const verticalSpeed = player && drone ? droneVerticalSpeed(entity) : 0;
+        // a drone left hovering keeps buzzing; one standing is silent
+        const load = drone ? droneLoad(entity) : player ? driveLoad(keys, entity.speed, bicycle) : 0;
+        const gain = player ? 1 : drone ? 0.5 : 0.5;
+        const range = drone ? DRONE_RANGE : 160;
+        this.motor(entity, kind, x, y + (drone ? 0.16 : 0.7), z, player ? entity.speed : 0, load, entity.heading,
           false, player, seedAt(i), false, gain, range, verticalSpeed);
       }
     }

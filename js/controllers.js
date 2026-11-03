@@ -6,14 +6,11 @@ import {
   buildCarGeometry,
   buildSteerableWheelGeo,
   createLoftedCarMaterial,
-  buildHelicopterBodyGeometry,
-  buildHelicopterMainRotorGeometry,
-  buildHelicopterTailRotorGeometry,
-  createLoftedHelicopterMaterial
+  createDroneModel
 } from './actor-models.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
-import { collisionBody, buildingContact } from './collision-shapes.js';
+import { collisionBody, buildingContact, colliderContainsPoint } from './collision-shapes.js';
 import { createStaticIndex } from './static-colliders.js';
 import { mergeRigidMeshes } from './rigid-meshes.js';
 
@@ -23,11 +20,17 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 // 1. Person (Skinned Pedestrian: planted-footstep IK walk/run/jump, see pedestrians.js)
 // 2. Car (Aerodynamic Sculpted Hatchback with Sloped Windshield & Clearcoat)
 // 3. City Bike and Long-John Cargo Bike (Procedural Frames with Skinned Riders)
-// 4. Helicopter (Sightseeing Twin-Turbine Chopper)
+// 4. Drone (X-frame quadcopter, see actor-models.js createDroneModel)
 
 // Spawn by Gammel Torv; the vehicles are staggered around it
 const SPAWN_Z = TELEPORT_LOCATIONS.torv.z;
 const groundCollider = { type: 'ground' };
+
+// The drone: 60 km/h, 75 km/h in sport (Shift); at most 120 m above the ground (the EU open-category limit); teleports arrive 40 m up
+const DRONE_FLIGHT = {
+  speed: 60 / 3.6, sportSpeed: 75 / 3.6, climb: 5, sportClimb: 6, response: 2.6, yawRate: 1.9,
+  ceiling: 120, arrival: 40, maxTilt: 25 * Math.PI / 180, radius: 0.4, step: 0.35, roam: 1500
+};
 
 const CAR_DRIVE = {
   speed: 23.5, boostSpeed: 36, reverseSpeed: 10.5, acceleration: 4.5, boostAcceleration: 5.25,
@@ -222,7 +225,7 @@ class ThirdPersonControllerManager {
     this._colliderIndex = null; // built on first use, see nearColliders()
     this._indexedColliders = null;
     this._indexedColliderCount = -1;
-    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'helicopter'
+    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'drone'
 
     this.keys = {
       forward: false,
@@ -239,7 +242,7 @@ class ThirdPersonControllerManager {
       car: this.createCarEntity(),
       cyclist: this.createCyclistEntity(),
       cargobike: this.createCargoBikeEntity(),
-      helicopter: this.createHelicopterEntity()
+      drone: this.createDroneEntity()
     };
 
     Object.values(this.entities).forEach((ent) => {
@@ -366,14 +369,16 @@ class ThirdPersonControllerManager {
     const ent = this.getActiveEntity();
     this.resetInput();
     if (!Number.isFinite(heading)) heading = ent.heading;
-    const heli = this.activeMode === 'helicopter';
-    const altitude = heli ? Math.max(0.25, Math.min(380, savedAltitude ?? Math.max(92, ent.position.y))) : 0;
+    const air = this.activeMode === 'drone';
+    // the drone arrives DRONE_FLIGHT.arrival above the ground (a restored altitude is kept, within the ceiling)
+    const ground = air && Number.isFinite(x) && Number.isFinite(z) ? this.getGroundHeight(x, z, 'drone') : 0;
+    const altitude = air ? Math.max(ground, Math.min(ground + DRONE_FLIGHT.ceiling, savedAltitude ?? ground + DRONE_FLIGHT.arrival)) : 0;
     const destination = this.findTeleportPosition(x, z, heading, altitude);
     if (destination) {
       ent.position.x = destination.x;
       ent.position.z = destination.z;
       ent.heading = heading;
-      ent.position.y = heli ? altitude : this.getGroundHeight(destination.x, destination.z, this.activeMode);
+      ent.position.y = air ? altitude : this.getGroundHeight(destination.x, destination.z, this.activeMode);
     }
     ent.speed = 0;
     if (this.activeMode === 'person') {
@@ -395,8 +400,9 @@ class ThirdPersonControllerManager {
       if (ent.frontSteerPivot) ent.frontSteerPivot.rotation.y = 0;
       if (ent.handlebarPivot) ent.handlebarPivot.rotation.y = 0;
       if (ent.bikeFrame) ent.bikeFrame.steerAngle = 0;
-    } else if (heli) {
-      ent.verticalSpeed = ent.pitchAngle = ent.rollAngle = 0;
+    } else if (air) {
+      ent.verticalSpeed = ent.pitchAngle = ent.rollAngle = ent.velX = ent.velZ = ent.motorLoad = 0;
+      ent.landed = false;
       ent.tiltPivot.rotation.x = ent.tiltPivot.rotation.z = 0;
       ent.tiltPivot.position.y = 0;
     }
@@ -409,25 +415,25 @@ class ThirdPersonControllerManager {
   // between overlapping buildings, so test whole candidate footprints instead; retain the old position if none fits.
   findTeleportPosition(x, z, heading, altitude) {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
-    const heli = this.activeMode === 'helicopter';
-    const radius = heli ? 4.5 : this.activeMode === 'person' ? 0.48 : this.activeMode === 'cargobike' ? 1.4 : 0.65;
+    const air = this.activeMode === 'drone';
+    const radius = air ? DRONE_FLIGHT.radius : this.activeMode === 'person' ? 0.48 : this.activeMode === 'cargobike' ? 1.4 : 0.65;
     const sinH = Math.sin(heading), cosH = Math.cos(heading);
     const shape = collisionBody(this.activeMode, radius, heading, 0.1, this.getActiveEntity()?.bodySpec);
     const reach = Math.max(shape.extX, shape.extZ);
-    const margin = heli ? 6000 : 0;
+    const margin = air ? DRONE_FLIGHT.roam : 0;
     const entity = this.getActiveEntity();
-    // Conservative body bounds, including car corners, bicycle wheels, the cargo frame and helicopter tail/rotor.
-    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], helicopter: [6.2, 3.2] };
+    // Conservative body bounds, including car corners, bicycle wheels, the cargo frame and the drone's prop tips.
+    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], drone: [0.45, 0.3] };
     const others = Object.values(this.entities).filter(e => e !== entity && e.mesh?.visible !== false).map(e => ({
       x: e.position.x, z: e.position.z, radius: body[e.type][0],
-      bottom: e.position.y - (e.type === 'helicopter' ? 0.7 : 0), top: e.position.y + body[e.type][1]
+      bottom: e.position.y, top: e.position.y + body[e.type][1]
     }));
     const cameraBack = Math.cos(0.09) * entity.chaseDistance;
     const cameraUp = entity.chaseHeight + Math.sin(0.09) * entity.chaseDistance * 0.85;
     const clampPoint = (px, pz) => {
-      pz = Math.max(ISLAND_BOUNDS.minZ + (heli ? -6000 : 30), Math.min(ISLAND_BOUNDS.maxZ + margin, pz));
+      pz = Math.max(ISLAND_BOUNDS.minZ + (air ? -margin : 30), Math.min(ISLAND_BOUNDS.maxZ + margin, pz));
       px = Math.max(ISLAND_BOUNDS.minX - margin, Math.min(ISLAND_BOUNDS.maxX + margin, px));
-      if (!heli && getIslandBoundsAtZ) {
+      if (!air && getIslandBoundsAtZ) {
         const shore = getIslandBoundsAtZ(pz);
         const west = shore.westX + 8, east = shore.eastX - 8;
         if (west > east) return null;
@@ -437,12 +443,12 @@ class ThirdPersonControllerManager {
     };
     const clear = (p) => {
       if (!p) return false;
-      const baseY = heli ? altitude : this.getGroundHeight(p.x, p.z, this.activeMode);
+      const baseY = air ? altitude : this.getGroundHeight(p.x, p.z, this.activeMode);
       // Keep other player models out of both the arrival and its default chase view. A corridor also prevents a
       // parked car between camera and character from hiding the character even when the camera itself is outside it.
       const viewTop = baseY + Math.max(body[entity.type][1], cameraUp);
       for (const other of others) {
-        if (other.bottom > viewTop + 0.3 || other.top < baseY - (heli ? 0.7 : 0) - 0.3) continue;
+        if (other.bottom > viewTop + 0.3 || other.top < baseY - 0.3) continue;
         const dx = other.x - p.x, dz = other.z - p.z;
         const back = Math.max(0, Math.min(cameraBack, -dx * sinH - dz * cosH));
         if (Math.hypot(dx + sinH * back, dz + cosH * back) < other.radius + Math.max(body[entity.type][0], 0.5) + 0.1) return false;
@@ -1330,87 +1336,34 @@ class ThirdPersonControllerManager {
   }
 
   // =========================================================================
-  // 4. HELICOPTER (3D LOFTED SIGHTSEEING TWIN-TURBINE CHOPPER)
+  // 4. DRONE (X-FRAME QUADCOPTER, see actor-models.js createDroneModel)
   // =========================================================================
-  createHelicopterEntity() {
-    const root = new THREE.Group();
-    root.name = 'PlayerHelicopter';
-
-    const tiltPivot = new THREE.Group();
-    root.add(tiltPivot);
-
-    const heliLoftMat = createLoftedHelicopterMaterial();
-    const blurDiscMat = new THREE.MeshBasicNodeMaterial({
-      color: 0xc8d8e8,
-      transparent: true,
-      opacity: 0.13,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-
-    // 1. 3D Lofted Monocoque Fuselage + Tailboom + Twin-Turbine Cowling + Swept Fin + Stabilizers + Tubular Skids
-    const heliBodyGeo = buildHelicopterBodyGeometry();
-    const heliBodyMesh = new THREE.Mesh(heliBodyGeo, heliLoftMat);
-    heliBodyMesh.castShadow = true;
-    heliBodyMesh.receiveShadow = true;
-    tiltPivot.add(heliBodyMesh);
-
-    // 2. 4-Blade Main Rotor Assembly with Swashplate, Hub Dome & Yellow Safety Blade Tips
-    const mainRotorPivot = new THREE.Group();
-    mainRotorPivot.position.set(0, 2.66, -0.35);
-    const mainRotorGeo = buildHelicopterMainRotorGeometry();
-    const mainRotorMesh = new THREE.Mesh(mainRotorGeo, heliLoftMat);
-    mainRotorMesh.castShadow = true;
-    mainRotorPivot.add(mainRotorMesh);
-
-    const blurDisc = new THREE.Mesh(new THREE.CylinderGeometry(4.85, 4.85, 0.015, 32), blurDiscMat);
-    mainRotorPivot.add(blurDisc);
-    tiltPivot.add(mainRotorPivot);
-
-    // 3. 4-Blade Tail Rotor Assembly on Swept Vertical Fin
-    const tailRotorPivot = new THREE.Group();
-    tailRotorPivot.position.set(0.18, 2.02, -5.62);
-    const tailRotorGeo = buildHelicopterTailRotorGeometry();
-    const tailRotorMesh = new THREE.Mesh(tailRotorGeo, heliLoftMat);
-    tailRotorPivot.add(tailRotorMesh);
-    tiltPivot.add(tailRotorPivot);
-
-    // 4. FAA Port (Red), Starboard (Green) & Anti-Collision Fin Beacon (Red) Navigation Strobes
-    const navRed = new THREE.Mesh(
-      new THREE.SphereGeometry(0.036, 8, 8),
-      new THREE.MeshBasicNodeMaterial({ color: 0xff2b2b })
-    );
-    navRed.position.set(-1.09, 1.54, -4.35);
-    const navGreen = new THREE.Mesh(
-      new THREE.SphereGeometry(0.036, 8, 8),
-      new THREE.MeshBasicNodeMaterial({ color: 0x22ff66 })
-    );
-    navGreen.position.set(1.09, 1.54, -4.35);
-    const navTail = new THREE.Mesh(
-      new THREE.SphereGeometry(0.042, 8, 8),
-      new THREE.MeshBasicNodeMaterial({ color: 0xff3b2b })
-    );
-    navTail.position.set(0, 2.84, -6.04);
-    tiltPivot.add(navRed, navGreen, navTail);
-
-    this.scene.add(root);
-
+  createDroneEntity() {
+    const model = createDroneModel();
+    this.scene.add(model.root);
     return {
-      type: 'helicopter',
-      label: 'Sightseeing Helicopter',
-      mesh: root,
-      tiltPivot,
-      mainRotorPivot,
-      tailRotorPivot,
-      position: new THREE.Vector3(-110, 96, SPAWN_Z - 60),
+      type: 'drone',
+      label: 'Drone',
+      mesh: model.root,
+      tiltPivot: model.tiltPivot,
+      props: model.props,
+      propDisc: model.discMat,
+      gimbal: model.gimbal,
+      position: new THREE.Vector3(-110, DRONE_FLIGHT.arrival, SPAWN_Z - 60),
       heading: 0.62,
       speed: 0,
+      velX: 0,
+      velZ: 0,
       verticalSpeed: 0,
       pitchAngle: 0,
       rollAngle: 0,
-      cameraTargetOffset: new THREE.Vector3(0, 1.55, 0),
-      chaseDistance: 11.4,
-      chaseHeight: 3.3
+      motorLoad: 0, // 0..1: what the props spin and the buzz pitch follow
+      landed: false,
+      // the static solids the drone meets as LoD2 heightfields (updateDrone), not as blocks: the city collision stage skips them too
+      staticSkip: (c) => this.droneHeightfield(c),
+      cameraTargetOffset: new THREE.Vector3(0, 0.15, 0),
+      chaseDistance: 4.0,
+      chaseHeight: 1.5
     };
   }
 
@@ -1420,6 +1373,44 @@ class ThirdPersonControllerManager {
     if (!this.groundField) return 0.0;
     if (mode === 'person' || mode === 'cyclist') return this.groundField.heightAt(x, z);
     return this.groundField.terrainAt ? this.groundField.terrainAt(x, z) : 0.0;
+  }
+
+  // Buildings with a loaded LoD2 record (`roofHeightAt`, set by main.js from world.roofHeightAt) are heightfields for the drone: solid
+  // up to the roof as drawn at each point, which steps down to lower wings and courtyards the collider's single block (eave + 0.45 m)
+  // cannot show. Where the record has no roof triangle over the footprint the block's top stands in. Every other collider is a block.
+  droneHeightfield(c) {
+    return c.type === 'building' && !!this.roofHeightAt?.has?.(String(c.id).replace(/^building:/, ''));
+  }
+
+  droneTopAt(c, x, z) {
+    if (!colliderContainsPoint(c, x, z)) return null;
+    if (!this.droneHeightfield(c)) return c.maxY;
+    return this.roofHeightAt(String(c.id).replace(/^building:/, ''), x, z) ?? c.maxY;
+  }
+
+  // What the drone stands on at (x, z) when it is at height y: the terrain, or a building top under the point no more than
+  // DRONE_FLIGHT.step above y (it settles onto a roof from above; a wall it meets sideways stops it instead)
+  droneSupportAt(x, z, y) {
+    let support = this.getGroundHeight(x, z, 'drone');
+    for (const c of this.nearColliders(x, z, 0.5)) {
+      const top = this.droneTopAt(c, x, z);
+      if (top !== null && top > support && top <= y + DRONE_FLIGHT.step) support = top;
+    }
+    return support;
+  }
+
+  // True when the drone's body at (x, z, y) would be inside a heightfield building: a roof higher than a step over it at the centre
+  // or at the body's rim
+  droneBlockedAt(x, z, y) {
+    const r = DRONE_FLIGHT.radius;
+    for (const c of this.nearColliders(x, z, r + 0.5)) {
+      if (!this.droneHeightfield(c) || c.minY > y + 0.3) continue;
+      for (const [px, pz] of [[x, z], [x + r, z], [x - r, z], [x, z + r], [x, z - r]]) {
+        const top = this.droneTopAt(c, px, pz);
+        if (top !== null && top > y + DRONE_FLIGHT.step) return true;
+      }
+    }
+    return false;
   }
 
   // The colliders whose bounds come within `r` of (x, z), in their original order. They never move, so they are
@@ -1444,6 +1435,7 @@ class ThirdPersonControllerManager {
 
   horizontalContactAt(x, y, z, body, candidates, contact = this._buildingContact ??= { nx: 0, nz: 0, depth: 0 }) {
     for (const collider of candidates) {
+      if (this._skipCollider && this._skipCollider(collider)) continue; // the drone meets LoD2 buildings as heightfields instead
       if (buildingContact(collider, x, y, z, body, contact)) {
         return { collider, nx: contact.nx, nz: contact.nz, depth: contact.depth };
       }
@@ -1457,7 +1449,7 @@ class ThirdPersonControllerManager {
   }
 
   applyHorizontalContact(collider, radius, carEntity, entity, body, x, y, z, nx, nz) {
-    const heli = this.activeMode === 'helicopter';
+    const air = this.activeMode === 'drone';
     const sinH = body.sin, cosH = body.cos;
     if (this._collisionListener && entity && entity.type !== 'person') {
       const sin = carEntity ? sinH : Math.sin(entity.heading || 0);
@@ -1466,7 +1458,7 @@ class ThirdPersonControllerManager {
       const support = body.oriented
         ? Math.abs(nx * cos - nz * sin) * body.hx + Math.abs(nx * sin + nz * cos) * body.hz
         : radius;
-      this.reportCollision(entity, collider, 'building', x - nx * support, y + (heli ? 1.1 : 0.56), z - nz * support,
+      this.reportCollision(entity, collider, 'building', x - nx * support, y + (air ? 0.15 : 0.56), z - nz * support,
         nx, 0, nz, approachSpeed);
     }
 
@@ -1494,10 +1486,10 @@ class ThirdPersonControllerManager {
   }
 
   boundedHorizontalEscape(x, z, y, body, reach) {
-    const heli = this.activeMode === 'helicopter';
-    const margin = heli ? 6000 : 0;
+    const air = this.activeMode === 'drone';
+    const margin = air ? DRONE_FLIGHT.roam : 0;
     const minX = ISLAND_BOUNDS.minX - margin, maxX = ISLAND_BOUNDS.maxX + margin;
-    const minZ = ISLAND_BOUNDS.minZ + (heli ? -6000 : 30), maxZ = ISLAND_BOUNDS.maxZ + margin;
+    const minZ = ISLAND_BOUNDS.minZ + (air ? -margin : 30), maxZ = ISLAND_BOUNDS.maxZ + margin;
     for (let distance = 0.5; distance <= 1024; distance += 0.5) {
       const directions = distance < 16 ? 16 : 8;
       for (let i = 0; i < directions; i++) {
@@ -1505,7 +1497,7 @@ class ThirdPersonControllerManager {
         const px = x + Math.cos(angle) * distance;
         const pz = z + Math.sin(angle) * distance;
         if (px < minX || px > maxX || pz < minZ || pz > maxZ) continue;
-        if (!heli && getIslandBoundsAtZ) {
+        if (!air && getIslandBoundsAtZ) {
           const shore = getIslandBoundsAtZ(pz);
           if (px < shore.westX + 8 || px > shore.eastX - 8) continue;
         }
@@ -1516,12 +1508,12 @@ class ThirdPersonControllerManager {
   }
 
   resolveHorizontalCollision(pos, radius, carEntity = null, entity = carEntity, previousPosition = null) {
-    // The detailed island (the helicopter may roam out over the harbour & the boroughs)
-    const heli = this.activeMode === 'helicopter';
-    const m = heli ? 6000 : 0;
+    // The district (the drone may roam DRONE_FLIGHT.roam beyond it, over the fjord and the far ring)
+    const air = this.activeMode === 'drone';
+    const m = air ? DRONE_FLIGHT.roam : 0;
     pos.x = Math.max(ISLAND_BOUNDS.minX - m, Math.min(ISLAND_BOUNDS.maxX + m, pos.x));
-    pos.z = Math.max(ISLAND_BOUNDS.minZ + (heli ? -6000 : 30), Math.min(ISLAND_BOUNDS.maxZ + m, pos.z));
-    if (this.activeMode !== 'helicopter' && getIslandBoundsAtZ) {
+    pos.z = Math.max(ISLAND_BOUNDS.minZ + (air ? -m : 30), Math.min(ISLAND_BOUNDS.maxZ + m, pos.z));
+    if (!air && getIslandBoundsAtZ) {
       const shore = getIslandBoundsAtZ(pos.z);
       const minShoreX = shore.westX + 8.0;
       const maxShoreX = shore.eastX - 8.0;
@@ -1654,9 +1646,11 @@ class ThirdPersonControllerManager {
   }
 
   update(dt, elapsed) {
-    const heli = this.entities.helicopter;
-    heli.mainRotorPivot.rotation.y += dt * 24.0;
-    heli.tailRotorPivot.rotation.x += dt * 32.0;
+    // the drone's props: idling on the ground, spinning up with the motor load in the air (the blur disc fades in as they blur)
+    const drone = this.entities.drone;
+    const spin = drone.landed && this.activeMode !== 'drone' ? 0 : 18 + 42 * drone.motorLoad;
+    for (const p of drone.props) p.pivot.rotation.y += p.dir * spin * dt;
+    drone.propDisc.opacity = Math.min(0.16, spin * 0.003);
 
     if (this.activeMode === 'person') {
       this.updatePerson(dt, elapsed);
@@ -1677,8 +1671,8 @@ class ThirdPersonControllerManager {
       this.updateCyclist(dt, this.entities.cyclist, 'cyclist');
     } else if (this.activeMode === 'cargobike') {
       this.updateCyclist(dt, this.entities.cargobike, 'cargobike');
-    } else if (this.activeMode === 'helicopter') {
-      this.updateHelicopter(dt, elapsed);
+    } else if (this.activeMode === 'drone') {
+      this.updateDrone(dt, elapsed);
     }
 
     for (const key of Object.keys(this.entities)) {
@@ -1874,58 +1868,94 @@ class ThirdPersonControllerManager {
     for (const pedal of b.pedals) pedal.rotation.x = -b.pedalPhase;
   }
 
-  updateHelicopter(dt, elapsed) {
-    const h = this.entities.helicopter;
-    const maxHorizSpeed = this.keys.boost ? 52.0 : 32.0;
-    const maxVertSpeed = 16.0;
-
-    let fwdInput = 0;
-    if (this.keys.forward) fwdInput = this.keys.forward;
-    else if (this.keys.backward) fwdInput = -this.keys.backward;
-
+  // The drone: W / S fly along the nose, A / D yaw, Space / E climb, Q / C descend, Shift sport. The velocity follows the nose (no
+  // momentum lost in a turn) and brakes to a hover when you let go; the body tilts towards where it is going, up to 25°. It stands on
+  // the terrain or on a roof (droneSupportAt), takes off with a climb, and never rises more than DRONE_FLIGHT.ceiling over the ground.
+  updateDrone(dt, elapsed) {
+    const d = this.entities.drone;
+    const F = DRONE_FLIGHT;
+    const sport = !!this.keys.boost;
+    const maxSpeed = sport ? F.sportSpeed : F.speed;
+    const maxClimb = sport ? F.sportClimb : F.climb;
+    const fwdInput = this.keys.forward ? this.keys.forward : this.keys.backward ? -this.keys.backward : 0;
     let yawInput = 0;
     if (this.keys.left) yawInput = this.keys.left;
     if (this.keys.right) yawInput = -this.keys.right;
+    const vertInput = this.keys.up ? this.keys.up : this.keys.down ? -this.keys.down : 0;
 
-    let vertInput = 0;
-    if (this.keys.up) vertInput = this.keys.up;
-    else if (this.keys.down) vertInput = -this.keys.down;
+    d.verticalSpeed += (vertInput * maxClimb - d.verticalSpeed) * Math.min(1, dt * 3.5);
+    const grounded = d.landed && d.verticalSpeed <= 0.05;
+    if (!grounded) d.heading += yawInput * F.yawRate * dt;
+    const sinH = Math.sin(d.heading), cosH = Math.cos(d.heading);
+    const target = grounded ? 0 : fwdInput * maxSpeed * (fwdInput < 0 ? 0.6 : 1);
+    const k = grounded ? 1 : Math.min(1, dt * F.response);
+    d.velX += (sinH * target - d.velX) * k;
+    d.velZ += (cosH * target - d.velZ) * k;
 
-    if (fwdInput !== 0) {
-      h.speed += fwdInput * 24.0 * dt;
-      h.speed = Math.max(-maxHorizSpeed * 0.6, Math.min(maxHorizSpeed, h.speed));
-    } else {
-      h.speed *= Math.max(0, 1 - dt * 1.8);
+    const previousPosition = { x: d.position.x, z: d.position.z };
+    const previousY = d.position.y;
+    d.position.x += d.velX * dt;
+    d.position.z += d.velZ * dt;
+    d.position.y += d.verticalSpeed * dt;
+    const ground = this.getGroundHeight(d.position.x, d.position.z, 'drone');
+    if (d.position.y > ground + F.ceiling) {
+      d.position.y = ground + F.ceiling;
+      if (d.verticalSpeed > 0) d.verticalSpeed = 0;
     }
-
-    if (vertInput !== 0) {
-      h.verticalSpeed += vertInput * 22.0 * dt;
-      h.verticalSpeed = Math.max(-maxVertSpeed, Math.min(maxVertSpeed, h.verticalSpeed));
-    } else {
-      h.verticalSpeed *= Math.max(0, 1 - dt * 3.5);
+    // land first (a roof it was above this frame holds it), so the walls below the roof line never see the drone
+    const touchdown = this.droneSupportAt(d.position.x, d.position.z, Math.max(previousY, d.position.y));
+    if (d.position.y < touchdown) {
+      if (d.verticalSpeed < -2) {
+        this.reportCollision(d, groundCollider, 'ground', d.position.x, touchdown, d.position.z, 0, 1, 0, -d.verticalSpeed);
+      }
+      d.position.y = touchdown;
+      if (d.verticalSpeed < 0) d.verticalSpeed = 0;
     }
-
-    h.heading += yawInput * 1.45 * dt;
-
-    const previousPosition = { x: h.position.x, z: h.position.z };
-    h.position.x += Math.sin(h.heading) * h.speed * dt;
-    h.position.z += Math.cos(h.heading) * h.speed * dt;
-    h.position.y += h.verticalSpeed * dt;
-
-    if (h.position.y < 0.25) {
-      this.reportCollision(h, groundCollider, 'ground', h.position.x, 0.25, h.position.z, 0, 1, 0, -h.verticalSpeed);
+    // heightfield buildings (LoD2): slide along them on the axis that is free, else hold position
+    if (this.roofHeightAt && this.droneBlockedAt(d.position.x, d.position.z, d.position.y)) {
+      const nx = d.position.x, nz = d.position.z, y = d.position.y;
+      if (!this.droneBlockedAt(nx, previousPosition.z, y)) {
+        d.position.z = previousPosition.z;
+        d.velZ = 0;
+      } else if (!this.droneBlockedAt(previousPosition.x, nz, y)) {
+        d.position.x = previousPosition.x;
+        d.velX = 0;
+      } else {
+        d.position.x = previousPosition.x;
+        d.position.z = previousPosition.z;
+        d.velX = d.velZ = 0;
+      }
     }
-    h.position.y = Math.max(0.25, Math.min(380, h.position.y));
-    this.resolveHorizontalCollision(h.position, 4.5, null, h, previousPosition);
+    // every other collider (poles, shelters, buildings without LoD2) as a block
+    this._skipCollider = this.roofHeightAt ? (c) => this.droneHeightfield(c) : null;
+    try {
+      this.resolveHorizontalCollision(d.position, F.radius, null, d, previousPosition);
+    } finally {
+      this._skipCollider = null;
+    }
+    // standing on what is under it now (pushed off a roof edge it flies on)
+    const support = this.droneSupportAt(d.position.x, d.position.z, d.position.y);
+    if (d.position.y < support) d.position.y = support;
+    d.landed = d.position.y <= support + 1e-6;
+    if (d.landed && d.verticalSpeed < 0) d.verticalSpeed = 0;
 
-    const targetPitch = (h.speed / maxHorizSpeed) * 0.24;
-    const targetRoll = -yawInput * 0.28;
-    h.pitchAngle += (targetPitch - h.pitchAngle) * Math.min(1, dt * 5);
-    h.rollAngle += (targetRoll - h.rollAngle) * Math.min(1, dt * 5);
-
-    h.tiltPivot.rotation.x = h.pitchAngle;
-    h.tiltPivot.rotation.z = h.rollAngle;
-    h.tiltPivot.position.y = Math.sin(elapsed * 2.6) * 0.18;
+    // speed along the nose for the HUD and the collision response; tilt from the velocity and the push towards the target
+    const fwdVel = d.velX * sinH + d.velZ * cosH;
+    const sideVel = d.velX * cosH - d.velZ * sinH;
+    d.speed = fwdVel;
+    const clamp1 = (v) => Math.max(-1, Math.min(1, v));
+    const targetPitch = d.landed ? 0 : clamp1(fwdVel / maxSpeed * 0.65 + (target - fwdVel) / maxSpeed * 0.9) * F.maxTilt;
+    const targetRoll = d.landed ? 0 : clamp1(-yawInput * Math.abs(fwdVel) / maxSpeed * 0.7 + sideVel / maxSpeed) * F.maxTilt * 0.6;
+    d.pitchAngle += (targetPitch - d.pitchAngle) * Math.min(1, dt * 6);
+    d.rollAngle += (targetRoll - d.rollAngle) * Math.min(1, dt * 6);
+    d.tiltPivot.rotation.x = d.pitchAngle;
+    d.tiltPivot.rotation.z = d.rollAngle;
+    d.tiltPivot.position.y = d.landed ? 0 : Math.sin(elapsed * 3.1) * 0.012;
+    // the gimbal keeps the camera level
+    d.gimbal.rotation.x = -d.pitchAngle;
+    d.gimbal.rotation.z = -d.rollAngle;
+    const load = d.landed && d.verticalSpeed <= 0 ? 0.0 : 0.45 + 0.35 * Math.hypot(d.velX, d.velZ) / maxSpeed + 0.25 * d.verticalSpeed / maxClimb;
+    d.motorLoad += (Math.max(0, Math.min(1, load)) - d.motorLoad) * Math.min(1, dt * 4);
   }
 }
 

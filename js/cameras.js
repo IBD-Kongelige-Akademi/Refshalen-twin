@@ -213,7 +213,7 @@ class CameraSystem {
           entity.position.z - Math.cos(totalYaw) * horizDist
         );
 
-        const lookUpBias = entity.type === 'helicopter' ? 0.2
+        const lookUpBias = entity.type === 'drone' ? 0.1
           : entity.type === 'car' ? 0.52
             : entity.type === 'cargobike' ? 1.2 : 1.55;
         desiredLook.set(
@@ -226,12 +226,12 @@ class CameraSystem {
 
       case 'action': {
         const sideOffset = entity.type === 'car' ? 2.65
-          : entity.type === 'helicopter' ? 4.2
+          : entity.type === 'drone' ? 0.9
             : entity.type === 'cargobike' ? 1.3 : 0.95;
         const backDist = (entity.type === 'car' ? 3.6
-          : entity.type === 'helicopter' ? 8.5
+          : entity.type === 'drone' ? 2.2
             : entity.type === 'cargobike' ? 4.1 : 2.8) + speedLag;
-        const lowY = entity.type === 'helicopter' ? entity.position.y + 1.2 : entity.position.y + 0.92;
+        const lowY = entity.type === 'drone' ? entity.position.y + 0.35 : entity.position.y + 0.92;
 
         desiredPos.set(
           entity.position.x - Math.sin(entity.heading) * backDist + Math.cos(entity.heading) * sideOffset,
@@ -259,9 +259,10 @@ class CameraSystem {
         } else if (entity.type === 'cargobike') {
           fwdOffset = -0.42;
           eyeY = 1.68;
-        } else if (entity.type === 'helicopter') {
-          fwdOffset = 1.65;
-          eyeY = 1.65;
+        } else if (entity.type === 'drone') {
+          // FPV: the gimbal camera under the nose
+          fwdOffset = 0.11;
+          eyeY = 0.07;
         }
 
         desiredPos.set(
@@ -325,7 +326,7 @@ class CameraSystem {
       // target by a distance that depends on the frame time (about speed x dt), so with uneven frame times the camera
       // surged back and forth behind an accelerating or fast car. Relative to the entity a steady drive keeps the
       // camera steady, while turns, orbit drags, zoom & the speed pull-back are still eased. The entity's height is
-      // eased in world space (curbs, park lawns, jumps, the helicopter climbing).
+      // eased in world space (curbs, park lawns, jumps, the drone climbing).
       if (this.followEntity !== entity) {
         // preset or mode switch: start from where the camera is and glide over to the new framing
         this.followEntity = entity;

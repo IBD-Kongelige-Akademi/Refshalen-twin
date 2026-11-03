@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { CPH_FRAME, setCityBounds, getDataBbox } from './city-config.js';
 import { buildRealBuildings } from './buildings-real.js';
-import { loadLod2 } from './lod2-geometry.js';
+import { loadLod2, roofHeightSampler } from './lod2-geometry.js';
 import { createTrafficSystem } from './traffic.js';
 import { buildCphRoadSurfaces } from './road-surfaces.js';
 import { createCyclistSystem } from './cyclists.js';
@@ -54,7 +54,7 @@ const CPH_GEODATA_URL = './data/cph-geodata.json';
 const CPH_SURFACES_URL = './data/cph-surfaces.json';
 const CPH_LAKES_URL = './data/cph-lakes.json';
 const CPH_VEGETATION_URL = './data/cph-vegetation.json';
-const COLLIDING_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'helicopter']);
+const COLLIDING_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'drone']);
 
 /** Optional ground-surface register and road markings (tools/geodata/surfaces.py); null when absent. */
 async function loadCphSurfaces(url = CPH_SURFACES_URL, fetchImpl = globalThis.fetch) {
@@ -315,10 +315,11 @@ function attachCollisionPhase(traffic, cyclists, { stage = null } = {}) {
     actor.kind = 'player';
     actor.mode = mode;
     actor.spec = entity.bodySpec || null;
-    actor.bodyTop = mode === 'helicopter' ? 3.2 : mode === 'car' ? entity.bodySpec?.height || 1.8 : 1.9;
-    actor.bodyBottom = mode === 'helicopter' ? -0.25 : 0;
-    actor.radius = mode === 'helicopter' ? 4.5 : mode === 'cargobike' ? 0.4 : mode === 'cyclist' ? 0.38 : mode === 'car' ? (entity.bodySpec?.width || 1.72) / 2 : mode === 'person' ? 0.48 : 0.32;
-    actor.mass = mode === 'helicopter' ? 2200 : mode === 'car' ? 1250 : mode === 'cargobike' ? 135 : mode === 'cyclist' ? 95 : 72;
+    actor.bodyTop = mode === 'drone' ? 0.3 : mode === 'car' ? entity.bodySpec?.height || 1.8 : 1.9;
+    actor.bodyBottom = 0;
+    actor.radius = mode === 'drone' ? 0.4 : mode === 'cargobike' ? 0.4 : mode === 'cyclist' ? 0.38 : mode === 'car' ? (entity.bodySpec?.width || 1.72) / 2 : mode === 'person' ? 0.48 : 0.32;
+    actor.mass = mode === 'drone' ? 0.9 : mode === 'car' ? 1250 : mode === 'cargobike' ? 135 : mode === 'cyclist' ? 95 : 72;
+    actor.skipStatic = entity.staticSkip || null;
     actor.x = entity.position.x; actor.y = entity.position.y; actor.z = entity.position.z;
     actor.heading = entity.heading || 0;
     actor.placed = true;
@@ -1003,7 +1004,9 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     /** True when the tile index has a tile at this local point (the citywide teleport presets use it). */
     tileExists: (x, z) => !!index.tiles[tileOfLocal(x, z)],
     /** A data/city/<rel> JSON file through the tile store (packed or not), e.g. the overview map's map.json. */
-    fetchCityJson: (rel) => store.fetchCityJson(rel)
+    fetchCityJson: (rel) => store.fetchCityJson(rel),
+    /** (building id, x, z) -> the height of its LoD2 roof there, or null: the drone lands on the roof as drawn (js/controllers.js). */
+    roofHeightAt: lod2 ? roofHeightSampler((id) => lod2.get(id)) : null
   };
 }
 

@@ -18,8 +18,9 @@ export function collisionBody(mode, radius, heading, margin = 0, spec = null) {
     offsetForward: cargoBike ? -0.06 : 0,
     extX: oriented ? Math.abs(cos) * hx + Math.abs(sin) * hz : radius + margin,
     extZ: oriented ? Math.abs(sin) * hx + Math.abs(cos) * hz : radius + margin,
-    bottom: mode === 'helicopter' ? -0.25 : 0,
-    top: mode === 'helicopter' ? 3.2 : car ? (Number.isFinite(spec?.height) && spec.height > 0 ? spec.height : 1.8) : 1.9
+    bottom: 0,
+    // the drone's origin is at its feet; 0.3 m covers the props
+    top: mode === 'drone' ? 0.3 : car ? (Number.isFinite(spec?.height) && spec.height > 0 ? spec.height : 1.8) : 1.9
   };
 }
 
@@ -81,6 +82,17 @@ const pointInPolygon = (collider, x, z) => {
   if (holes) for (let h = 0; h < holes.length; h++) if (pointInRing(holes[h], x, z)) return false;
   return true;
 };
+
+/** True when (x, z) lies inside the collider's footprint (polygon with holes, circle, OBB or AABB): what stands on its top there. */
+export function colliderContainsPoint(collider, x, z) {
+  if (x < collider.minX || x > collider.maxX || z < collider.minZ || z > collider.maxZ) return false;
+  if (collider.ring?.length >= 6) return pointInPolygon(collider, x, z);
+  const o = collider.obb;
+  if (collider.shape === 'circle') return hypot(x - o.cx, z - o.cz) <= collider.radius;
+  if (!o) return true;
+  const dx = x - o.cx, dz = z - o.cz;
+  return Math.abs(dx * o.cs - dz * o.sn) <= o.hx && Math.abs(dx * o.sn + dz * o.cs) <= o.hz;
+}
 
 function ringsOf(collider) {
   return [collider.ring, ...(collider.holes || [])];

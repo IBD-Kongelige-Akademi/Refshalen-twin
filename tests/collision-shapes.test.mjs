@@ -1,12 +1,28 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { bodyContact, buildingContact, collisionBody } from '../js/collision-shapes.js';
+import { bodyContact, buildingContact, collisionBody, colliderContainsPoint } from '../js/collision-shapes.js';
+
+test('colliderContainsPoint: polygons with courtyards, rotated boxes, circles and plain bounds', () => {
+  const ring = [0, 0, 20, 0, 20, 20, 0, 20];
+  const courtyard = { minX: 0, maxX: 20, minZ: 0, maxZ: 20, ring, holes: [[5, 5, 15, 5, 15, 15, 5, 15]] };
+  assert.equal(colliderContainsPoint(courtyard, 2, 2), true);
+  assert.equal(colliderContainsPoint(courtyard, 10, 10), false, 'the courtyard is open');
+  assert.equal(colliderContainsPoint(courtyard, 25, 2), false);
+  const cs = Math.SQRT1_2;
+  const diamond = { minX: -7.1, maxX: 7.1, minZ: -7.1, maxZ: 7.1, obb: { cx: 0, cz: 0, hx: 5, hz: 5, cs, sn: cs } };
+  assert.equal(colliderContainsPoint(diamond, 0, 6.5), true);
+  assert.equal(colliderContainsPoint(diamond, 6, 6), false, 'the bounds corner is outside the rotated box');
+  const pole = { shape: 'circle', radius: 0.5, minX: -0.5, maxX: 0.5, minZ: -0.5, maxZ: 0.5, obb: { cx: 0, cz: 0 } };
+  assert.equal(colliderContainsPoint(pole, 0.3, 0.3), true);
+  assert.equal(colliderContainsPoint(pole, 0.45, 0.45), false);
+  assert.equal(colliderContainsPoint({ minX: 0, maxX: 1, minZ: 0, maxZ: 1 }, 0.5, 0.5), true);
+});
 
 const box = (x, y, z, mode = 'car', heading = 0) => ({
   x, y, z, ...collisionBody(mode, mode === 'car' ? 1.35 : 0.48, heading)
 });
 
-test('collisionBody preserves circle, car, cargo bike, and helicopter footprints', () => {
+test('collisionBody preserves circle, car, cargo bike, and drone footprints', () => {
   const person = collisionBody('person', 0.48, 0);
   assert.equal(person.radius, 0.48);
   assert.equal(person.extX, 0.48);
@@ -20,7 +36,7 @@ test('collisionBody preserves circle, car, cargo bike, and helicopter footprints
   assert.equal(cityBike.oriented, true);
   assert.deepEqual([cityBike.hx, cityBike.hz], [0.34, 0.95]);
   assert.equal(collisionBody('cargobike', 1.4, 0).offsetForward, -0.06);
-  assert.deepEqual([collisionBody('helicopter', 4.5, 0).bottom, collisionBody('helicopter', 4.5, 0).top], [-0.25, 3.2]);
+  assert.deepEqual([collisionBody('drone', 0.4, 0).bottom, collisionBody('drone', 0.4, 0).top, collisionBody('drone', 0.4, 0).radius], [0, 0.3, 0.4]);
   assert.equal(collisionBody('car', 1.35, 0, 0, { height: 2.65 }).top, 2.65);
 });
 
@@ -50,8 +66,8 @@ test('bodyContact uses exact oriented box and circle-to-box corner distance', ()
 
 test('bodyContact ignores actors with separated vertical intervals', () => {
   const person = box(0, 0, 0, 'person');
-  const helicopter = box(0.2, 4, 0, 'helicopter');
-  assert.equal(bodyContact(person, helicopter, {}), false);
+  const drone = box(0.2, 4, 0, 'drone');
+  assert.equal(bodyContact(person, drone, {}), false);
   const nearbyGroundBike = box(0.2, 0, 0, 'cyclist');
   const airbornePerson = { ...person, y: 2.2 };
   assert.equal(bodyContact(airbornePerson, nearbyGroundBike, {}), false);

@@ -1,6 +1,19 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseLod2Record, loadLod2, lod2EdgeTops, lod2WallPieces, clipAbove } from '../js/lod2-geometry.js';
+import { parseLod2Record, loadLod2, lod2EdgeTops, lod2WallPieces, clipAbove, roofHeightSampler } from '../js/lod2-geometry.js';
+
+test('roofHeightSampler: the height of a gable roof under a point, null off the roof or without a record', () => {
+  // 10 x 10 m, eaves at x = 0 and x = 10 (5 m), ridge along z at x = 5 (8 m), plus a vertical gable triangle that must not count
+  const pos = new Float32Array([0, 5, 0, 5, 8, 0, 5, 8, 10, 0, 5, 10, 10, 5, 0, 10, 5, 10, 5, 5, 0]);
+  const tris = [[0, 1, 2], [0, 2, 3], [1, 4, 5], [1, 5, 2], [6, 1, 4]];
+  const rec = { nV: 7, nT: tris.length, pos, idx: new Uint16Array(tris.flat()), kind: new Uint8Array([0, 0, 0, 0, 1]) };
+  const at = roofHeightSampler((id) => (id === 'gdk:1' ? rec : null));
+  assert.ok(Math.abs(at('gdk:1', 2.5, 5) - 6.5) < 1e-6, 'half way up the slope');
+  assert.ok(Math.abs(at('gdk:1', 5, 5) - 8) < 1e-6, 'the ridge');
+  assert.ok(Math.abs(at('gdk:1', 9, 2) - 5.6) < 1e-6, 'the other slope');
+  assert.equal(at('gdk:1', 20, 5), null, 'beside the building');
+  assert.equal(at('gdk:2', 2.5, 5), null, 'no LoD2 record');
+});
 import { createAccumulator, addBuilding, cleanRing } from '../js/building-geometry.js';
 import { texturedWalls } from '../js/appearance.js';
 

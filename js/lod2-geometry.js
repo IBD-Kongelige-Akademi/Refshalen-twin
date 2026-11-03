@@ -207,6 +207,46 @@ function lod2RoofTriangles(rec, { filter = true } = {}) {
   return out;
 }
 
+/**
+ * The height of a building's LoD2 roof under a point: `sampler(id, x, z)` -> the highest roof triangle over (x, z), or null (no
+ * parsed record for the id, or the point is not under its roof). `getRecord(id)` returns a parsed record or null (js/tile-store.js
+ * createTileLod2 `get`); each record's roof triangles are flattened once, with their bounds, and kept while the record lives.
+ */
+function roofHeightSampler(getRecord) {
+  const cache = new WeakMap();
+  const trianglesOf = (rec) => {
+    let t = cache.get(rec);
+    if (!t) {
+      const tris = lod2RoofTriangles(rec);
+      t = new Float64Array(tris.length * 9);
+      tris.forEach((tri, i) => tri.forEach((p, k) => t.set(p, i * 9 + k * 3)));
+      cache.set(rec, t);
+    }
+    return t;
+  };
+  const sampler = (id, x, z) => {
+    const rec = getRecord(id);
+    if (!rec) return null;
+    const t = trianglesOf(rec);
+    let best = null;
+    for (let i = 0; i < t.length; i += 9) {
+      const ax = t[i], ay = t[i + 1], az = t[i + 2], bx = t[i + 3], by = t[i + 4], bz = t[i + 5], cx = t[i + 6], cy = t[i + 7], cz = t[i + 8];
+      if (x < Math.min(ax, bx, cx) || x > Math.max(ax, bx, cx) || z < Math.min(az, bz, cz) || z > Math.max(az, bz, cz)) continue;
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-12) continue; // a vertical (or degenerate) triangle has no height over a point
+      const u = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d;
+      const v = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+      if (u < -1e-9 || v < -1e-9 || u + v > 1 + 1e-9) continue;
+      const y = u * ay + v * by + (1 - u - v) * cy;
+      if (best === null || y > best) best = y;
+    }
+    return best;
+  };
+  /** True when the building has a parsed LoD2 record (its roof is what `sampler` measures). */
+  sampler.has = (id) => !!getRecord(id);
+  return sampler;
+}
+
 /** Keeps the part of a triangle at or above y = yMin; returns 0 to 2 triangles (the clip polygon fanned). */
 function clipAbove(tri, yMin) {
   const poly = [];
@@ -264,4 +304,4 @@ function lod2WallPieces(rec, lod) {
   return out;
 }
 
-export { LOD2_NO_TOP, ROOF, WALL, parseLod2Record, loadLod2, rawEdges, lod2EdgeTops, lod2RoofTriangles, roofFragmentMask, lod2WallPieces, clipAbove };
+export { LOD2_NO_TOP, ROOF, WALL, parseLod2Record, loadLod2, rawEdges, lod2EdgeTops, lod2RoofTriangles, roofHeightSampler, roofFragmentMask, lod2WallPieces, clipAbove };

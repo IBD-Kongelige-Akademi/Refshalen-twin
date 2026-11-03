@@ -134,11 +134,11 @@ test('mode changes clear touches and expose the relevant actions', () => {
   assert.equal(buttons.down.hidden, true);
   stick.dispatch('pointerdown', { clientY: 20 });
   buttons.up.dispatch('pointerdown', { pointerId: 2 });
-  controls.setMode('helicopter');
+  controls.setMode('drone');
   assert.equal(Object.values(input).some(Boolean), false);
   assert.equal(stick.hasPointerCapture(1), false);
   assert.equal(buttons.up.hasPointerCapture(2), false);
-  assert.equal(labels.boost.textContent, 'Boost');
+  assert.equal(labels.boost.textContent, 'Sport');
   assert.equal(labels.up.textContent, 'Ascend');
   assert.equal(buttons.up.hidden, false);
   assert.equal(buttons.down.hidden, false);

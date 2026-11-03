@@ -860,7 +860,7 @@ body.hud-minimized .icon-show {
   transition: opacity 0.3s ease;
 }
 
-body[data-mode='helicopter'] .gauge-alt {
+body[data-mode='drone'] .gauge-alt {
   opacity: 1;
 }
 

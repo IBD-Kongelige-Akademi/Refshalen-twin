@@ -94,60 +94,27 @@ function combustionBuffers(context, cylinders, diesel, seed) {
   };
 }
 
-function rotorBuffers(context) {
+function propBuffer(context) {
+  // A quadcopter's buzz: four two-blade props at slightly different speeds (their blade-pass tones beat against each other), each
+  // with the harmonics of a thin blade, the electric motors' whine a few octaves up and a little air noise. Every tone has a whole
+  // number of cycles in the 2 s loop, so it wraps without a click; the voice follows the motor load with the playback rate.
   const rate = context.sampleRate;
-  const revolutions = 16, blades = 4, revolutionsPerSecond = 5.2;
-  const length = Math.round(rate * revolutions / revolutionsPerSecond);
-  const rotor = context.createBuffer(1, length, rate);
-  const envelope = context.createBuffer(1, length, rate);
-  const data = rotor.getChannelData(0), modulation = envelope.getChannelData(0);
-  const random = randomSequence(0x726f746f);
-  const strengths = [1, 0.73, 0.96, 0.76];
-  const interval = length / (revolutions * blades);
-  for (let blade = 0; blade < revolutions * blades; blade++) {
-    let index = Math.round((blade + (random() - 0.5) * 0.012) * interval);
-    index = (index + length) % length;
-    const strength = strengths[blade % blades] * (0.94 + random() * 0.12);
-    let turbulence = 0;
-    for (let i = 0; i < rate * 0.085; i++) {
-      const t = i / rate;
-      turbulence += (random() * 2 - 1 - turbulence) * 0.24;
-      const attack = 1 - Math.exp(-t / 0.0003);
-      const pressure = (1 - t / 0.0032) * Math.exp(-t / 0.0032);
-      const body = Math.sin(t * 2 * Math.PI * 52) * Math.exp(-t / 0.021) * 0.32;
-      // A compact pressure pulse and low body give each blade weight; most wash is a separate modulated layer.
-      const slapTime = t - 0.005;
-      const slap = slapTime > 0 ? (1 - slapTime / 0.0008) * Math.exp(-slapTime / 0.0008) * 0.24 : 0;
-      const wash = attack * Math.exp(-t / 0.016);
-      data[index] += strength * (pressure * attack + body + slap + turbulence * wash * 0.42);
-      modulation[index] += strength * wash;
-      if (++index === length) index = 0;
-    }
-  }
-  let peak = 0;
-  for (let i = 0; i < length; i++) peak = Math.max(peak, modulation[i]);
-  for (let i = 0; i < length; i++) modulation[i] /= peak;
-  return { rotor: normalizeLoop(rotor, 0.29), envelope };
-}
-
-function turbineBuffer(context) {
-  const rate = context.sampleRate;
-  const buffer = context.createBuffer(1, Math.round(rate * 2), rate);
-  const data = buffer.getChannelData(0), random = randomSequence(0x74757262);
-  let lowNoise = 0;
+  const seconds = 2;
+  const buffer = context.createBuffer(1, Math.round(rate * seconds), rate);
+  const data = buffer.getChannelData(0), random = randomSequence(0x64726f6e);
+  const props = [197, 200.5, 203, 199]; // blade-pass frequencies (Hz): ~6,000 rpm with two blades
+  let air = 0;
   for (let i = 0; i < data.length; i++) {
     const t = i / rate;
-    const white = random() * 2 - 1;
-    lowNoise += (white - lowNoise) * 0.18;
-    // Two close turbine tones beat gently above the gearbox. Integer cycles and periodic phase modulation
-    // wrap continuously; baking them once avoids a stack of oscillators for every helicopter voice.
-    const flutter = Math.sin(2 * Math.PI * 23 * t) * 0.12;
-    data[i] = Math.sin(2 * Math.PI * 1580 * t + flutter) * 0.30
-      + Math.sin(2 * Math.PI * 1593 * t - flutter) * 0.24
-      + Math.sin(2 * Math.PI * 3160 * t + flutter * 2) * 0.12
-      + Math.sin(2 * Math.PI * 790 * t) * 0.08 + (white - lowNoise) * 0.25;
+    let v = 0;
+    for (const f of props) {
+      for (let n = 1; n <= 7; n++) v += Math.sin(2 * Math.PI * f * n * t + n * f) * 0.22 / n ** 1.15;
+      v += Math.sin(2 * Math.PI * f * 7 * t) * 0.035; // motor whine (seven pole pairs)
+    }
+    air += (random() * 2 - 1 - air) * 0.3;
+    data[i] = v + air * 0.18;
   }
-  return normalizeLoop(buffer, 0.22, 0.8);
+  return normalizeLoop(buffer, 0.25);
 }
 
 function ratchetBuffer(context) {
@@ -269,7 +236,6 @@ export function createSynthResources(context) {
   }
 
   const wave = (harmonics) => context.createPeriodicWave(new Float32Array(harmonics.length), new Float32Array(harmonics));
-  const helicopter = rotorBuffers(context);
   return {
     noise,
     impulse,
@@ -278,9 +244,7 @@ export function createSynthResources(context) {
       suv: combustionBuffers(context, 6, false, 0x73757631),
       bus: combustionBuffers(context, 6, true, 0x64696573)
     },
-    rotor: helicopter.rotor,
-    rotorEnvelope: helicopter.envelope,
-    turbine: turbineBuffer(context),
+    props: propBuffer(context),
     ratchet: ratchetBuffer(context),
     chain: chainBuffer(context),
     sirenWave: wave([0, 1, 0.13, 0.29, 0.055, 0.11, 0.025, 0.045, 0.012, 0.018]),
@@ -303,7 +267,7 @@ function smoothParameter(parameter, timeConstant = 0.07, epsilon = 0.0001, snapI
 }
 
 export function createMotorVoice(context, resources, kind, output) {
-  if (!['sedan', 'suv', 'bus', 'helicopter', 'cyclist', 'siren'].includes(kind)) {
+  if (!['sedan', 'suv', 'bus', 'drone', 'cyclist', 'siren'].includes(kind)) {
     throw new RangeError(`Unknown motor voice: ${kind}`);
   }
   const nodes = [];
@@ -435,50 +399,20 @@ export function createMotorVoice(context, resources, kind, output) {
       roadFrequency((2200 + Math.min(1, rolling) * 2400) * doppler, now);
       noiseRate(doppler * (0.96 + variation * 0.08), now);
     };
-  } else if (kind === 'helicopter') {
-    const rotor = loop(resources.rotor);
-    const rotorFilter = filter('lowpass', 1500, 0.5);
-    const rotorGain = gain();
-    rotor.connect(rotorFilter).connect(rotorGain).connect(mix);
-    const air = loop();
-    const washFilter = filter('lowpass', 1400, 0.5);
-    const washGain = gain();
-    air.connect(washFilter).connect(washGain).connect(mix);
-    const bladeEnvelope = loop(resources.rotorEnvelope);
-    const bladeDepth = gain();
-    bladeEnvelope.connect(bladeDepth).connect(washGain.gain);
-    const turbine = loop(resources.turbine);
-    const turbineFilter = filter('bandpass', 2400, 0.55);
-    const turbineGain = gain();
-    turbine.connect(turbineFilter).connect(turbineGain).connect(mix);
-    const rotorRate = smoothParameter(rotor.playbackRate, 0.30, 0.0004, true);
-    const envelopeRate = smoothParameter(bladeEnvelope.playbackRate, 0.30, 0.0004, true);
-    const rotorLevel = smoothParameter(rotorGain.gain, 0.22);
-    const rotorCutoff = smoothParameter(rotorFilter.frequency, 0.22, 1);
-    const washLevel = smoothParameter(washGain.gain, 0.22);
-    const bladeLevel = smoothParameter(bladeDepth.gain, 0.22);
-    const washCutoff = smoothParameter(washFilter.frequency, 0.25, 1);
-    const turbineFrequency = smoothParameter(turbineFilter.frequency, 0.25, 1);
-    const turbineLevel = smoothParameter(turbineGain.gain, 0.22);
-    const turbineRate = smoothParameter(turbine.playbackRate, 0.4, 0.0005, true);
-    const noiseRate = smoothParameter(air.playbackRate, 0.15, 0.001);
-    render = (speed, load, doppler, now, verticalSpeed) => {
-      const flight = Math.min(1, speed / 40);
-      const descent = clamp(-verticalSpeed / 10, 0, 1) * Math.min(1, speed / 10) * (1 - flight * 0.6);
-      // A governed rotor changes speed very little: collective/forward flight primarily strengthen the blade slap
-      // and turbulent wash. The pressure loop and its noise envelope share the same phase and playback rate.
-      const rate = (0.994 + variation * 0.012 - load * 0.012 + flight * 0.004) * doppler;
-      rotorRate(rate, now);
-      envelopeRate(rate, now);
-      rotorLevel(0.32 + load * 0.18 + descent * 0.12 + flight * 0.025, now);
-      rotorCutoff((1150 + load * 700 + descent * 1800) * doppler, now);
-      washLevel(0.022 + load * 0.025, now);
-      bladeLevel(0.18 + load * 0.25 + descent * 0.25, now);
-      washCutoff((800 + load * 650 + flight * 900) * doppler, now);
-      turbineFrequency((2000 + load * 900) * doppler, now);
-      turbineLevel(0.055 + load * 0.055, now);
-      turbineRate((0.92 + load * 0.16) * doppler, now);
-      noiseRate(doppler, now);
+  } else if (kind === 'drone') {
+    // A quadcopter steers by changing its props' speed (there is no governed rotor): the buzz's pitch follows the motor load
+    const props = loop(resources.props);
+    const propFilter = filter('lowpass', 3000, 0.6);
+    const propGain = gain();
+    props.connect(propFilter).connect(propGain).connect(mix);
+    const propRate = smoothParameter(props.playbackRate, 0.12, 0.0004, true);
+    const propLevel = smoothParameter(propGain.gain, 0.12);
+    const propCutoff = smoothParameter(propFilter.frequency, 0.15, 1);
+    render = (speed, load, doppler, now) => {
+      const spinning = load > 0.01 ? 1 : 0;
+      propRate((0.72 + variation * 0.04 + load * 0.62) * doppler, now);
+      propLevel(spinning * (0.16 + load * 0.2), now);
+      propCutoff((2200 + load * 2600) * doppler, now);
     };
   } else if (kind === 'cyclist') {
     const road = loop();

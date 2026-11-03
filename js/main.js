@@ -98,9 +98,10 @@ async function initApp() {
   const { trafficSystem } = world;
   const allColliders = world.staticIndex ? [] : world.colliders; // a streamed city's colliders come and go: the controllers query world.staticIndex
 
-  // 4. Initialize Third-Person Controllers (Person, Car, both Bikes, Helicopter) & Multi-Camera System
+  // 4. Initialize Third-Person Controllers (Person, Car, both Bikes, Drone) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
   controllerManager.groundField = world.groundHeight || null;
+  controllerManager.roofHeightAt = world.roofHeightAt || null;
   if (world.staticIndex) controllerManager.staticIndex = world.staticIndex; // streamed city: per-tile colliders
   // Reuse teleport placement so saved players return at rest, close to their last positions.
   try {
@@ -247,7 +248,7 @@ async function initApp() {
   const elControlsHint = document.getElementById('hud-controls-hint');
   const gamepadControls = new GamepadControls(controllerManager, cameraSystem, {
     onCycleMode: (step) => {
-      const modes = ['person', 'car', 'cyclist', 'helicopter'];
+      const modes = ['person', 'car', 'cyclist', 'drone'];
       const activeMode = controllerManager.activeMode === 'cargobike' ? 'cyclist' : controllerManager.activeMode;
       const nextMode = modes[(modes.indexOf(activeMode) + step + modes.length) % modes.length];
       selectMode(nextMode === 'cyclist' ? lastBikeMode : nextMode);
@@ -262,10 +263,10 @@ async function initApp() {
     person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
     cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
-    helicopter: [[['W', 'S'], 'Pitch'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Ascend'], [['Q', 'C'], 'Descend'], [['Shift'], 'Boost']]
+    drone: [[['W', 'S'], 'Fly'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Climb / Take off'], [['Q', 'C'], 'Descend / Land'], [['Shift'], 'Sport']]
   };
   // Top speeds in km/h set the full scale of the speed meter for each active vehicle.
-  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, helicopter: 187 };
+  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, drone: 75 };
 
   function renderControlHints(mode) {
     if (!elControlsHint) return;
@@ -539,7 +540,7 @@ async function initApp() {
         selectMode('cyclist');
         break;
       case 'Digit4':
-        selectMode('helicopter');
+        selectMode('drone');
         break;
       case 'Digit6':
         selectCamera('action', true);
@@ -793,7 +794,10 @@ async function initApp() {
       const activeEnt = controllerManager.getActiveEntity();
       const mode = controllerManager.activeMode;
       const kmh = Math.round(Math.abs(activeEnt.speed) * 3.6);
-      const altM = Math.max(0, Math.round(activeEnt.position.y));
+      // the drone's height over the ground (what its 120 m ceiling counts), else the height above the frame origin
+      const altM = Math.max(0, Math.round(mode === 'drone'
+        ? activeEnt.position.y - controllerManager.getGroundHeight(activeEnt.position.x, activeEnt.position.z, 'drone')
+        : activeEnt.position.y));
 
       if (elFps) {
         elFps.textContent = String(currentFps);
