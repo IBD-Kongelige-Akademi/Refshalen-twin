@@ -19,7 +19,7 @@ Teleports (`js/city-config.js`, `index.html`, `js/cameras.js`, `tools/check-coll
 ## Tests
 
 - The monolithic Copenhagen data moved to `tests/fixtures/cph/`. 28 engine test files (controllers, texture-memory budget, traffic, collisions…) use it as input. Replace it with Aalborg fixtures once phase 2–3 data exists, then delete it, and its attribution in the README with it.
-- Three tests are skipped because their Copenhagen water fixtures sit at the Copenhagen sea level: two in `goboat-harbour.test.mjs` and one in `lakes.test.mjs`. Their modules go in phase 4.
+- One test in `lakes.test.mjs` is skipped because its Copenhagen water fixture sits at the Copenhagen sea level (the two GoBoat ones went with GoBoat in phase 4).
 - `teleports.test.cjs` "street teleports land on the street they name" runs once `data/city/roadgraph.json` exists.
 
 ## Credentials and hosting
@@ -36,8 +36,8 @@ A case-insensitive grep for `copenhagen` still finds about 80 files. These are k
 |---|---|
 | KK / Frederiksberg fetchers and KK WFS layers in `tools/geodata` (`build_city.py`, `city_sources.py`, `city_layers*.py`, `furniture.py`, `surfaces.py`, `entrances.py`, `city_tiles.py` DAGI) | phases 2, 3, 5 and 6 (datagrundlag.dk) |
 | ~~roofer / point-cloud LoD2 path~~ | done in phase 2b (docs/aalborg-phase2.md) |
-| Copenhagen-only scenery: `bridge-dlb*`, `goboat*`, `swan-*`, Irma sign, `lake-furniture.js`, Søerne lakes and water override, Københavnerfortov paving, hero loader (`hero-cache.js`, `heroesEnabled`) | phase 4 |
-| `index.html` credits, the rest of the README, `tools/shoot-m2.py` camera views, `CITY_TELEPORT_LOCATIONS` | phase 4 |
+| ~~Copenhagen-only scenery~~ | done in phase 4 (docs/aalborg-phase4.md); paving and lake-furniture kept on purpose |
+| ~~`index.html` credits, README, `CITY_TELEPORT_LOCATIONS`~~ | done in phase 4; `tools/shoot-m2.py` camera views remain Copenhagen |
 | Comments ("Copenhagen's short links…") and identifiers (`CPH_FRAME`, `CopenhagenGround`, `cph-*` data format ids) | kept: renaming them buys nothing and makes upstream cherry-picks harder |
 | `Europe/Copenhagen` time zone, `copenhagenLocalDateTimeToUtc` | kept: it is Denmark's time zone |
 | `docs/research`, `docs/PLAN.md`, `docs/citywide-*.md` | upstream reference, kept as is |

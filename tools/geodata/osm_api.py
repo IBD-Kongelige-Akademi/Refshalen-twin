@@ -74,18 +74,15 @@ def _way_out(way, nodes):
     return {"type": "way", "id": way["id"], "tags": way.get("tags", {}), "geometry": _geom(way, nodes)}
 
 
-def emulate(key: str, elements: list[dict]) -> dict:
-    """The Overpass `out geom` answer to build_city.OSM_QUERIES[key], rebuilt from map elements."""
+def select(elements: list[dict], way=None, relation=None, node=None) -> dict:
+    """An Overpass `out geom` answer with the ways / relations / nodes whose tags pass the given predicates (None: none of that kind)."""
     nodes, ways = _index(elements)
     out = []
-    if key == "roads":
-        out = [_way_out(w, nodes) for w in ways.values() if "highway" in w.get("tags", {})]
-    elif key == "water_parks":
-        def keep(t):
-            return t.get("natural") == "water" or t.get("leisure") in ("park", "garden")
-        out = [_way_out(w, nodes) for w in ways.values() if keep(w.get("tags", {}))]
+    if way:
+        out += [_way_out(w, nodes) for w in ways.values() if way(w.get("tags", {}))]
+    if relation:
         for el in elements:
-            if el["type"] == "relation" and keep(el.get("tags", {})):
+            if el["type"] == "relation" and relation(el.get("tags", {})):
                 members = []
                 for m in el.get("members", []):
                     mm = {"type": m["type"], "ref": m["ref"], "role": m.get("role", "")}
@@ -93,14 +90,29 @@ def emulate(key: str, elements: list[dict]) -> dict:
                         mm["geometry"] = _geom(ways[m["ref"]], nodes)
                     members.append(mm)
                 out.append({"type": "relation", "id": el["id"], "tags": el.get("tags", {}), "members": members})
-    elif key == "nodes":
-        for nd in nodes.values():
-            t = nd.get("tags", {})
-            if t.get("highway") in ("traffic_signals", "street_lamp") or (t.get("highway") == "crossing" and t.get("crossing") == "traffic_signals"):
-                out.append({"type": "node", "id": nd["id"], "lat": nd["lat"], "lon": nd["lon"], "tags": t})
-    else:
-        raise KeyError(f"no emulation for {key!r}")
+    if node:
+        out += [{"type": "node", "id": nd["id"], "lat": nd["lat"], "lon": nd["lon"], "tags": nd.get("tags", {})}
+                for nd in nodes.values() if nd.get("tags") and node(nd["tags"])]
     return {"version": 0.6, "generator": "osm_api.py (api/0.6/map, Overpass-shaped)", "elements": out}
 
 
-EMULATED = ("roads", "water_parks", "nodes")
+def _water_park(t):
+    return t.get("natural") == "water" or t.get("leisure") in ("park", "garden")
+
+
+def _signal_lamp(t):
+    return t.get("highway") in ("traffic_signals", "street_lamp") or (t.get("highway") == "crossing" and t.get("crossing") == "traffic_signals")
+
+
+QUERIES = {  # build_city.OSM_QUERIES as select() arguments
+    "roads": {"way": lambda t: "highway" in t},
+    "water_parks": {"way": _water_park, "relation": _water_park},
+    "nodes": {"node": _signal_lamp},
+}
+
+
+def emulate(key: str, elements: list[dict]) -> dict:
+    """The Overpass `out geom` answer to build_city.OSM_QUERIES[key], rebuilt from map elements."""
+    if key not in QUERIES:
+        raise KeyError(f"no emulation for {key!r}")
+    return select(elements, **QUERIES[key])

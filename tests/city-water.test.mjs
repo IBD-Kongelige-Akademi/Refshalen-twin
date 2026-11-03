@@ -6,38 +6,33 @@ import { fileURLToPath } from 'node:url';
 import { buildTileWaterArrays } from '../js/water-tiles.js';
 import { buildTileGroundArrays } from '../js/terrain.js';
 import { pointInRing } from '../js/polygon.js';
-import { tileOfLocal, tileBoundsLocal } from '../js/tile-grid.js';
+import { tileOfLocal, tileBoundsLocal, SEA_LEVEL_LOCAL } from '../js/tile-grid.js';
 
 // The citywide water data (tools/geodata/city_water.py): runs against data/city + data/tiles when they hold it, otherwise skipped.
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const headerPath = path.join(ROOT, 'data/city/water.json');
 const have = fs.existsSync(headerPath) && fs.existsSync(path.join(ROOT, 'data/city/post.json'));
 const header = have ? JSON.parse(fs.readFileSync(headerPath, 'utf8')) : null;
-const layer = (id) => JSON.parse(fs.readFileSync(path.join(ROOT, 'data/tiles', id, 'water.json'), 'utf8'));
+const layerPath = (id) => path.join(ROOT, 'data/tiles', id, 'water.json');
+const layer = (id) => JSON.parse(fs.readFileSync(layerPath(id), 'utf8'));
 const skip = !have && 'run uv run tools/geodata/city_water.py after the tile compiler';
 
-test('the header: levels per body, the sea level, the Soerne override with the district levels', { skip }, () => {
+test('the header: levels per body, the Limfjord at the sea level, no override', { skip }, () => {
   assert.equal(header.version, 'cph-water/1');
-  assert.equal(header.sea, -6.84);
-  assert.ok(header.stats.bodies > 100 && header.stats.quay_km > 50);
+  assert.equal(header.sea, SEA_LEVEL_LOCAL);
+  assert.ok(header.stats.bodies >= 3 && header.stats.quay_km > 2, JSON.stringify(header.stats));
   for (const b of header.bodies) assert.ok(Number.isFinite(b.level) && b.area_m2 > 0, b.id);
-  assert.ok(header.bodies.some((b) => b.sea && b.level === -6.84), 'the harbour is at the sea');
-  const o = header.override;
-  assert.ok(o.lakes.length >= 3 && o.bridges.length >= 1 && o.basins.length >= 4);
-  // Peblinge Soe and Sortedams Soe: two basins, 0.84 m apart (data/cph-lakes.json basins, the DTM over the water)
-  const levels = o.basins.map((b) => b.level);
-  assert.ok(levels.some((v) => Math.abs(v + 0.94) < 0.06) && levels.some((v) => Math.abs(v + 0.1) < 0.06), `basin levels ${levels}`);
-  assert.ok(Math.abs(o.terrain.bridges[0].deck - 1.62) < 0.1, 'the Dronning Louises Bro deck');
-  assert.equal(o.terrain.lakes.length, o.lakes.length);
-  for (const l of o.lakes) assert.ok(o.terrain.lakes.some((t) => t.id === l.id));
+  const sea = header.bodies.filter((b) => b.sea);
+  assert.ok(sea.some((b) => b.level === SEA_LEVEL_LOCAL && b.area_m2 > 1e6), 'the Limfjord is one sea-level body over 1 km²');
+  assert.equal(header.override, null);
 });
 
-test('Nyhavn: the harbour has a quay, the ground is cut under the water, nothing of the ground lies in it', { skip }, () => {
-  const id = tileOfLocal(2000, 300); // the canal mouth
+test('Utzon Center: the harbour has a quay, the ground is cut under the water, nothing of the ground lies in it', { skip }, () => {
+  const id = tileOfLocal(200, -300); // the fjord off Utzon Center
   const p = layer(id);
   const a = buildTileWaterArrays(p);
   assert.ok(a.surface.index.length > 0 && a.walls.index.length > 0);
-  assert.ok(p.bodies.some((b) => b.level === -6.84 && (b.walls || []).some((w) => w.s === 'q')), 'a quay at sea level');
+  assert.ok(p.bodies.some((b) => b.level === SEA_LEVEL_LOCAL && (b.walls || []).some((w) => w.s === 'q')), 'a quay at sea level');
   for (const b of p.bodies) for (const w of b.walls || []) assert.equal(w.top.length, w.pts.length / 2, 'a wall-top height per vertex');
   assert.ok(p.cut && p.cut.skip.length && p.cut.pieces.length);
   const terrain = { heightAt: () => 0, doc: {}, flat: false };
@@ -56,11 +51,16 @@ test('Nyhavn: the harbour has a quay, the ground is cut under the water, nothing
 });
 
 test('green ground and far water pieces are clipped to their tile', { skip }, () => {
-  const id = tileOfLocal(-1900, 800); // Frederiksberg Have
-  const b = tileBoundsLocal(id);
-  const p = layer(id);
-  assert.ok((p.green || []).length > 0, 'the park is green');
-  for (const g of p.green) for (let i = 0; i < g.ring.length; i += 2) assert.ok(g.ring[i] >= b[0] - 0.01 && g.ring[i] <= b[2] + 0.01 && g.ring[i + 1] >= b[1] - 0.01 && g.ring[i + 1] <= b[3] + 0.01);
+  let greens = 0;
+  for (const id of fs.readdirSync(path.join(ROOT, 'data/tiles'))) {
+    if (!fs.existsSync(layerPath(id))) continue;
+    const b = tileBoundsLocal(id);
+    for (const g of layer(id).green || []) {
+      greens++;
+      for (let i = 0; i < g.ring.length; i += 2) assert.ok(g.ring[i] >= b[0] - 0.01 && g.ring[i] <= b[2] + 0.01 && g.ring[i + 1] >= b[1] - 0.01 && g.ring[i + 1] <= b[3] + 0.01, id);
+    }
+  }
+  assert.ok(greens > 0, 'the parks are green');
   for (const [tid, pieces] of Object.entries(header.far)) {
     const tb = tileBoundsLocal(tid);
     for (const pc of pieces) for (const q of pc.p) for (let i = 0; i < q.ring.length; i += 2) assert.ok(q.ring[i] >= tb[0] - 0.2 && q.ring[i] <= tb[2] + 0.2 && q.ring[i + 1] >= tb[1] - 0.2 && q.ring[i + 1] <= tb[3] + 0.2, tid);

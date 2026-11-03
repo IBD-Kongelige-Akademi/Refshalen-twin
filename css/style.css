@@ -1150,7 +1150,3 @@ body.touch-enabled .pop-item { min-height: 44px; }
   }
 }
 
-/* Boat subtype follows the existing bicycle selector. */
-.bike-type-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.boat-pier-action { background: var(--bg); color: var(--text); min-height: 44px; }
-.boat-pier-action[hidden] { display: none; }

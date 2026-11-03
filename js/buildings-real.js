@@ -1,8 +1,4 @@
 import * as THREE from 'three/webgpu';
-import { createIrmaNeon } from './irma-neon.js';
-import { irmaNeonArtwork } from './irma-neon-art.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createPreWarBuildingMaterial, createCurtainWallMaterial } from './tsl-materials.js';
 import { attribute } from 'three/tsl';
 import { createAccumulator, addBuilding, groundLow } from './building-geometry.js';
@@ -13,23 +9,21 @@ import { WINDOW, FACADE_CORNER_PIER } from './facade-style.js';
 import { texRequested, lookFile, estimateTextureBytes, createPhotoBudget } from './facade-lod.js';
 import { createContext as createGroundContext } from './groundfloor.js';
 import { createEntranceIndex, createDoorAccumulator, addDoors } from './entrances.js';
-import { CPH_FRAME, toLocal } from './city-config.js';
+import { CPH_FRAME } from './city-config.js';
 import { disposeTree } from './dispose-tree.js';
 import { nextFrame } from './yield-frame.js';
-import { createHeroCache } from './hero-cache.js';
-import { dataUrl, heroesEnabled } from './data-config.js';
+import { dataUrl } from './data-config.js';
 import { getAtlasSource } from './data-packs.js';
 import { batchBuildingCells, batchBuildingCellsAsync, updateBuildingCellVisibility } from './building-batches.js';
 import { admitOverrides } from './detail-overrides.js';
 import { loadOverrideMesh, disposeOverride, detailsMesh, registerOverridePack } from './override-meshes.js';
 
 // js/buildings-real.js
-// Copenhagen's real buildings (M2): every geodata building is extruded from its measured footprint (rings with holes)
+// The real buildings (M2): every geodata building is extruded from its measured footprint (rings with holes)
 // to its eave, walls carrying the per-vertex facade frame the wallAttr facade shaders read, merged into one mesh per
-// quadtree cell. Hero buildings (docs/cph-geodata-schema.md `heroes`) load their glTF instead and skip the extrusion.
+// quadtree cell. Detail overrides (js/detail-overrides.js) replace a building with a model in the near ring.
 // Picking maps a ray hit back to its building through the index ranges recorded per mesh.
 
-const HEROES_DIR = './data/heroes';
 const STREAM_RADIUS = 2400; // cells further than this from the camera are hidden (the district is 1.5 km across)
 const TEX_DIR = './data/tex';
 const GROUNDFLOOR_URL = './data/cph-groundfloor.json';
@@ -95,63 +89,6 @@ function rangeAt(ranges, triangle) {
   }
   return null;
 }
-
-/** Merges every mesh of a glTF scene into one mesh per material (7 draw calls instead of 1476). */
-function mergeByMaterial(root) {
-  root.updateMatrixWorld(true);
-  const groups = new Map();
-  root.traverse((o) => {
-    if (!o.isMesh || !o.geometry?.attributes?.position) return;
-    let g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
-    for (const name of Object.keys(g.attributes)) if (name !== 'position' && name !== 'normal') g.deleteAttribute(name);
-    if (!g.attributes.normal) g.computeVertexNormals();
-    g.applyMatrix4(o.matrixWorld);
-    const material = Array.isArray(o.material) ? o.material[0] : o.material;
-    if (!groups.has(material)) groups.set(material, []);
-    groups.get(material).push(g);
-  });
-  const merged = new THREE.Group();
-  for (const [material, geometries] of groups) {
-    const mesh = new THREE.Mesh(mergeGeometries(geometries), material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.name = `hero-${material.name || 'material'}`;
-    merged.add(mesh);
-    geometries.forEach((g) => g.dispose());
-  }
-  return merged;
-}
-
-/** Loads one hero glb and places it in the Copenhagen frame from its building.json `frame.origin` (EPSG:25832 + DVR90). */
-async function loadHero(hero, { fetchImpl = globalThis.fetch, enabled = heroesEnabled() } = {}) {
-  // published builds carry no hero models (js/data-config.js heroesEnabled): extrude without asking for files that are not there
-  if (!enabled) throw Object.assign(new Error(`hero ${hero.building_id}: hero models are local-only (not published)`), { code: 'hero-disabled' });
-  const dir = `${HEROES_DIR}/${String(hero.building_id).replace(/[^\w.-]+/g, '_')}`;
-  let origin = null;
-  try {
-    const response = await fetchImpl(`${dir}/building.json`);
-    if (response.ok) origin = (await response.json())?.frame?.origin ?? null;
-  } catch { /* falls back to the glb's own extras below */ }
-  const gltf = await new GLTFLoader().loadAsync(`${dir}/building.glb`);
-  origin ??= gltf.asset?.extras?.origin ?? gltf.parser?.json?.asset?.extras?.origin;
-  if (!origin) throw new Error(`hero ${hero.building_id}: no frame origin in building.json or the glb`);
-  const local = toLocal(origin[0], origin[1], origin[2]);
-  // The glTF is ENU, z up (x east, y north, z up) around its own origin: (x, y, z) -> three (x, z, -y), then translate.
-  const inner = mergeByMaterial(gltf.scene);
-  inner.rotation.x = -Math.PI / 2;
-  const group = new THREE.Group();
-  group.add(inner);
-  group.position.set(local.x, local.y, local.z);
-  group.name = `Hero-${hero.building_id}`;
-  group.userData.buildingId = hero.building_id;
-  group.userData.hero = hero;
-  return group;
-}
-
-// A hero glTF is parsed once and cloned for every build of its tile (js/hero-cache.js); the clones share its geometries, materials and
-// textures, which the cache owns (userData.cached)
-const heroCache = createHeroCache((hero) => loadHero(hero));
-const loadHeroCached = (hero) => heroCache.get(hero);
 
 function describeBuilding(b, lod2Info = null) {
   const metres = (v) => `${v.toFixed(1)} m`;
@@ -490,7 +427,7 @@ function createBuildingMaterials() {
  *             every building it covers (they are not built at all); one that fails to load falls back to the generated building with its
  *             parametric details
  */
-async function buildRealBuildings(scene, geo, { heroLoader = loadHeroCached, withInfoPanel = true, lod2 = null, tex = texRequested(), observed = true, terrain = null, venues = null, entrances = undefined, shared = null, context = null, doors: wantDoors = true, slice = null, lite = false, compute = null, photoBudget = null, overrides = null, signal = null } = {}) {
+async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel = true, lod2 = null, tex = texRequested(), observed = true, terrain = null, venues = null, entrances = undefined, shared = null, context = null, doors: wantDoors = true, slice = null, lite = false, compute = null, photoBudget = null, overrides = null, signal = null } = {}) {
   const abortBuild = () => { throw Object.assign(new Error('Building tile build aborted'), { name: 'AbortError' }); };
   const checkpoint = async () => {
     if (signal?.aborted) abortBuild();
@@ -652,7 +589,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = loadHeroCached, wit
 
     await Promise.all((geo.heroes || []).map(async (hero) => {
       try {
-        const group = await heroLoader(hero);
+        if (!heroLoader) throw Object.assign(new Error('no hero loader'), { code: 'hero-disabled' }); // heroes extrude unless a caller loads models
         root.add(group);
         heroGroups.push(group);
         heroStatus.push({ id: hero.building_id, loaded: true, position: group.position.toArray() });
@@ -742,8 +679,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = loadHeroCached, wit
     if (slice || signal) await batchBuildingCellsAsync(root, leaves, pickables, slice, signal);
     else batchBuildingCells(root, leaves, pickables);
 
-    // the Irma sign only exists where its buildings are: a tile without them builds no neon materials
-    const neon = irmaNeonArtwork().some((art) => byId.has(art.buildingId)) ? createIrmaNeon(root, byId, lod2Records) : { group: null, panels: [], update() {}, stats: { panels: 0 } };
+    const neon = { group: null, panels: [], update() {}, stats: { panels: 0 } }; // upstream's Irma sign; no neon signs in Aalborg yet
     texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget }) : null; // joins the shared budget itself
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
@@ -870,4 +806,4 @@ async function buildRealBuildings(scene, geo, { heroLoader = loadHeroCached, wit
   }
 }
 
-export { buildRealBuildings, createBuildingMaterials, createInfoPanel, loadHero, loadHeroCached, heroCache, describeBuilding, rangeAt, mergeByMaterial };
+export { buildRealBuildings, createBuildingMaterials, createInfoPanel, describeBuilding, rangeAt };

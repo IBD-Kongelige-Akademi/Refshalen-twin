@@ -15,7 +15,6 @@ import { createBaseGeo, createTileData, createCityGeo } from '../js/tile-data.js
 import { createStreamTerrain, createChunkSampler, faceNormals, vertexNormals } from '../js/terrain.js';
 import { createZoneMap } from '../js/zones.js';
 import { placeFurniture } from '../js/placement.js';
-import { createHeroCache } from '../js/hero-cache.js';
 import { createPhotoBudget, selectPhotoSet, makePhotoRoom, PHOTO } from '../js/facade-lod.js';
 import { ROOT, TILES_URL, isDistrict } from './helpers/district-tiles.mjs';
 
@@ -67,30 +66,6 @@ test('tile pool: no Worker, a worker that fails or throws: run resolves null and
 });
 
 // ---------------------------------------------------------------------------------------------- the caches
-
-test('hero cache: one load for any number of clones, a failure is remembered for the retry interval', async () => {
-  let loads = 0;
-  let clock = 0;
-  const cache = createHeroCache(async () => { loads++; return { userData: {}, clone() { return { cloned: true, from: this }; } }; }, { now: () => clock });
-  const hero = { building_id: 'gdk:1' };
-  const [a, b] = await Promise.all([cache.get(hero), cache.get(hero)]);
-  const c = await cache.get(hero);
-  assert.equal(loads, 1);
-  assert.ok(a.cloned && b.cloned && c.cloned && a !== b);
-  assert.equal(a.from, b.from, 'the clones come from one template');
-  assert.equal(a.from.userData.cached, true);
-  assert.equal(cache.stats.hits, 2);
-
-  let attempts = 0;
-  const failing = createHeroCache(async () => { attempts++; throw new Error('404'); }, { retryMs: 1000, now: () => clock });
-  await assert.rejects(() => failing.get(hero), /404/);
-  await tick();
-  await assert.rejects(() => failing.get(hero), /404/);
-  assert.equal(attempts, 1, 'not asked again within the interval');
-  clock = 2000;
-  await assert.rejects(() => failing.get(hero), /404/);
-  assert.equal(attempts, 2, 'asked again after it');
-});
 
 // A photo manager as js/facade-lod.js applyPhotoPlan drives it (js/buildings-real.js createTexManager): it records the plan and the
 // loads it is asked to start; a started load stays in flight.

@@ -11,21 +11,6 @@ import {
   buildHelicopterTailRotorGeometry,
   createLoftedHelicopterMaterial
 } from './actor-models.js';
-import { createSwanBoat } from './swan-boat.js';
-import { createGoBoat } from './goboat.js';
-import { createGoBoatPiers, normalizeGoBoatPierRecords, GOBOAT_PIER_RECORDS } from './goboat-piers.js';
-import { createGoBoatNavigation, confineGoBoatMotion, advanceGoBoatSpeed, GOBOAT_MAX_SPEED, GOBOAT_SEA_LEVEL_LOCAL } from './goboat-navigation.js';
-import {
-  SWAN_HEADING,
-  SWAN_MAX_SPEED,
-  SWAN_BOAT_CLEARANCE,
-  SWAN_START,
-  SWAN_STATIC_MOORINGS,
-  advanceSwanSpeed,
-  confineSwanMotion,
-  createSwanNavigation
-} from './swan-navigation.js';
-import { WATER } from './lakes.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import { collisionBody, buildingContact } from './collision-shapes.js';
@@ -40,7 +25,7 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 // 3. City Bike and Long-John Cargo Bike (Procedural Frames with Skinned Riders)
 // 4. Helicopter (Sightseeing Twin-Turbine Chopper)
 
-// Spawn at Nørre Søgade 37 (the frame origin); the vehicles are staggered around it
+// Spawn by Gammel Torv; the vehicles are staggered around it
 const SPAWN_Z = TELEPORT_LOCATIONS.torv.z;
 const groundCollider = { type: 'ground' };
 
@@ -237,7 +222,7 @@ class ThirdPersonControllerManager {
     this._colliderIndex = null; // built on first use, see nearColliders()
     this._indexedColliders = null;
     this._indexedColliderCount = -1;
-    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'helicopter' | 'swanboat' | 'goboat'
+    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'helicopter'
 
     this.keys = {
       forward: false,
@@ -254,23 +239,8 @@ class ThirdPersonControllerManager {
       car: this.createCarEntity(),
       cyclist: this.createCyclistEntity(),
       cargobike: this.createCargoBikeEntity(),
-      helicopter: this.createHelicopterEntity(),
-      swanboat: this.createSwanBoatEntity(),
-      goboat: this.createGoBoatEntity()
+      helicopter: this.createHelicopterEntity()
     };
-
-    this.swanWaterLevel = WATER.surfaceY;
-    this.swanNavigation = null;
-    this.goBoatNavigation = null;
-    this.goBoatPiers = null;
-    this.goBoatDetailWater = new Map();
-    this.swanFleet = SWAN_STATIC_MOORINGS.map((point, index) => {
-      const model = createSwanBoat();
-      model.group.position.set(point.x, this.swanWaterLevel, point.z);
-      model.group.rotation.y = point.heading;
-      this.scene.add(model.group);
-      return { ...model, point, phase: index * 0.91 };
-    });
 
     Object.values(this.entities).forEach((ent) => {
       if (ent.mesh) {
@@ -382,109 +352,10 @@ class ThirdPersonControllerManager {
     for (const action of Object.keys(this.keys)) this.keys[action] = false;
   }
 
-  setMode(mode, { preserveSwanPosition = false, preserveGoBoatPosition = false, restoreState = false } = {}) {
-    if (!this.entities[mode] || (mode === 'goboat' && !this.goBoatNavigation)) return false;
-    const enteringGoBoat = mode === 'goboat' && this.activeMode !== mode;
-    const leavingGoBoat = this.activeMode === 'goboat' && mode !== 'goboat';
-    const leavingGoBoatForPerson = leavingGoBoat && mode === 'person';
-    const enteringSwanboat = mode === 'swanboat' && this.activeMode !== mode;
+  setMode(mode) {
+    if (!this.entities[mode]) return false;
     this.activeMode = mode;
-    if (leavingGoBoat) {
-      const boat = this.entities.goboat;
-      boat.speed = boat.vx = boat.vz = 0;
-    }
-    if (enteringSwanboat && !preserveSwanPosition) {
-      this.teleportActiveTo(SWAN_START.x, SWAN_START.z, SWAN_HEADING);
-    }
-    if (enteringGoBoat && !preserveGoBoatPosition) {
-      const pier = this.goBoatPiers.records[0];
-      this.teleportActiveTo(pier.departurePoint.x, pier.departurePoint.z, pier.departurePoint.heading);
-    }
-    if (leavingGoBoatForPerson && !restoreState) this.placePersonOnGoBoatPier(this.goBoatLastPier || this.goBoatPiers.records[0]);
-    this.syncSwanRiderVisibility();
     return true;
-  }
-
-  setGoBoatWorldData({ water = [], frame = null, pierRecords = GOBOAT_PIER_RECORDS, tileGrid = null } = {}) {
-    // Only pass water that is actually rendered. Empty/partial maps keep both the pier and boat hidden.
-    // `tileGrid` ({ tileOf, boundsOf }): the streamed tiles' full-resolution water refines the quay (setGoBoatDetailWater).
-    const rawRecords = normalizeGoBoatPierRecords(pierRecords, frame);
-    const preliminary = createGoBoatNavigation({ waterOverride: water, pierRecords: rawRecords });
-    if (this.goBoatPiers) this.scene.remove(this.goBoatPiers.group);
-    this.goBoatNavigation = null;
-    this.goBoatPiers = null;
-    this.entities.goboat.mesh.visible = false;
-    if (preliminary) {
-      const piers = createGoBoatPiers({ records: pierRecords, frame, waterLevel: preliminary.level });
-      const navigation = createGoBoatNavigation({ waterOverride: water, pierRecords: piers.records, tileGrid });
-      if (navigation && piers.fleetLayouts.every(fleet => fleet.every(p => navigation.isWaterPoint(p.x, p.z)))) {
-        this.goBoatPiers = piers;
-        this.goBoatNavigation = navigation;
-        this.goBoatLastPier = piers.records[0];
-        for (const [id, payload] of this.goBoatDetailWater) navigation.setDetailWater(id, payload);
-        this.scene.add(piers.group);
-        const boat = this.entities.goboat, start = piers.records[0].departurePoint;
-        boat.position.set(start.x, navigation.level, start.z);
-        boat.heading = start.heading;
-        boat.speed = boat.vx = boat.vz = 0;
-        boat.mesh.position.copy(boat.position);
-        boat.mesh.rotation.y = boat.heading;
-        boat.mesh.visible = true;
-      }
-    }
-    if (!this.goBoatNavigation && this.activeMode === 'goboat') {
-      this.activeMode = 'car';
-    }
-    this.syncSwanRiderVisibility();
-    return Boolean(this.goBoatNavigation);
-  }
-
-  /** A streamed tile's water layer arrived (payload) or left (null): the GoBoat collides with the drawn quay there. */
-  setGoBoatDetailWater(id, payload) {
-    if (payload) this.goBoatDetailWater.set(id, payload);
-    else this.goBoatDetailWater.delete(id);
-    this.goBoatNavigation?.setDetailWater(id, payload || null);
-  }
-
-  placePersonOnGoBoatPier(pier) {
-    const person = this.entities.person, p = pier.boardingPoint;
-    person.position.set(p.x, pier.deckHeight, p.z);
-    person.heading = p.heading || 0;
-    person.speed = person.verticalVel = 0;
-    person.mesh.position.copy(person.position);
-    person.rig.reset(p.x, p.z, person.heading, personGround, this);
-    this.resetInput();
-  }
-
-  getGoBoatInteraction() {
-    if (!this.goBoatNavigation || !this.goBoatPiers) return null;
-    const boat = this.entities.goboat;
-    for (const pier of this.goBoatPiers.records) {
-      const nearBoat = Math.hypot(boat.position.x - pier.departurePoint.x, boat.position.z - pier.departurePoint.z) <= 6;
-      if (!nearBoat || Math.max(Math.abs(boat.speed), Math.hypot(boat.vx, boat.vz)) > 0.35) continue;
-      if (this.activeMode === 'goboat') return { action: 'disembark', label: 'Step onto pier', pier };
-      const person = this.entities.person;
-      if (this.activeMode === 'person' && Math.hypot(person.position.x - pier.boardingPoint.x, person.position.z - pier.boardingPoint.z) <= 3) return { action: 'board', label: 'Board GoBoat', pier };
-    }
-    return null;
-  }
-
-  interactGoBoat() {
-    const interaction = this.getGoBoatInteraction();
-    if (!interaction) return false;
-    this.goBoatLastPier = interaction.pier;
-    this.resetInput();
-    this.entities.goboat.speed = this.entities.goboat.vx = this.entities.goboat.vz = 0;
-    return this.setMode(interaction.action === 'board' ? 'goboat' : 'person', { preserveGoBoatPosition: true });
-  }
-
-  setSwanWorldData(lakes, waterLevel = WATER.surfaceY) {
-    this.swanNavigation = createSwanNavigation(lakes);
-    this.swanWaterLevel = Number.isFinite(waterLevel) ? waterLevel : WATER.surfaceY;
-    const boat = this.entities.swanboat;
-    boat.position.y = this.swanWaterLevel;
-    boat.mesh.position.y = this.swanWaterLevel;
-    for (const moored of this.swanFleet) moored.group.position.y = this.swanWaterLevel;
   }
 
   getActiveEntity() {
@@ -496,15 +367,13 @@ class ThirdPersonControllerManager {
     this.resetInput();
     if (!Number.isFinite(heading)) heading = ent.heading;
     const heli = this.activeMode === 'helicopter';
-    const swanboat = this.activeMode === 'swanboat';
-    const goboat = this.activeMode === 'goboat';
     const altitude = heli ? Math.max(0.25, Math.min(380, savedAltitude ?? Math.max(92, ent.position.y))) : 0;
     const destination = this.findTeleportPosition(x, z, heading, altitude);
     if (destination) {
       ent.position.x = destination.x;
       ent.position.z = destination.z;
       ent.heading = heading;
-      ent.position.y = heli ? altitude : swanboat ? this.swanWaterLevel : goboat ? this.goBoatNavigation.level : this.getGroundHeight(destination.x, destination.z, this.activeMode);
+      ent.position.y = heli ? altitude : this.getGroundHeight(destination.x, destination.z, this.activeMode);
     }
     ent.speed = 0;
     if (this.activeMode === 'person') {
@@ -530,13 +399,6 @@ class ThirdPersonControllerManager {
       ent.verticalSpeed = ent.pitchAngle = ent.rollAngle = 0;
       ent.tiltPivot.rotation.x = ent.tiltPivot.rotation.z = 0;
       ent.tiltPivot.position.y = 0;
-    } else if (goboat) {
-      ent.vx = ent.vz = 0;
-      ent.mesh.rotation.x = ent.mesh.rotation.z = 0;
-    } else if (swanboat) {
-      ent.vx = ent.vz = ent.pedalPhase = 0;
-      ent.pedals.rotation.x = ent.paddleWheel.rotation.x = 0;
-      ent.mesh.rotation.x = ent.mesh.rotation.z = 0;
     }
     ent.mesh.position.copy(ent.position);
     ent.mesh.rotation.y = ent.heading;
@@ -547,16 +409,15 @@ class ThirdPersonControllerManager {
   // between overlapping buildings, so test whole candidate footprints instead; retain the old position if none fits.
   findTeleportPosition(x, z, heading, altitude) {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
-    if (this.activeMode === 'goboat') return this.goBoatNavigation?.findNearestLegalPosition(x, z) || null;
     const heli = this.activeMode === 'helicopter';
-    const radius = heli ? 4.5 : this.activeMode === 'person' ? 0.48 : this.activeMode === 'cargobike' ? 1.4 : this.activeMode === 'swanboat' ? SWAN_BOAT_CLEARANCE : 0.65;
+    const radius = heli ? 4.5 : this.activeMode === 'person' ? 0.48 : this.activeMode === 'cargobike' ? 1.4 : 0.65;
     const sinH = Math.sin(heading), cosH = Math.cos(heading);
     const shape = collisionBody(this.activeMode, radius, heading, 0.1, this.getActiveEntity()?.bodySpec);
     const reach = Math.max(shape.extX, shape.extZ);
     const margin = heli ? 6000 : 0;
     const entity = this.getActiveEntity();
     // Conservative body bounds, including car corners, bicycle wheels, the cargo frame and helicopter tail/rotor.
-    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], helicopter: [6.2, 3.2], swanboat: [SWAN_BOAT_CLEARANCE, 1.75], goboat: [2.7, 1.8] };
+    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], helicopter: [6.2, 3.2] };
     const others = Object.values(this.entities).filter(e => e !== entity && e.mesh?.visible !== false).map(e => ({
       x: e.position.x, z: e.position.z, radius: body[e.type][0],
       bottom: e.position.y - (e.type === 'helicopter' ? 0.7 : 0), top: e.position.y + body[e.type][1]
@@ -576,7 +437,6 @@ class ThirdPersonControllerManager {
     };
     const clear = (p) => {
       if (!p) return false;
-      if (this.activeMode === 'swanboat' && (!this.swanNavigation || !this.swanNavigation.isPositionLegal(p.x, p.z))) return false;
       const baseY = heli ? altitude : this.getGroundHeight(p.x, p.z, this.activeMode);
       // Keep other player models out of both the arrival and its default chase view. A corridor also prevents a
       // parked car between camera and character from hiding the character even when the camera itself is outside it.
@@ -1554,88 +1414,9 @@ class ThirdPersonControllerManager {
     };
   }
 
-  createGoBoatEntity() {
-    const { group } = createGoBoat();
-    group.visible = false;
-    this.scene.add(group);
-    const riderCrowd = new PersonCrowd(1, { farDistance: Infinity });
-    riderCrowd.meshes.forEach(mesh => { mesh.visible = false; this.scene.add(mesh); });
-    const riderRig = new PersonRig({ seed: 4.2, scale: 1, girth: 1.02, hair: 0.18 });
-    const anchor = new THREE.Group(); anchor.position.x = 0.30; group.add(anchor);
-    return {
-      type: 'goboat', label: 'GoBoat', mesh: group,
-      position: new THREE.Vector3(0, GOBOAT_SEA_LEVEL_LOCAL, 0), heading: 0, speed: 0, vx: 0, vz: 0,
-      riderCrowd, riderRig, anchor,
-      riderFrame: { seat: new THREE.Vector3(0, 0.44, -1.66), bars: new THREE.Vector3(0.24, 0.60, -1.89), gripHalf: 0.12,
-        bracket: new THREE.Vector3(0, 0.10, -1.10), crankLength: 0, pelvisPitch: 0, chestPitch: 0, kneeLift: 1,
-        hands: [new THREE.Vector3(0.18, 0.62, -1.89), new THREE.Vector3(-0.18, 0.61, -1.34)] },
-      cameraTargetOffset: new THREE.Vector3(0, 0.75, 0), chaseDistance: 8.5, chaseHeight: 3.3
-    };
-  }
-
-  createSwanBoatEntity() {
-    const model = createSwanBoat();
-    const root = model.group;
-    root.name = 'PlayerSwanPedalBoat';
-    this.scene.add(root);
-    const riderCrowd = new PersonCrowd(2, { farDistance: Infinity });
-    // PersonRig writes world-space bones, so the draw meshes stay at the scene origin.
-    // Seat anchors are children of the boat and inherit its heading, roll and bob.
-    riderCrowd.meshes.forEach((mesh) => {
-      mesh.visible = false;
-      this.scene.add(mesh);
-    });
-    const riders = [
-      new PersonRig({ seed: 4.2, scale: 1, girth: 1.02, hair: 0.18 }),
-      new PersonRig({ seed: 23.7, scale: 0.96, female: true, girth: 0.96, hair: 0.65 })
-    ].map((rig, index) => {
-      const anchor = new THREE.Group();
-      anchor.name = index === 0 ? 'SwanPlayerSeat' : 'SwanPassengerSeat';
-      anchor.position.x = index === 0 ? -0.29 : 0.29;
-      root.add(anchor);
-      return { rig, anchor };
-    });
-    riderCrowd.begin();
-    riderCrowd.end();
-    return {
-      type: 'swanboat',
-      label: 'Swan pedal boat',
-      mesh: root,
-      pedals: model.pedals,
-      paddleWheel: model.paddleWheel,
-      riderCrowd,
-      riders,
-      riderFrame: {
-        seat: new THREE.Vector3(0, 0.25, -0.39),
-        bars: new THREE.Vector3(0, 0.33, -0.02),
-        gripHalf: 0.26,
-        bracket: new THREE.Vector3(0, 0.18, 0.24),
-        crankLength: 0.115,
-        pelvisPitch: -0.10,
-        chestPitch: 0.04,
-        kneeLift: 3
-      },
-      position: new THREE.Vector3(SWAN_START.x, WATER.surfaceY, SWAN_START.z),
-      heading: SWAN_HEADING,
-      speed: 0,
-      vx: 0,
-      vz: 0,
-      pedalPhase: 0,
-      cameraTargetOffset: new THREE.Vector3(0, 0.92, 0),
-      chaseDistance: 6.6,
-      chaseHeight: 2.6
-    };
-  }
-
   // The walking surface of the person and the cyclist follows the street surface model (terrain + carriageway, cycle track,
   // raised pavement, ramps; set by main.js from world.groundHeight); everything else drives on the bare terrain
   getGroundHeight(x, z, mode = 'person') {
-    if (mode === 'swanboat') return this.swanWaterLevel ?? WATER.surfaceY;
-    if (mode === 'goboat') return this.goBoatNavigation?.level ?? GOBOAT_SEA_LEVEL_LOCAL;
-    if (mode === 'person') {
-      const deck = this.goBoatPiers?.getDeckHeightAt(x, z);
-      if (Number.isFinite(deck)) return deck;
-    }
     if (!this.groundField) return 0.0;
     if (mode === 'person' || mode === 'cyclist') return this.groundField.heightAt(x, z);
     return this.groundField.terrainAt ? this.groundField.terrainAt(x, z) : 0.0;
@@ -1735,7 +1516,6 @@ class ThirdPersonControllerManager {
   }
 
   resolveHorizontalCollision(pos, radius, carEntity = null, entity = carEntity, previousPosition = null) {
-    if (this.activeMode === 'person' && Number.isFinite(this.goBoatPiers?.getDeckHeightAt(pos.x, pos.z))) return;
     // The detailed island (the helicopter may roam out over the harbour & the boroughs)
     const heli = this.activeMode === 'helicopter';
     const m = heli ? 6000 : 0;
@@ -1851,12 +1631,11 @@ class ThirdPersonControllerManager {
   // where it now is, planting its feet on the ground; the cyclist sits on the bike, hands on the grips, feet on the
   // pedals, helmet on its head
   poseCharacters(dt) {
-    this.syncSwanRiderVisibility();
     const p = this.entities.person;
     const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person');
     p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
     p.crowd.begin();
-    if (this.activeMode !== 'swanboat' && this.activeMode !== 'goboat') p.crowd.add(p.rig, 0);
+    p.crowd.add(p.rig, 0);
     p.crowd.end();
 
     for (const mode of ['cyclist', 'cargobike']) {
@@ -1872,49 +1651,6 @@ class ThirdPersonControllerManager {
       bike.helmet.quaternion.copy(bike.riderRig.headQuaternion);
       bike.helmet.position.set(0, 0.175, -0.012).applyQuaternion(bike.helmet.quaternion).add(bike.riderRig.headPosition);
     }
-    this.poseSwanRiders();
-    const goBoat = this.entities.goboat;
-    if (goBoat?.riderCrowd) {
-      goBoat.riderCrowd.begin();
-      if (this.activeMode === 'goboat') {
-        goBoat.riderRig.ride(goBoat.anchor, 0, goBoat.riderFrame);
-        goBoat.riderCrowd.add(goBoat.riderRig, 0);
-      }
-      goBoat.riderCrowd.end();
-    }
-  }
-
-  syncSwanRiderVisibility() {
-    const seated = this.activeMode === 'swanboat' || this.activeMode === 'goboat';
-    const boat = this.entities.swanboat;
-    if (boat?.riderCrowd) {
-      for (const mesh of boat.riderCrowd.meshes) mesh.visible = this.activeMode === 'swanboat';
-      if (this.activeMode !== 'swanboat') {
-        boat.riderCrowd.begin();
-        boat.riderCrowd.end();
-      }
-    }
-    const goBoat = this.entities.goboat;
-    if (goBoat?.riderCrowd) {
-      for (const mesh of goBoat.riderCrowd.meshes) mesh.visible = this.activeMode === 'goboat';
-    }
-    const walker = this.entities.person;
-    if (walker) {
-      walker.mesh.visible = !seated;
-      for (const mesh of walker.crowd.meshes || []) mesh.visible = !seated;
-    }
-  }
-
-  poseSwanRiders() {
-    const boat = this.entities.swanboat;
-    boat.riderCrowd.begin();
-    if (this.activeMode === 'swanboat') {
-      for (const { rig, anchor } of boat.riders) {
-        rig.ride(anchor, boat.pedalPhase, boat.riderFrame);
-        boat.riderCrowd.add(rig, 0);
-      }
-    }
-    boat.riderCrowd.end();
   }
 
   update(dt, elapsed) {
@@ -1924,7 +1660,7 @@ class ThirdPersonControllerManager {
 
     if (this.activeMode === 'person') {
       this.updatePerson(dt, elapsed);
-    } else if (this.activeMode !== 'swanboat' && this.activeMode !== 'goboat') {
+    } else {
       // Keep the sidewalk pedestrian walking naturally when not actively controlled
       const p = this.entities.person;
       const walkSpeed = 1.48;
@@ -1943,25 +1679,12 @@ class ThirdPersonControllerManager {
       this.updateCyclist(dt, this.entities.cargobike, 'cargobike');
     } else if (this.activeMode === 'helicopter') {
       this.updateHelicopter(dt, elapsed);
-    } else if (this.activeMode === 'goboat') {
-      this.updateGoBoat(dt, elapsed);
-    } else if (this.activeMode === 'swanboat') {
-      this.updateSwanBoat(dt, elapsed);
     }
 
     for (const key of Object.keys(this.entities)) {
       const e = this.entities[key];
       e.mesh.position.copy(e.position);
       e.mesh.rotation.y = e.heading;
-    }
-    const goBoat = this.entities.goboat;
-    if (goBoat) goBoat.mesh.position.y = goBoat.position.y + Math.sin(elapsed * 1.1) * 0.018;
-    const swanboat = this.entities.swanboat;
-    swanboat.mesh.position.y = swanboat.position.y + Math.sin(elapsed * 1.15 + 0.7) * 0.025;
-    for (const moored of this.swanFleet) {
-      moored.group.position.y = this.swanWaterLevel + Math.sin(elapsed * 1.15 + moored.phase) * 0.025;
-      moored.group.rotation.x = Math.sin(elapsed * 0.73 + moored.phase) * 0.009;
-      moored.group.rotation.z = Math.cos(elapsed * 0.61 + moored.phase) * 0.012;
     }
 
     // Modulate clustered vehicle & bike lights by time of day (off during Midday & Golden Hour; fade in at Dusk & Night)
@@ -2203,63 +1926,6 @@ class ThirdPersonControllerManager {
     h.tiltPivot.rotation.x = h.pitchAngle;
     h.tiltPivot.rotation.z = h.rollAngle;
     h.tiltPivot.position.y = Math.sin(elapsed * 2.6) * 0.18;
-  }
-
-  updateGoBoat(dt, elapsed) {
-    const boat = this.entities.goboat;
-    dt = Math.max(0, Math.min(0.1, dt));
-    const throttle = (this.keys.forward || 0) - (this.keys.backward || 0);
-    const steer = (this.keys.left || 0) - (this.keys.right || 0);
-    boat.speed = advanceGoBoatSpeed(boat.speed, throttle, dt);
-    const ratio = Math.min(1, Math.abs(boat.speed) / GOBOAT_MAX_SPEED);
-    boat.heading += steer * Math.sign(boat.speed) * (0.1 + ratio * 0.40) * dt;
-    const inertia = 1 - Math.exp(-dt * 2);
-    boat.vx += (Math.sin(boat.heading) * boat.speed - boat.vx) * inertia;
-    boat.vz += (Math.cos(boat.heading) * boat.speed - boat.vz) * inertia;
-    if (!this.goBoatNavigation.isPositionLegal(boat.position.x, boat.position.z)) {
-      // a tile's full-resolution quay just replaced the coarse one under the hull: step back onto open water
-      const free = this.goBoatNavigation.findNearestLegalPosition(boat.position.x, boat.position.z, 8, 0.25);
-      if (free) { boat.position.x = free.x; boat.position.z = free.z; }
-    }
-    const move = confineGoBoatMotion(this.goBoatNavigation, boat.position, { x: boat.vx * dt, z: boat.vz * dt });
-    boat.position.x = move.x; boat.position.z = move.z;
-    boat.position.y = this.goBoatNavigation.level;
-    if (move.blocked) boat.speed = boat.vx = boat.vz = 0;
-    boat.mesh.rotation.x = Math.sin(elapsed * 1.1) * 0.009;
-    boat.mesh.rotation.z = -steer * ratio * 0.025 + Math.sin(elapsed * 0.8) * 0.006;
-  }
-
-  updateSwanBoat(dt, elapsed) {
-    const boat = this.entities.swanboat;
-    const throttle = (this.keys.forward || 0) - (this.keys.backward || 0);
-    const steering = (this.keys.left || 0) - (this.keys.right || 0);
-    boat.speed = advanceSwanSpeed(boat.speed, throttle, dt);
-
-    const speedRatio = Math.min(1, Math.abs(boat.speed) / SWAN_MAX_SPEED);
-    boat.heading += steering * (0.22 + speedRatio * 0.48) * dt;
-    const targetX = Math.sin(boat.heading) * boat.speed;
-    const targetZ = Math.cos(boat.heading) * boat.speed;
-    const inertia = 1 - Math.exp(-dt * 2.0);
-    boat.vx += (targetX - boat.vx) * inertia;
-    boat.vz += (targetZ - boat.vz) * inertia;
-
-    const move = this.swanNavigation
-      ? confineSwanMotion(this.swanNavigation, boat.position, { x: boat.vx * dt, z: boat.vz * dt })
-      : { x: boat.position.x, z: boat.position.z, dx: 0, dz: 0 };
-    boat.position.x = move.x;
-    boat.position.z = move.z;
-    boat.position.y = this.swanWaterLevel;
-    if (dt > 0 && (Math.abs(move.dx - boat.vx * dt) > 1e-5 || Math.abs(move.dz - boat.vz * dt) > 1e-5)) {
-      boat.vx = move.dx / dt;
-      boat.vz = move.dz / dt;
-    }
-
-    boat.pedalPhase += boat.speed * dt * 3.6;
-    boat.pedals.rotation.x = boat.pedalPhase;
-    boat.paddleWheel.rotation.x = boat.pedalPhase * 0.86;
-    const sway = Math.sin(elapsed * 1.15 + 0.7) * 0.012;
-    boat.mesh.rotation.x = -Math.sign(boat.speed) * speedRatio * 0.018 + sway;
-    boat.mesh.rotation.z = -steering * speedRatio * 0.055 + Math.cos(elapsed * 0.8) * 0.009;
   }
 }
 

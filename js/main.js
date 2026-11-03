@@ -8,8 +8,6 @@ import { isTypingInField, TELEPORT_LOCATIONS } from './city-config.js';
 import { CITY_TELEPORT_LOCATIONS } from './city-teleports.js';
 import { buildWorld } from './world.js';
 import { ThirdPersonControllerManager } from './controllers.js';
-import { goBoatWaterFromCity } from './goboat-navigation.js';
-import { tileOfLocal, tileBoundsLocal } from './tile-grid.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
@@ -103,15 +101,6 @@ async function initApp() {
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
   controllerManager.groundField = world.groundHeight || null;
   if (world.staticIndex) controllerManager.staticIndex = world.staticIndex; // streamed city: per-tile colliders
-  controllerManager.setSwanWorldData(world.lakeData, world.lakes?.level);
-  // GoBoat: the citywide sea-level water (data/city/water.json, resident from boot) is the harbour it can reach; the streamed tiles' full
-  // water layers sharpen the quay where they are loaded. Without the citywide water (the district fallback) only the rendered lakes count.
-  const goBoatWater = world.cityWater ? goBoatWaterFromCity(world.cityWater) : world.lakes ? world.lakeData?.lakes || [] : [];
-  controllerManager.setGoBoatWorldData({ water: goBoatWater, frame: world.geo?.frame, tileGrid: world.cityWater ? { tileOf: tileOfLocal, boundsOf: tileBoundsLocal } : null });
-  if (world.waterTiles) {
-    for (const [id, payload] of world.waterTiles) controllerManager.setGoBoatDetailWater(id, payload);
-    world.onWaterTile((id, payload) => controllerManager.setGoBoatDetailWater(id, payload));
-  }
   // Reuse teleport placement so saved players return at rest, close to their last positions.
   try {
     const saved = JSON.parse(localStorage.getItem('cph-player-state'));
@@ -119,11 +108,10 @@ async function initApp() {
       for (const mode of Object.keys(controllerManager.entities)) {
         const p = saved.entities?.[mode];
         if (!p || ![p.x, p.y, p.z, p.heading].every(Number.isFinite)) continue;
-        if (mode === 'goboat' && !controllerManager.goBoatNavigation) continue;
-        controllerManager.setMode(mode, { preserveSwanPosition: true, preserveGoBoatPosition: true, restoreState: true });
+        controllerManager.setMode(mode);
         controllerManager.teleportActiveTo(p.x, p.z, p.heading, p.y);
       }
-      controllerManager.setMode(Object.hasOwn(controllerManager.entities, saved.activeMode) && (saved.activeMode !== 'goboat' || controllerManager.goBoatNavigation) ? saved.activeMode : 'car', { preserveSwanPosition: true, preserveGoBoatPosition: true, restoreState: true });
+      controllerManager.setMode(Object.hasOwn(controllerManager.entities, saved.activeMode) ? saved.activeMode : 'car');
     }
   } catch { /* Missing or unavailable storage does not prevent playing. */ }
 
@@ -246,10 +234,6 @@ async function initApp() {
   const bikeTypeSwitch = document.getElementById('bike-type-switch');
   const bikeTypeButtons = bikeTypeSwitch ? [...bikeTypeSwitch.querySelectorAll('[data-bike-type]')] : [];
   let lastBikeMode = controllerManager.activeMode === 'cargobike' ? 'cargobike' : 'cyclist';
-  const boatTypeSwitch = document.getElementById('boat-type-switch');
-  const boatTypeButtons = boatTypeSwitch ? [...boatTypeSwitch.querySelectorAll('[data-boat-type]')] : [];
-  const pierAction = document.getElementById('boat-pier-action');
-  let lastBoatMode = controllerManager.activeMode === 'goboat' ? 'goboat' : 'swanboat';
   touchControls.onAvailabilityChange = placeModeIndicator;
 
   const elFps = document.getElementById('hud-fps');
@@ -262,13 +246,12 @@ async function initApp() {
   const elControlsHint = document.getElementById('hud-controls-hint');
   const gamepadControls = new GamepadControls(controllerManager, cameraSystem, {
     onCycleMode: (step) => {
-      const modes = ['person', 'car', 'cyclist', 'helicopter', 'swanboat'];
-      const activeMode = controllerManager.activeMode === 'cargobike' ? 'cyclist' : controllerManager.activeMode === 'goboat' ? 'swanboat' : controllerManager.activeMode;
+      const modes = ['person', 'car', 'cyclist', 'helicopter'];
+      const activeMode = controllerManager.activeMode === 'cargobike' ? 'cyclist' : controllerManager.activeMode;
       const nextMode = modes[(modes.indexOf(activeMode) + step + modes.length) % modes.length];
       selectMode(nextMode === 'cyclist' ? lastBikeMode : nextMode);
     },
-    onCycleCamera: cycleCamera,
-    onInteract: interactWithPier
+    onCycleCamera: cycleCamera
   });
 
   // Keyboard guide for each mode: [keys, action]
@@ -276,12 +259,10 @@ async function initApp() {
     person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
     cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
-    helicopter: [[['W', 'S'], 'Pitch'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Ascend'], [['Q', 'C'], 'Descend'], [['Shift'], 'Boost']],
-    swanboat: [[['W'], 'Pedal'], [['S'], 'Reverse'], [['A', 'D'], 'Steer'], [['Drag'], 'Orbit']],
-    goboat: [[['W', 'S'], 'Throttle / Reverse'], [['A', 'D'], 'Steer'], [['E'], 'Board / Step off at pier'], [['Drag'], 'Orbit']]
+    helicopter: [[['W', 'S'], 'Pitch'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Ascend'], [['Q', 'C'], 'Descend'], [['Shift'], 'Boost']]
   };
   // Top speeds in km/h set the full scale of the speed meter for each active vehicle.
-  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, helicopter: 187, swanboat: 6, goboat: 6 };
+  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, helicopter: 187 };
 
   function renderControlHints(mode) {
     if (!elControlsHint) return;
@@ -312,15 +293,11 @@ async function initApp() {
 
   function selectMode(mode, options = {}) {
     if (mode === 'cyclist' && lastBikeMode === 'cargobike') mode = lastBikeMode;
-    if (mode === 'swanboat') mode = lastBoatMode === 'goboat' && !controllerManager.goBoatNavigation ? 'swanboat' : lastBoatMode;
-    const previousMode = controllerManager.activeMode;
-    controllerManager.setMode(mode, options);
+    controllerManager.setMode(mode);
     const activeMode = controllerManager.activeMode;
     const bikeActive = activeMode === 'cyclist' || activeMode === 'cargobike';
     if (bikeActive) lastBikeMode = activeMode;
-    const boatActive = activeMode === 'swanboat' || activeMode === 'goboat';
-    if (boatActive) lastBoatMode = activeMode;
-    const primaryMode = activeMode === 'cargobike' ? 'cyclist' : boatActive ? 'swanboat' : activeMode;
+    const primaryMode = activeMode === 'cargobike' ? 'cyclist' : activeMode;
     touchControls.setMode(activeMode);
     gamepadControls.reset();
     modeButtons.forEach((btn) => {
@@ -332,26 +309,15 @@ async function initApp() {
       btn.classList.toggle('active', selected);
       btn.setAttribute('aria-pressed', String(selected));
     });
-    if (boatTypeSwitch) boatTypeSwitch.hidden = !boatActive;
-    boatTypeButtons.forEach(btn => {
-      const selected = btn.dataset.boatType === activeMode;
-      btn.classList.toggle('active', selected);
-      btn.setAttribute('aria-pressed', String(selected));
-      btn.disabled = btn.dataset.boatType === 'goboat' && !controllerManager.goBoatNavigation;
-      btn.title = btn.disabled ? 'Harbour map not loaded' : '';
-    });
     document.body.dataset.mode = primaryMode;
     placeModeIndicator();
     const ent = controllerManager.getActiveEntity();
     if (elMode) elMode.textContent = ent.label;
-    renderControlHints(activeMode === 'goboat' ? 'goboat' : primaryMode);
+    renderControlHints(primaryMode);
 
     // If currently on a static scenic camera, switch to 3rd-Person Chase so user sees their selected character/vehicle
     const currentCam = cameraSystem.getActivePreset();
-    if (boatActive && previousMode !== activeMode) {
-      cameraSystem.resetForTeleport();
-      selectCamera('chase', true);
-    } else if (currentCam.category !== 'follow') {
+    if (currentCam.category !== 'follow') {
       selectCamera('chase', false);
     }
   }
@@ -430,21 +396,6 @@ async function initApp() {
       selectMode(lastBikeMode);
     });
   });
-
-  boatTypeButtons.forEach(btn => btn.addEventListener('click', () => {
-    lastBoatMode = btn.dataset.boatType;
-    selectMode(lastBoatMode);
-  }));
-
-  function interactWithPier() {
-    if (controllerManager.interactGoBoat()) {
-      if (controllerManager.activeMode === 'goboat') lastBoatMode = 'goboat';
-      selectMode(controllerManager.activeMode, { preserveGoBoatPosition: true });
-      cameraSystem.resetForTeleport();
-      selectCamera('chase', true);
-    }
-  }
-  pierAction?.addEventListener('click', interactWithPier);
 
   cameraButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -550,13 +501,10 @@ async function initApp() {
     });
   }
 
-  // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), and HUD (H)
+  // Global keyboard shortcuts for modes (1-4), cameras (V / 6-0), and HUD (H)
   window.addEventListener('keydown', (e) => {
     if (isTypingInField(e)) return;
     switch (e.code) {
-      case 'KeyE':
-        if (!e.repeat && controllerManager.activeMode !== 'helicopter') interactWithPier();
-        break;
       case 'Digit1':
         selectMode('person');
         break;
@@ -568,9 +516,6 @@ async function initApp() {
         break;
       case 'Digit4':
         selectMode('helicopter');
-        break;
-      case 'Digit5':
-        selectMode('swanboat');
         break;
       case 'Digit6':
         selectCamera('action', true);
@@ -741,14 +686,6 @@ async function initApp() {
     const T0 = frameProbe ? performance.now() : 0;
     gamepadControls.update(dt);
     controllerManager.update(dt, elapsed);
-    if (pierAction) {
-      const interaction = controllerManager.getGoBoatInteraction();
-      pierAction.hidden = !interaction;
-      if (interaction) {
-        const label = `${interaction.label} [E / A]`;
-        if (pierAction.textContent !== label) pierAction.textContent = label;
-      }
-    }
     cameraSystem.update(dt, elapsed);
     trafficSystem.update(
       dt,

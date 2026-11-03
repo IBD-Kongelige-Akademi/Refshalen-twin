@@ -9,7 +9,6 @@ import { buildDirectionOverlay } from './direction-overlay.js';
 import { buildSignalHeads } from './signal-heads.js';
 import { createWalkSpace } from './walk-space.js';
 import { buildLakes } from './water.js';
-import { buildBridgeDLB, filterDLBFurniture } from './bridge-dlb.js';
 import { setCalibration } from './appearance.js';
 import { applySurfaceCuts } from './lakes.js';
 import { loadCphFurniture } from './street-furniture-data.js';
@@ -19,13 +18,12 @@ import { createStreetFurniture } from './street-furniture.js';
 import { createZoneMap } from './zones.js';
 import { placeFurniture } from './placement.js';
 import { createGrass } from './grass.js';
-import { openTileStore, createTileLod2, createFurnitureAssembler } from './tile-store.js';
+import { openTileStore, createTileLod2 } from './tile-store.js';
 import { createRoadSurfaceLayer } from './road-surfaces.js';
 import { createTiledHeightField } from './ground-height.js';
 import { createTiledLawnMask } from './grass-layout.js';
 import { tileOfLocal, tileBoundsLocal } from './tile-grid.js';
 import { createBaseGeo, graphFixFits, createTileData } from './tile-data.js';
-import { isGoBoatPierBuilding } from './goboat-pier-data.js';
 import { createTileStreamer } from './tile-streamer.js';
 import { streamConfig, extentOfTiles, distanceToRect } from './tile-rings.js';
 import { createBuildingsLayer } from './buildings-stream.js';
@@ -334,7 +332,7 @@ function attachCollisionPhase(traffic, cyclists, { stage = null } = {}) {
     inactivePlayerActors.length = 0;
     if (controllerManager) {
       for (const [mode, entity] of Object.entries(controllerManager.entities || {})) {
-        if (!COLLIDING_PLAYER_MODES.has(mode) || (controllerManager.activeMode === 'swanboat' && mode === 'person')) continue;
+        if (!COLLIDING_PLAYER_MODES.has(mode)) continue;
         if (entity === frame.playerEntity || entity.mesh?.visible === false) continue;
         inactivePlayerActors.push(playerActor(entity, mode));
       }
@@ -490,16 +488,11 @@ async function buildWorld(scene, { markInit = () => {}, debug = '', geoUrl = CPH
   // Lakes (the Soerne): the ground plane is cut open over the water, so the plain plane is only built without them
   const lakesDoc = geo && !debug.split(',').includes('nowater') ? await loadCphLakes() : null;
   const furnitureDoc = geo ? await loadCphFurniture() : null;
-  let bridgeDLB = null;
-  if (lakesDoc?.lakes?.length && !debug.split(',').includes('nobridge')) {
-    bridgeDLB = buildBridgeDLB(scene, geo, lakesDoc, { terrain, furnitureDoc });
-    if (bridgeDLB) markInit(`dlb(${bridgeDLB.lamps.count} lamps, ${bridgeDLB.layout.arches.length} arches)`);
-  }
   let lakes = null;
   let ground;
   if (lakesDoc?.lakes?.length) {
     lakes = buildLakes(scene, lakesDoc, { groundMaterial: groundMaterial(), size: GROUND_SIZE, bbox: geo.frame?.bbox || CPH_FRAME.bbox, planar: water !== 'simple', terrain,
-      parks: geo.parks || [], modelBridge: (bridge) => bridgeDLB?.layout.bridgeId === bridge.id });
+      parks: geo.parks || [] });
     scene.add(lakes.ground);
     ground = lakes.ground;
     markInit(`lakes(${lakes.stats.lakes})`);
@@ -539,7 +532,7 @@ async function buildWorld(scene, { markInit = () => {}, debug = '', geoUrl = CPH
   // M4: street furniture (data/cph-furniture.json): trees, lamps, parked cars, bins, bollards, benches, racks, bus stops
   let furniture = null;
   if (geo && !debug.split(',').includes('nofurniture')) {
-    const doc = furnitureDoc && bridgeDLB ? filterDLBFurniture(furnitureDoc, bridgeDLB.layout) : furnitureDoc;
+    const doc = furnitureDoc;
     if (doc) {
       // ONE spatial constraint map (footprints, water, the measured carriageway, cycle strips, pavements) places every item
       const zones = streetsStats && !debug.split(',').includes('noplace') ? createZoneMap({ geo, lakes: lakesDoc, surfaces: surfacesCut }) : null;
@@ -569,9 +562,7 @@ async function buildWorld(scene, { markInit = () => {}, debug = '', geoUrl = CPH
       lakes?.update(x, z);
       grass?.update(x, z);
       furniture?.update(x, z, night);
-      bridgeDLB?.update(night);
     },
-    bridgeDLB,
     furniture,
     audioSignals: [],
     locationLabel: createLocator(geo),
@@ -652,7 +643,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   const terrain = terrainHeader && !flags.has('flat') ? createStreamTerrain(terrainHeader) : FLAT_TERRAIN;
   const lod2 = city.meta.lod2 && !flags.has('nolod2') ? createTileLod2(city.meta, store.fetchBin) : null;
   const streets = flags.has('nostreets') ? null : city.streets;
-  const data = createTileData({ index, meta: city.meta, streets, lakes: city.lakes, geo, terrain, lod2, dropBuilding: isGoBoatPierBuilding });
+  const data = createTileData({ index, meta: city.meta, streets, lakes: city.lakes, geo, terrain, lod2 });
   globalThis.CPH_TERRAIN = terrain;
 
   // Lakes with a level in the terrain header get the district's water (walls, coping, the shore field, reflections); they are global:
@@ -669,7 +660,6 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   } : null;
   const hasLakes = !!lakesDoc?.lakes?.length;
   const waterDoc = !flags.has('nowater') ? city.lakes : null; // every lake, pond and bridge strip: where nothing may stand or walk
-  let dlbFurniture = null;
   if (hasLakes && !terrain.flat) {
     const bb = ringsBbox([...(lakesDoc.lakes || []), ...(lakesDoc.ponds || []), ...(lakesDoc.bridges || [])].map((l) => l.ring));
     if (bb) {
@@ -678,20 +668,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
       markInit(`terrain(${pinned.length} pinned)`);
     }
   }
-  if (hasLakes && !flags.has('nobridge') && !flags.has('nofurniture')) {
-    const bridges = (lakesDoc.bridges || []).map((b) => ringsBbox([b.ring])).filter(Boolean);
-    const dlbTiles = new Set(bridges.flatMap((bb) => store.tilesForLocalBbox(bb, 10)));
-    const asm = createFurnitureAssembler(city.meta);
-    await Promise.all([...dlbTiles].map(async (id) => asm.addTile(await store.fetchLayer(id, 'furniture'))));
-    dlbFurniture = asm.doc();
-  }
   markInit(terrain.flat ? 'terrain(flat)' : `terrain(${city.meta.terrain.min}..${city.meta.terrain.max} m)`);
-
-  let bridgeDLB = null;
-  if (hasLakes && !flags.has('nobridge')) {
-    bridgeDLB = buildBridgeDLB(scene, geo, lakesDoc, { terrain, furnitureDoc: dlbFurniture });
-    if (bridgeDLB) markInit(`dlb(${bridgeDLB.lamps.count} lamps, ${bridgeDLB.layout.arches.length} arches)`);
-  }
 
   // water (global) and the ground material the tiles share
   // (with the generic water layer the ground shader reads a window raster that follows the camera: grass in the parks everywhere, the gravel path
@@ -704,7 +681,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     const frame = getDataBbox();
     const waterBox = citywide && lakeBox ? [lakeBox[0] - 120, lakeBox[1] - 120, lakeBox[2] + 120, lakeBox[3] + 120] : frame;
     lakes = buildLakes(scene, lakesDoc, { groundMaterial: sharedGround, size: GROUND_SIZE, bbox: waterBox, planar: water !== 'simple', terrain,
-      parks: cityWater ? null : [], lakeField: !!cityWater, hideDuringReflection: () => (cityWater ? reflectionCull() : []), modelBridge: (bridge) => bridgeDLB?.layout.bridgeId === bridge.id, skipGround: true });
+      parks: cityWater ? null : [], lakeField: !!cityWater, hideDuringReflection: () => (cityWater ? reflectionCull() : []), skipGround: true });
     markInit(`lakes(${lakes.stats.lakes})`);
   }
   const tileBoundsMap = new Map(ids.map((id) => [id, index.tiles[id].local]));
@@ -762,7 +739,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   const layers = [];
   layers.push({ name: 'ground', rings: ['near', 'mid'], fidelity: true, add: (ctx, ring) => ground.addTile(ctx.id, ctx.bounds, { near: ring === 'near', tileCut: waterLayer ? ctx.water?.cut || null : null }), remove: (id) => ground.removeTile(id) });
   if (waterLayer) layers.push(waterLayer.layer);
-  // the full-resolution water layers of the resident tiles, for the GoBoat's quay collision (main.js; js/goboat-navigation.js setDetailWater)
+  // the full-resolution water layers of the resident tiles, for whoever needs the drawn quay (world.waterTiles / onWaterTile)
   const waterTiles = new Map();
   const waterWatchers = new Set();
   if (waterLayer) {
@@ -836,7 +813,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
       add: async (ctx) => {
         const own = ctx.furniture;
         if (!own) return;
-        const doc = bridgeDLB ? filterDLBFurniture(own, bridgeDLB.layout) : own;
+        const doc = own;
         // ONE spatial constraint map per tile (+ a margin): footprints, water, carriageways, cycle strips, pavements; the items are placed against it
         let place = null;
         if (zonesOn) {
@@ -987,9 +964,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
       }
       grass?.update(x, z);
       furniture?.update(x, z, night);
-      bridgeDLB?.update(night);
     },
-    bridgeDLB,
     furniture,
     audioSignals: [],
     locationLabel: createLocator(geo),
