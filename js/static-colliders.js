@@ -1,5 +1,5 @@
 // Build pure, immutable-enough collision records from the final geometry and placed furniture plan.
-import { triangulatePolygon } from './polygon-cph.js';
+import { triangulatePolygon } from './polygon.js';
 import { cleanRing } from './building-geometry.js';
 
 const INDEX_CELL = 16;
@@ -170,7 +170,7 @@ export function buildStaticColliders(geo, { furniturePlan = null, carSpecs = {},
         Math.max(2.2, numberOr(tree.crown?.base, 3.2)));
     });
     appendPlaced(colliders, plan.lamps, (lamp, index) => {
-      // as js/street-furniture-cph.js draws them: a lamp hanging from its wire has no pole; a mast stands on its own pole, and a
+      // as js/street-furniture.js draws them: a lamp hanging from its wire has no pole; a mast stands on its own pole, and a
       // wire lamp without wire geometry (`bracket`) stands on a 6.2 m tube pole
       if (lamp.mount !== 'mast' && lamp.wire) return null;
       const y = numberOr(lamp.y, groundAt(groundHeight, lamp.x, lamp.z));

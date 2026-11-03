@@ -1,6 +1,6 @@
 // js/tile-store.js
 // Reads the tiled layers (data/tiles/index.json, data/tiles/<id>/<layer>.json, data/city/*; written by
-// tools/cph-geodata/tile_split.py) and assembles them into the same documents the monolithic files hold, so the layer
+// tools/geodata/tile_split.py) and assembles them into the same documents the monolithic files hold, so the layer
 // modules (buildings-real, street-furniture-data, terrain, surfaces, vegetation ...) take their inputs from tiles when
 // the index exists and from data/cph-*.json otherwise (world.js decides).
 //
@@ -12,7 +12,7 @@
 // loads a subset of tiles must also load the ring of neighbours around it.
 
 import { parseLod2Record } from './lod2-geometry.js';
-import { decodeGrid } from './terrain-cph.js';
+import { decodeGrid } from './terrain.js';
 import { tilesForLocalBbox } from './tile-grid.js';
 import { dataUrl, isRemoteBase, resolveDataBase, packsWanted } from './data-config.js';
 import { fetchManifest, createPackSource, createAtlasSource, setAtlasSource } from './data-packs.js';
@@ -108,7 +108,7 @@ export function createEntrancesAssembler(meta) {
 }
 
 /**
- * Merges a tile's `appearance` layer ({ buildings: { <gdk id>: { walls, roof, summary, atlas? } } }, tools/cph-geodata/appearance_city*.py) into
+ * Merges a tile's `appearance` layer ({ buildings: { <gdk id>: { walls, roof, summary, atlas? } } }, tools/geodata/appearance_city*.py) into
  * its building records as `observed` = { walls, roof, atlas? } (what js/appearance.js reads). A building that already carries an `observed`
  * block (the district's) keeps it untouched. Mutates and returns `buildings`.
  */
@@ -258,11 +258,11 @@ async function createStore(index, source) {
   const json = (rel, signal) => source.json(rel, signal);
   const cityDir = String(index.city?.meta || '../city/meta.json').replace(/\/[^/]*$/, '');
 
-  // Post-process layers (data/city/post.json, written by tools/cph-geodata/far_lod.py and tile_streets.py after the tile compiler):
+  // Post-process layers (data/city/post.json, written by tools/geodata/far_lod.py and tile_streets.py after the tile compiler):
   //   far      { header, bin }               the far-ring block meshes (js/far-lod.js)
   //   streets  { graph, tiles: { id: bytes } }  the street layout bucketed per tile (a `streets` layer of those tiles) + the graph fix
   //   water    { header, tiles: { id: bytes } }  the generic water, ground cut and green ground per tile (a `water` layer of those tiles,
-  //            tools/cph-geodata/city_water.py) + the city header (bodies, far-ring pieces, the Soerne override)
+  //            tools/geodata/city_water.py) + the city header (bodies, far-ring pieces, the Soerne override)
   let post = null;
   try {
     const doc = await json(`${cityDir}/post.json`);

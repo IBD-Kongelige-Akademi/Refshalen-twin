@@ -1,4 +1,4 @@
-# Build context = the staged tree made by `cloudctl.py stage` (tools/lod2/*.py, tools/cph-geodata/frame.py, tools/cloud/roofer/*).
+# Build context = the staged tree made by `cloudctl.py stage` (tools/lod2/*.py, tools/geodata/frame.py, tools/cloud/roofer/*).
 # roofer 3dgi/roofer:v1.1.0-beta.1 (tools/lod2/common.ROOFER_IMAGE), pinned by its multi-arch index digest; Ubuntu 24.04.
 FROM 3dgi/roofer@sha256:476b5f4bbaf4109c52fe7fba1e81a9ece0ef4ade557dbdadb79b318444689e99
 USER root
@@ -12,7 +12,7 @@ ENV PATH=/opt/pdal/bin:$PATH PROJ_DATA=/opt/pdal/share/proj GDAL_DATA=/opt/pdal/
 COPY tools/cloud/roofer/requirements.txt /tmp/requirements.txt
 RUN /usr/bin/python3 -m venv /opt/venv && /opt/venv/bin/pip install --no-cache-dir -r /tmp/requirements.txt
 COPY tools/lod2/common.py tools/lod2/prep.py tools/lod2/fetch.py tools/lod2/convert.py /app/tools/lod2/
-COPY tools/cph-geodata/frame.py /app/tools/cph-geodata/frame.py
+COPY tools/geodata/frame.py /app/tools/geodata/frame.py
 COPY tools/cloud/roofer/task.py tools/cloud/roofer/lidar_r2.py tools/cloud/roofer/r2_credentials.py /app/tools/cloud/roofer/
 WORKDIR /work
 ENTRYPOINT ["/opt/venv/bin/python", "/app/tools/cloud/roofer/task.py"]

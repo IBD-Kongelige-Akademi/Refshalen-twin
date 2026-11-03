@@ -1,10 +1,10 @@
 // Kerbs inside carriageways, ranked by place. Usage: node tools/audit/kerbs.mjs [--depth 1] [--top 40] [--json out.json] [--views views.json] [--noclip]
-// (--noclip measures the kerbs as they were drawn before road-surfaces-cph.js cut them at the carriageways)
+// (--noclip measures the kerbs as they were drawn before road-surfaces.js cut them at the carriageways)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyStreets } from '../../js/layout-cph.js';
-import { buildRoadSurfaceArrays } from '../../js/road-surfaces-cph.js';
+import { applyStreets } from '../../js/layout.js';
+import { buildRoadSurfaceArrays } from '../../js/road-surfaces.js';
 import { kerbIntrusions, classify } from './kerbs-lib.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');

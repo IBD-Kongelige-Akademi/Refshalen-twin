@@ -1,4 +1,4 @@
-import { carriagewayFromLanes } from './road-width-cph.js';
+import { carriagewayFromLanes } from './road-width.js';
 
 // js/road-network.js
 // Drivable road graph from the Copenhagen centreline graph (data/cph-geodata.json roadGraph): junctions, directed
@@ -12,7 +12,7 @@ const CROSSWALK = 2.5; // depth between an intersection box and its stop lines
 
 function buildRoadNetwork(signalIntersections = [], options = {}) {
   // `options.roadGraph` is the roadGraph of data/cph-geodata.json; the roads themselves are the truth, so no obstacle
-  // rectangle blocks a lane. `options.walkable` / `options.onSidewalk` come from walk-space-cph.js.
+  // rectangle blocks a lane. `options.walkable` / `options.onSidewalk` come from walk-space.js.
   let nodes = [];
 
   // 4. Streets from the centreline graph: chained through vertices where just two similar vehicular links meet, into
@@ -749,7 +749,7 @@ function buildRoadNetwork(signalIntersections = [], options = {}) {
 // [a, b, nameIdx, width, lanes, dir, inner, chainId].
 const CPH_VEHICULAR = new Set(['primary', 'secondary', 'residential', 'service']);
 const CPH_LANE = 3.0;
-// (carriagewayFromLanes: the data's width is a clamped kerb-to-kerb spacing, see road-width-cph.js)
+// (carriagewayFromLanes: the data's width is a clamped kerb-to-kerb spacing, see road-width.js)
 
 function cphVehicularLinks(rg) {
   const out = [];
@@ -1011,7 +1011,7 @@ function curvePoint(c, s, out) {
  * The road graph without the service links whose driven strip runs through a building: a gateway, a covered yard lane or a passage
  * narrower than its lanes, which the footprints close
  * (the twin draws the building solid there), so a vehicle on it would stand in the walls and its collision body would push against
- * them forever. `inBuilding(x, z)` is js/walk-space-cph.js's footprint test. Streets of the other classes are kept as they are.
+ * them forever. `inBuilding(x, z)` is js/walk-space.js's footprint test. Streets of the other classes are kept as they are.
  */
 function dropCoveredServiceLinks(rg, inBuilding) {
   if (!rg || typeof inBuilding !== 'function') return rg;

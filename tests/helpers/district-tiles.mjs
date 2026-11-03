@@ -1,5 +1,5 @@
 // Which tile set the district assertions run on: CPH_TILES (a directory under the repo, e.g. .context/c2-tiles/tiles, made with
-//   uv run tools/cph-geodata/tile_split.py --out .context/c2-tiles/tiles --city .context/c2-tiles/city)
+//   uv run tools/geodata/tile_split.py --out .context/c2-tiles/tiles --city .context/c2-tiles/city)
 // or data/tiles when it holds the 16 consistent district tiles. A citywide build in data/tiles (milestone C3+), or one that is half
 // regenerated, is not the district: the tests that compare tiles with the monolithic district files are skipped for it.
 import fs from 'node:fs';

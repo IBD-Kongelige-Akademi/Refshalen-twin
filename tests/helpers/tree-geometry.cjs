@@ -58,14 +58,14 @@ const THREE = {
 };
 
 function loadTreeGeometry(data, season, document) {
-  const source = readFileSync(join(__dirname, '../../js/tree-geometry-cph.js'), 'utf8');
-  return loadModule(source, { filename: 'tree-geometry-cph.js', globals: { document }, imports: {
+  const source = readFileSync(join(__dirname, '../../js/tree-geometry.js'), 'utf8');
+  return loadModule(source, { filename: 'tree-geometry.js', globals: { document }, imports: {
     'three/webgpu': THREE,
     'three/tsl': { uniform: value => ({ value }) },
     './street-furniture-data.js': data,
     './tree-season.js': season,
     './tsl-materials.js': {},
-    './surface-materials-cph.js': {}
+    './surface-materials.js': {}
   } });
 }
 function loadTreeShadow(data) {

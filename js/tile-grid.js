@@ -1,5 +1,5 @@
 // js/tile-grid.js
-// The fixed 500 m tile grid in EPSG:25832: the JS mirror of tools/cph-geodata/frame.py (keep the two in step).
+// The fixed 500 m tile grid in EPSG:25832: the JS mirror of tools/geodata/frame.py (keep the two in step).
 // Tile id "<e500>_<n500>" = floor(E / 500), floor(N / 500); four tiles fill one 1 km DHM / LoD2 cell (6323_555).
 // Local frame: x = E - origin.E, z = -(N - origin.N). A tile's local bounds are [xmin, zmin, xmax, zmax].
 

@@ -126,7 +126,7 @@ def stage(dest: Path) -> None:
     import shutil
     if dest.exists():
         shutil.rmtree(dest)
-    for src, pats in [("tools/lod2", ["common.py", "prep.py", "fetch.py", "convert.py"]), ("tools/cph-geodata", ["frame.py"]),
+    for src, pats in [("tools/lod2", ["common.py", "prep.py", "fetch.py", "convert.py"]), ("tools/geodata", ["frame.py"]),
                       ("tools/cloud/roofer", ["task.py", "lidar_r2.py", "r2_credentials.py", "requirements.txt"])]:
         for p in pats:
             (dest / src).mkdir(parents=True, exist_ok=True)

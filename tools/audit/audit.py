@@ -7,7 +7,7 @@
 
 Runtime layout comes from the engine's own pure JS modules (tools/audit/dump_layout.mjs: carriageway half widths,
 ground-height field, placed street-furniture plan incl. parked cars and wire spans); everything else is rebuilt from
-the data files with the same rules the engine uses (road-surfaces-cph.js: carriageway = centreline ribbon of
+the data files with the same rules the engine uses (road-surfaces.js: carriageway = centreline ribbon of
 carriagewayWidth(), cycle track = 0.15 m kerb + 2.2 m strip beside it, pavement = geo.sidewalks, water = lakes minus
 bridges). Frame: x = E - 723900, z = -(N - 6176500).
 
@@ -130,7 +130,7 @@ for _k, _v in (lay.get("placed") or {}).items():
     if _v is not None:
         fur[_k] = _v
 
-# buildings, as the engine stands them: footprint errors resolved (drops / clips), terrain ground applied (js/layout-cph.js; see dump_layout.mjs)
+# buildings, as the engine stands them: footprint errors resolved (drops / clips), terrain ground applied (js/layout.js; see dump_layout.mjs)
 _data_b = {b["id"]: b for b in geo["buildings"]}
 B = []
 for lb in lay["buildings"]:
@@ -415,7 +415,7 @@ check("water-paths", "water", "Footway/cycleway centreline runs > 3 m through op
 
 # surfaces vs lakes
 _cuts = {c["id"]: c for c in lakes["surface_cuts"]}
-_cuts.update({c["id"]: c for c in lay.get("surfaceCuts", [])})  # the street layout's cuts replace the lake document's (js/layout-cph.js mergeSurfaceCuts)
+_cuts.update({c["id"]: c for c in lay.get("surfaceCuts", [])})  # the street layout's cuts replace the lake document's (js/layout.js mergeSurfaceCuts)
 cut_ids = set(_cuts)
 S = surf["surfaces"]
 spoly, scls, sid = [], [], []
@@ -906,7 +906,7 @@ CR = np.array([t["crown_radius"] for t in trees])
 clamp_h = sum(1 for h in H if h < 2.5 or h > 40)
 ex = [(f"tree[{i}] {t['genus']}", t["x"], t["z"], f"h {t['height']:.0f} m, crown r {t['crown_radius']:.1f} m", t["height"]) for i, t in enumerate(trees) if t["height"] > 28 or t["crown_radius"] > 9]
 check("tree-giant", "trees", "Tree height > 28 m or crown radius > 9 m", len(ex), len(trees), "med", ex, f"height p50 {np.median(H):.0f} p95 {np.percentile(H, 95):.0f} max {H.max():.0f}; crown p50 {np.median(CR):.1f} p95 {np.percentile(CR, 95):.1f} max {CR.max():.1f}", weight=1)
-# the engine gives untyped crowns a context genus (js/tree-species-cph.js): count what is drawn when the layout carries it
+# the engine gives untyped crowns a context genus (js/tree-species.js): count what is drawn when the layout carries it
 placed = plan.get("trees") or []
 gen = Counter(t["genus"] for t in (placed if placed and "genusSource" in placed[0] else trees))
 src = Counter(t.get("genusSource", "recorded") for t in placed) if placed else {}
@@ -935,7 +935,7 @@ DIM_TABLE = [
 RESULTS.append({"id": "dim-table", "layer": "scale", "title": "Prop dimensions vs visual-refs", "table": DIM_TABLE, "count": 0, "total": 0, "pct": 0, "severity": "info", "note": "", "examples": []})
 
 # ---------------------------------------------------------------------------------------------------------- 10. traffic direction
-# tools/audit/oneway.mjs judges the engine's cars and cyclists against the one-way / bicycle-direction data (tools/cph-geodata/bikedir.py)
+# tools/audit/oneway.mjs judges the engine's cars and cyclists against the one-way / bicycle-direction data (tools/geodata/bikedir.py)
 # with checks that read only position + heading and the road data. The live car simulation runs in the browser:
 # `uv run --with playwright python tools/shoot-m2.py --oneway` writes docs/oneway/sim-cars.json.
 subprocess.run(["node", str(ROOT / "tools/audit/oneway.mjs")], check=True, stdout=subprocess.DEVNULL)

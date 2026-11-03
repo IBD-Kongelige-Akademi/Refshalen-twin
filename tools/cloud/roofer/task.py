@@ -8,7 +8,7 @@ $CELL overrides (local runs). Inputs and outputs live in a store: gs://$BUCKET/.
     out  cells/<cell>/out/*.jsonl         roofer CityJSONSeq (LoD2.2 + rf_* quality attributes)
          cells/<cell>/manifest.json       tools/lod2 work layout (scan date, per own building BBR year / post_scan), read by convert.py
          cells/<cell>/{footprints.geojson,roofer.toml,roofer.log.gz}
-         cells/<cell>/veg/c<class>_<cell>.tif, gint_<cell>.tif   1 m rasters of the cell, only with VEG=1 (tools/cph-geodata/vegetation_rasters.py)
+         cells/<cell>/veg/c<class>_<cell>.tif, gint_<cell>.tif   1 m rasters of the cell, only with VEG=1 (tools/geodata/vegetation_rasters.py)
          cells/<cell>/DONE.json           written last; a cell with a marker is skipped (FORCE=1 reruns), FAILED.json on error
 
 LAZ resolution per tile (the shared Cloudflare R2 LiDAR cache contract, lidar_r2.py): R2 -> only if missing Datafordeler, then published
@@ -32,7 +32,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
-for cand in (HERE.parents[2], Path("/app")):  # repo root (tools/lod2 + tools/cph-geodata) or the image's /app
+for cand in (HERE.parents[2], Path("/app")):  # repo root (tools/lod2 + tools/geodata) or the image's /app
     if (cand / "tools" / "lod2" / "common.py").exists():
         sys.path.insert(0, str(cand / "tools" / "lod2"))
         break
@@ -149,7 +149,7 @@ def roofer_inputs(doc: dict, scan_year: int) -> tuple[dict, dict]:
 
 
 def roofer_toml(scan_year: int, workdir: Path) -> str:
-    sys.path.insert(0, str(Path(common.__file__).parent))  # tools/lod2 first: tools/cph-geodata has its own fetch.py
+    sys.path.insert(0, str(Path(common.__file__).parent))  # tools/lod2 first: tools/geodata has its own fetch.py
     import prep  # noqa: PLC0415  (the toml the district run uses; paths re-rooted)
     return prep.ROOFER_TOML.format(year=scan_year).replace("/data", str(workdir))
 

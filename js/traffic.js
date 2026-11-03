@@ -86,7 +86,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   // =========================================================================
   // 0. ROAD NETWORK
   // =========================================================================
-  // Vehicles rest on the terrain (js/terrain-cph.js via the scene's ground model); 0 on the flat plane
+  // Vehicles rest on the terrain (js/terrain.js via the scene's ground model); 0 on the flat plane
   const groundAt = (x, z) => (options.groundHeight ? options.groundHeight.terrainAt(x, z) : 0);
   let network = null;
   let nodes = [];

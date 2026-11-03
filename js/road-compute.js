@@ -1,12 +1,12 @@
 // js/road-compute.js
-// The CPU half of a streamed tile's road surfaces (js/road-surfaces-cph.js createRoadSurfaceLayer): the carriageway, kerb, cycle,
+// The CPU half of a streamed tile's road surfaces (js/road-surfaces.js createRoadSurfaceLayer): the carriageway, kerb, cycle,
 // paint, pavement and register-ground meshes as typed arrays, and the 0.5 m ground-height grid. Pure: runs in a Web Worker
 // (js/tile-worker.js) or on the main thread. The job carries what the build reads (the roads, pavements and cycle tracks of the tile
 // and its neighbours, the footprints, the surface register, the terrain chunks around) and which items the tile owns, as indices:
 // object identity does not survive the trip to a worker (js/tile-own.js `own` sets).
 
-import { computeSurfaceMeshes, buildGroundHeightGrid } from './road-surfaces-cph.js';
-import { createChunkSampler } from './terrain-cph.js';
+import { computeSurfaceMeshes, buildGroundHeightGrid } from './road-surfaces.js';
+import { createChunkSampler } from './terrain.js';
 
 const HEIGHT_MARGIN = 20;
 const DROP = new Set(['src', 'ptsSurvey', 'conf_fields', 'conf']);

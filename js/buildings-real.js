@@ -437,7 +437,7 @@ function createTexManager(root, candidates, { fetchImpl = globalThis.fetch, budg
   return manager;
 }
 
-/** Venues (data/cph-groundfloor.json, tools/cph-geodata/groundfloor.py); the file is optional: without it only BBR trade use gives shops. */
+/** Venues (data/cph-groundfloor.json, tools/geodata/groundfloor.py); the file is optional: without it only BBR trade use gives shops. */
 async function loadVenues(fetchImpl = globalThis.fetch) {
   try {
     const response = await fetchImpl(GROUNDFLOOR_URL);
@@ -448,7 +448,7 @@ async function loadVenues(fetchImpl = globalThis.fetch) {
   }
 }
 
-/** Real entrances (data/cph-entrances.json, tools/cph-geodata/entrances.py); optional: without it every door is the heuristic one. */
+/** Real entrances (data/cph-entrances.json, tools/geodata/entrances.py); optional: without it every door is the heuristic one. */
 async function loadEntrances(fetchImpl = globalThis.fetch) {
   try {
     const response = await fetchImpl(ENTRANCES_URL);

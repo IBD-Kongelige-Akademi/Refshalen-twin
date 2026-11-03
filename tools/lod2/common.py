@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools" / "cph-geodata"))
+sys.path.insert(0, str(ROOT / "tools" / "geodata"))
 import frame  # noqa: E402  (the one source of the origin, the district bbox and the tile grid)
 RAW_DIR = ROOT / "data" / "raw" / "lod2"
 WORK_DIR = RAW_DIR / "work"

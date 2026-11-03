@@ -1,4 +1,4 @@
-import { triangulatePolygon, pointInRing } from './polygon-cph.js';
+import { triangulatePolygon, pointInRing } from './polygon.js';
 
 // Dronning Louises Bro: dimensions are scaled from the inferred lake strip; the stone arch
 // proportions are reconstructed from the heritage photographs and remain inferred.

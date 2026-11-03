@@ -1,11 +1,11 @@
 // js/furniture-compute.js
-// The CPU half of a streamed tile's street furniture: the spatial constraint map (js/zones-cph.js: footprints, water, carriageways,
+// The CPU half of a streamed tile's street furniture: the spatial constraint map (js/zones.js: footprints, water, carriageways,
 // cycle strips, pavements on a 0.5 m raster over the tile and a margin) and the placement of the tile's items against it
-// (js/placement-cph.js). Pure: runs in a Web Worker (js/tile-worker.js) or on the main thread. What comes back is the placed furniture
+// (js/placement.js). Pure: runs in a Web Worker (js/tile-worker.js) or on the main thread. What comes back is the placed furniture
 // document (the layers then build their instances from it) and the placement report.
 
-import { createZoneMap } from './zones-cph.js';
-import { placeFurniture } from './placement-cph.js';
+import { createZoneMap } from './zones.js';
+import { placeFurniture } from './placement.js';
 
 const inBox = (ring, [x0, z0, x1, z1]) => {
   let a = Infinity; let b = Infinity; let c = -Infinity; let d = -Infinity;

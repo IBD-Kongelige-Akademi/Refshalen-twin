@@ -67,7 +67,7 @@ Field-level overrides go in `conf_fields: {field: conf}`. Nothing may be invente
  "src": [...], "conf": "…", "conf_fields": {"lanesFwd": "inferred", "bike": "inferred"}}
 ```
 
-#### Traffic direction (`carDir`, `bike`; additive, `tools/cph-geodata/bikedir.py`)
+#### Traffic direction (`carDir`, `bike`; additive, `tools/geodata/bikedir.py`)
 
 `pts` always run **with** the traffic: the compiler re-orients `oneway=-1` ways (and swaps their left/right and fwd/back), so `carDir` is `fwd` (one-way, cars follow `pts`), `both`, or `none` (paths). `back` is never emitted. Everything under `bike` is in that frame; sides are left/right of the `pts` direction (z south: right of an eastbound road is south).
 
@@ -78,9 +78,9 @@ Field-level overrides go in `conf_fields: {field: conf}`. Nothing may be invente
 - Sources: `src` gains `osm:bicycle-direction` and `kk:ensrettede_gader:cykling_mod_ensretning`; `conf_fields.contraflow = "observed"`. KK is the municipal record: it grants contraflow on a one-way street unless OSM says `oneway:bicycle=yes` (reported as `contraflow_kk_conflict` in `meta.road_stats`); KK one-way streets that OSM does not mark one-way (`oneway_kk_only`) stay two-way, since KK gives no direction.
 - `meta.road_stats` carries the counts (`ways_contraflow`, `ways_contraflow_lane|track|shared`, `ways_two_way_track`, `ways_cycleway_two_way|oneway`, `ways_bike_ban`, `ways_sidepath_side`, `contraflow_kk_agree|granted|conflict`).
 
-Regenerate only the roads (the rest of the file is kept as it is): `uv run tools/cph-geodata/build.py --patch-roads --out data/cph-geodata.json` (cached raw layers under `data/raw/`). Tag-parsing tests: `python3 tools/cph-geodata/test_bikedir.py`.
+Regenerate only the roads (the rest of the file is kept as it is): `uv run tools/geodata/build.py --patch-roads --out data/cph-geodata.json` (cached raw layers under `data/raw/`). Tag-parsing tests: `python3 tools/geodata/test_bikedir.py`.
 
-## Appearance (M4, `tools/cph-geodata/appearance.py`)
+## Appearance (M4, `tools/geodata/appearance.py`)
 
 > v2 (`appearance/2`) adds fields and one `conf` value, documented in "Appearance v2 additions" at the end of this section. v1 consumers keep working: every v1 field is unchanged in name and meaning.
 
@@ -139,29 +139,29 @@ Top-level `appearance`: `version: "appearance/2"`, `views_by_year`.
 
 ### Calibrated wall tones (`appearance-cal/1`)
 
-`tools/cph-geodata/appearance_calibrate.py` adds, per `observed.walls[]` entry: `tone_cal` (sRGB 0-1, calibrated colour), `cal`
+`tools/geodata/appearance_calibrate.py` adds, per `observed.walls[]` entry: `tone_cal` (sRGB 0-1, calibrated colour), `cal`
 (`own | neighbours | global | building | none`: how a shadow-sourced wall was matched to sunlit light) and `cal_brick: true` when the brick
 rule turned a pinkish BBR `mursten` wall into red-brown or yellow brick. `appearance.calibration` holds the run summary. See `data/appearance.calibration.md`.
 
 ### `data/cph-lakes.json` (`cph-lakes/1`)
 
-Derived by `tools/cph-geodata/lakes.py` from `water` plus the parkregister "Soerne" polygons (`parkregister.161*`), which are the open
+Derived by `tools/geodata/lakes.py` from `water` plus the parkregister "Soerne" polygons (`parkregister.161*`), which are the open
 water of Sortedams/Peblinge/Sankt Joergens Soe: `lakes` (disjoint outlines, bridge strips included), `bridges` (strips closed over a
 bridge deck, with `open_edges` onto the water), `ponds` (< 1500 m2) and `surface_cuts` (ground-surface polygons cut by the lakes).
-The engine sinks the water 0.8 m below the ground, builds granite walls and cuts the ground plane (`js/lakes-cph.js`, `js/water-cph.js`).
+The engine sinks the water 0.8 m below the ground, builds granite walls and cuts the ground plane (`js/lakes.js`, `js/water.js`).
 
-## Street furniture (M4, `tools/cph-geodata/furniture.py` -> `data/cph-furniture.json`)
+## Street furniture (M4, `tools/geodata/furniture.py` -> `data/cph-furniture.json`)
 
 A separate file (`version: "cph-furniture/1"`, same frame); `data/cph-geodata.json` is untouched. Every feature has `src`, `conf` and `licence` (`CC-BY-4.0`, `unstated` for datasets without a licence statement, `ODbL` for water-edge derived items). `yaw` is the direction an object faces (model +z -> `(sin yaw, cos yaw)` in x, z).
 
-Arrays: `trees` (`height`, `crown_radius`, `genus` family, `species`, `age`), `lamps` (Citelum mast and wire-suspended: `mount`, `pole` kbh/tube/park, `pole_h`, `light` led/sodium/metalhalide/fluorescent, `cct`, `watt`, wire `span` [x0, z0, x1, z1] from the 2018 `belysning-ledninger` lines or, `span_conf: inferred`, facade to facade across the street), `parkingBays` (`kind` par/ang/perp from `p_pladser` kerb lines and `parkering_areal` polygons), `parkMeters`, `bins`, `glassContainers`, `binStands`, `bollards` (`material`, `colour`), `benches`, `bikeRacks` (`capacity`), `busStops` (Movia equipment flags), `monuments`, `rescuePosts`, `lakeLights` (inferred CitySwan-style path lights, 15 m repeat). The engine (`js/street-furniture-cph.js`, pure mapping in `js/street-furniture-data.js`) places them at the ground height and fills the bays with parked cars at 70-85 % occupancy (seeded).
+Arrays: `trees` (`height`, `crown_radius`, `genus` family, `species`, `age`), `lamps` (Citelum mast and wire-suspended: `mount`, `pole` kbh/tube/park, `pole_h`, `light` led/sodium/metalhalide/fluorescent, `cct`, `watt`, wire `span` [x0, z0, x1, z1] from the 2018 `belysning-ledninger` lines or, `span_conf: inferred`, facade to facade across the street), `parkingBays` (`kind` par/ang/perp from `p_pladser` kerb lines and `parkering_areal` polygons), `parkMeters`, `bins`, `glassContainers`, `binStands`, `bollards` (`material`, `colour`), `benches`, `bikeRacks` (`capacity`), `busStops` (Movia equipment flags), `monuments`, `rescuePosts`, `lakeLights` (inferred CitySwan-style path lights, 15 m repeat). The engine (`js/street-furniture.js`, pure mapping in `js/street-furniture-data.js`) places them at the ground height and fills the bays with parked cars at 70-85 % occupancy (seeded).
 
 
-## `data/cph-vegetation.json` (`cph-vegetation/1`, `tools/cph-geodata/vegetation.py`)
+## `data/cph-vegetation.json` (`cph-vegetation/1`, `tools/geodata/vegetation.py`)
 
-Separate file, same local frame. `surfaces` are polygons in the `cph-surfaces` record shape (`ring`, optional `holes`, `src`, `conf`) with `cls: "grass"` and `kind`: `lawn` (CIR NDVI above the hard-ground 97th percentile, no class 5 above, no class 3/4 returns, `measured`), `planting` (NDVI with class 3/4 returns, `measured`), `parkfloor` (the ground under crowns inside a KK park polygon, `inferred`). Cut by buildings, KK pavements and lakes. `canopy` is the class 5 footprint (audit only). `stats` carries the areas and the NDVI threshold. The engine appends `surfaces` to cph-surfaces' `surfaces`; `grass` draws as ground (`js/surface-materials-cph.js`) and carries the tufts of `js/grass-cph.js`.
+Separate file, same local frame. `surfaces` are polygons in the `cph-surfaces` record shape (`ring`, optional `holes`, `src`, `conf`) with `cls: "grass"` and `kind`: `lawn` (CIR NDVI above the hard-ground 97th percentile, no class 5 above, no class 3/4 returns, `measured`), `planting` (NDVI with class 3/4 returns, `measured`), `parkfloor` (the ground under crowns inside a KK park polygon, `inferred`). Cut by buildings, KK pavements and lakes. `canopy` is the class 5 footprint (audit only). `stats` carries the areas and the NDVI threshold. The engine appends `surfaces` to cph-surfaces' `surfaces`; `grass` draws as ground (`js/surface-materials.js`) and carries the tufts of `js/grass.js`.
 
-## Ground-floor venues (`data/cph-groundfloor.json`, `cph-groundfloor/1`, `tools/cph-geodata/groundfloor.py`)
+## Ground-floor venues (`data/cph-groundfloor.json`, `cph-groundfloor/1`, `tools/geodata/groundfloor.py`)
 
 `venues[]`: `{x, z, kind, name, src, conf}` in the local frame; `kind` is `food | grocery | shop | service | craft | hotel | office`. Sources: OSM
 Overpass (`shop=*`, food/drink and service `amenity`, `craft`, public offices, hotels; ODbL) and the KK `bevillinger` layer (serveringsbevillinger,
@@ -170,7 +170,7 @@ street-facing wall, `entry` for a residential street front with a door, `rear` f
 neighbouring footprint, `blank` for outbuildings) and the facade shader reads it as `facadeBldg.y`. BBR trade use (3xx) without venue data gives an
 inferred shop. The file is optional: without it only BBR trade use makes shopfronts.
 
-## Building entrances (`data/cph-entrances.json`, `cph-entrances/1`, `tools/cph-geodata/entrances.py`)
+## Building entrances (`data/cph-entrances.json`, `cph-entrances/1`, `tools/geodata/entrances.py`)
 
 DAR (Datafordeler) `husnummer.adgangspunkt` is the entrance point of an address; `vejpunkt` the road access point. The compiler lists the
 husnumre of every street (`vejmidte`) found next to a twin building, keeps the gaeldende ones (status 3) and links each to a building by
@@ -189,7 +189,7 @@ The engine (`js/entrances.js`) builds a door (opaque leaf, frame, step, small ca
 (`facadeBldg.y = kind + 0.25`); a building without entrance data keeps the heuristic door and the info panel labels it `heuristic / inferred`.
 `?debug=nodoors` loads without the file (before/after shots).
 
-## Photo facade look atlases (`data/tex-look/*.webp`, `tools/cph-geodata/facade_look.py`)
+## Photo facade look atlases (`data/tex-look/*.webp`, `tools/geodata/facade_look.py`)
 
 Derived from `data/tex/` (gitignored like it): RGBA WebP, same layout as the JPEG atlas (`observed.atlas.walls[].px/uv` are unchanged). RGB is the
 de-lit, shadow-divided, sharpened strip normalised to the calibrated `tone_cal`; alpha is lossless: 0 unobserved texel (nearest-texel smear or flat
@@ -199,7 +199,7 @@ inside a detected window blob. `?tex=0` turns photo walls off, `?debug=notex` to
 Source imagery: Skråfoto 2023 and 2025 from Styrelsen for Dataforsyning og Infrastruktur, retrieved October 2026. The WebP atlases are derived from those photos and are included in the public site artifact with attribution.
 
 
-### Tree canopy enrichment (`tools/cph-geodata/tree_canopy.py`)
+### Tree canopy enrichment (`tools/geodata/tree_canopy.py`)
 
 Run after `furniture.py`. This is an additive, cached-only post-pass; it does not
 fetch imagery or change other furniture arrays. It uses the `ortho.py` CIR method
@@ -240,19 +240,19 @@ are `dhm:punktsky:class5` and `geodanmark:orto_foraar_cir:2025-04-27`; new trees
 `conf: observed`, field-level confidence, and `licence: Klimadatastyrelsen frie data`.
 The document's attribution includes GeoDanmark orthophoto and DHM Punktsky.
 
-Regenerate with `uv run tools/cph-geodata/tree_canopy.py`. Raw inputs remain read-only.
+Regenerate with `uv run tools/geodata/tree_canopy.py`. Raw inputs remain read-only.
 The derived height cache defaults to `.context/tree-heights.npz`; `--height-cache`
 can select another writable scratch path.
 
-## Tiles (`cph-tiles/1`, `tools/cph-geodata/tile_split.py`, `js/tile-store.js`)
+## Tiles (`cph-tiles/1`, `tools/geodata/tile_split.py`, `js/tile-store.js`)
 
-Generated from the layer files above, gitignored (about 40 MB); the engine reads `data/tiles/index.json` when it exists and the monolithic `data/cph-*.json` otherwise (`?debug=notiles` forces the monolithic path). Regenerate with `uv run tools/cph-geodata/tile_split.py`.
+Generated from the layer files above, gitignored (about 40 MB); the engine reads `data/tiles/index.json` when it exists and the monolithic `data/cph-*.json` otherwise (`?debug=notiles` forces the monolithic path). Regenerate with `uv run tools/geodata/tile_split.py`.
 
 - Grid: fixed 500 m in EPSG:25832, id `<floor(E/500)>_<floor(N/500)>` (`frame.py`, `js/tile-grid.js`); four tiles fill one 1 km DHM / LoD2 cell. The district touches 4 x 4 tiles (`1110_12644` .. `1113_12647`).
 - `data/tiles/index.json`: `{version, tileSize, frame, city: {meta, roadgraph, streets, lakes}, tiles: {id: {utm, local, layers: {name: bytes}, counts, bytes}}}`.
 - `data/tiles/<id>/<layer>.json`, each `{tile, ord, ...lists}`: `buildings` (geodata buildings), `roads` (roads, cycleTracks, sidewalks, water, parks, `points.<kind>`), `surfaces` (surfaces, markings), `furniture` (the cph-furniture lists), `vegetation` (surfaces, canopy), `entrances` (entrances, stairwells), `groundfloor` (venues), `terrain` (`chunk`: int16 cm cells owned by the tile, base64, plus per-building ground levels), `lod2` (+ `lod2.bin`: that tile's roofer records, offsets relative to the tile file).
 - Ownership is by centroid (bbox centre of a ring or polyline, x/z of a point); nothing is split, so an item may stick out of its tile. Terrain is owned by cell centre. Entrances, stairwells, per-building terrain levels and LoD2 records follow their building.
-- `ord[list]` is each item's index in the source list; assembling every tile restores the source documents exactly (tested in `tools/cph-geodata/tests/test_tile_split.py` and `tests/tile-store.test.mjs`).
+- `ord[list]` is each item's index in the source list; assembling every tile restores the source documents exactly (tested in `tools/geodata/tests/test_tile_split.py` and `tests/tile-store.test.mjs`).
 - `data/city/meta.json` holds what is not tile-owned (versions, frames, attributions, stats, terrain header and `cut`, heroes, appearance, `lod2` header); `data/city/roadgraph.json` is the citywide road graph; `streets.json` and `lakes.json` are copies of `cph-streets.json` and `cph-lakes.json`.
 - Compiler steps take `--bbox MINE MINN MAXE MAXN` or `--tile <id>` (repeatable) for an area other than the district; the raw cache then goes to `data/raw/areas/<bbox>/` and `--out` is required.
 

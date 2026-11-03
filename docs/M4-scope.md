@@ -2,7 +2,7 @@
 
 Sources: `docs/research/open-data-static.md` and `docs/research/open-data-live.md`. Both sweeps were checked with live queries over the bbox on 2026-10-25.
 
-M4 is ranked by visual or simulation impact per unit of effort. Data goes through `tools/cph-geodata` (the contract in `cph-geodata-schema.md`, additive fields only). Live feeds are fetched at runtime by a small `js/live/` layer, with a cached fallback in `data/live-cache/`.
+M4 is ranked by visual or simulation impact per unit of effort. Data goes through `tools/geodata` (the contract in `cph-geodata-schema.md`, additive fields only). Live feeds are fetched at runtime by a small `js/live/` layer, with a cached fallback in `data/live-cache/`.
 
 ## M4a: compiler additions (static)
 

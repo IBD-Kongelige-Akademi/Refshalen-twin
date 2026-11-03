@@ -12,7 +12,7 @@ const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) **
 const toLinear = (rgb) => rgb.map(srgbToLinear);
 const isRgb = (t) => Array.isArray(t) && t.length === 3 && t.every(Number.isFinite);
 
-// Calibrated wall tones (tools/cph-geodata/appearance_calibrate.py adds `tone_cal`): used when present. `?debug=nocal`
+// Calibrated wall tones (tools/geodata/appearance_calibrate.py adds `tone_cal`): used when present. `?debug=nocal`
 // (setCalibration(false)) shows the raw photogrammetric tones for before/after comparisons.
 let useCalibrated = true;
 const setCalibration = (on) => { useCalibrated = !!on; };
@@ -196,7 +196,7 @@ function clipPolygon(poly, lo, hi, hMax) {
  * cleaned edge's endpoints, its eave and the roofer wall triangles above that eave (gables, steps); `mapping` is mapObservedEdges'
  * result. Each quad spans the part of the cleaned edge covered by the raw edge whose strip is used, from the ground to the eave; the
  * pieces on that span get the same strip (the strip is cut from the ground up to `h_m`, which covers the gables since the atlases are
- * cut in the engine's wall frame: tools/cph-geodata/engine_walls.py; a piece above `h_m` is clipped there). Returns flat arrays
+ * cut in the engine's wall frame: tools/geodata/engine_walls.py; a piece above `h_m` is clipped there). Returns flat arrays
  * { position, normal, uv, wallUV, index } (uv in texture space, v down as in the JPEG) and the number of quads, or null when no strip is
  * usable.
  */

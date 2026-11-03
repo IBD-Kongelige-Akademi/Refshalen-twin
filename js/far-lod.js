@@ -6,7 +6,7 @@ import { SEA_LEVEL_LOCAL } from './tile-grid.js';
 
 // js/far-lod.js
 // The far ring (docs/citywide-plan.md, C5): everything beyond the tiles the streamer keeps resident. One compact citywide layer
-// (data/city/far.bin + far.json, tools/cph-geodata/far_lod.py) is loaded once; per tile it becomes two cheap meshes (merged
+// (data/city/far.bin + far.json, tools/geodata/far_lod.py) is loaded once; per tile it becomes two cheap meshes (merged
 // prisms for the buildings, a 16 x 16 ground grid) built when the tile comes within `range` of the camera and hidden while the
 // tile is resident near or mid. Beside them: the city's water polygons (lakes, ponds, the harbour) at their levels and one sea
 // plane out to the horizon.

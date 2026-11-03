@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { attribute, positionWorld, vec3, fract, sin, dot, mix, step } from 'three/tsl';
-import { createLakeWallMaterial } from './water-cph.js';
-import { WATER } from './lakes-cph.js';
+import { createLakeWallMaterial } from './water.js';
+import { WATER } from './lakes.js';
 import { buildBridgeDLBGeometry } from './bridge-dlb-geometry.js';
 
 const standard = (options) => new THREE.MeshStandardNodeMaterial(options);

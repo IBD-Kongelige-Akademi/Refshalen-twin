@@ -108,13 +108,13 @@ def surface_views():
     out['aerial-close'] = ([60, 120, 150], [30, 0, -60], 55)
     return out
 def fix_views():
-    """Camera setups for the M4 surface-fix shots (positions from the compiled data: see tests/junction-mouths-cph.test.mjs)."""
+    """Camera setups for the M4 surface-fix shots (positions from the compiled data: see tests/junction-mouths.test.mjs)."""
     out = {}
     mx, mz, dx, dz = 52.6, -95.0, 0.90, 0.43  # Kjeld Langes Gade opening on Nørre Søgade
     out['mouth-norre-sogade'] = ([mx + dx * 16, 7, mz + dz * 16], [mx, 0, mz], 62)
     out['mouth-norre-sogade-low'] = ([mx + dx * 9 + dz * 3, 1.8, mz + dz * 9 - dx * 3], [mx, 0.1, mz], 70)
     out['mouth-norre-sogade-aerial'] = ([mx + 12, 45, mz + 20], [mx, 0, mz], 55)
-    # facade sett strip: the longest strip near the teleport (see tests/surface-fixes-cph.test.mjs facadeStrips)
+    # facade sett strip: the longest strip near the teleport (see tests/surface-fixes.test.mjs facadeStrips)
     ux, uz, nx, nz, mx, mz = 0.903, 0.43, 0.43, -0.9, 71.3, -80.7
     out['facade-setts'] = ([mx + nx * 1.9 - ux * 2.4, 0.95, mz + nz * 1.9 - uz * 2.4], [mx + ux * 3, 0.2, mz + uz * 3], 62)
     out['facade-setts-down'] = ([mx + nx * 1.1, 1.7, mz + nz * 1.1], [mx + ux * 0.8 - nx * 0.2, 0.2, mz + uz * 0.8 - nz * 0.2], 70)

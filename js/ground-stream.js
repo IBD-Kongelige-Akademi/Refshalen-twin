@@ -1,11 +1,11 @@
 import * as THREE from 'three/webgpu';
-import { buildTerrainMeshArrays, buildTileGroundArrays, cutTouchesRegion, TERRAIN_MESH_DROP } from './terrain-cph.js';
+import { buildTerrainMeshArrays, buildTileGroundArrays, cutTouchesRegion, TERRAIN_MESH_DROP } from './terrain.js';
 import { getDataBbox } from './city-config.js';
 import { disposeTree } from './dispose-tree.js';
 
 // js/ground-stream.js
 // The ground of the streamed city. The district's ground mesh (a 4 m grid cut open over the lakes, plus the frame polygon out
-// to the horizon, js/terrain-cph.js buildTerrainMeshArrays) is cut into tiles: a tile mesh holds the grid cells whose centre lies
+// to the horizon, js/terrain.js buildTerrainMeshArrays) is cut into tiles: a tile mesh holds the grid cells whose centre lies
 // in the tile (neighbouring tiles share their edge nodes, so there is no crack), 4 m cells in the near ring and where the lakes
 // cut, 8 m cells in the mid ring. The frame polygon is built once. A tile of the index that is not resident gets a flat quad at
 // the datum, so the ground outside the loaded rings stays sane (it also hides the lakes there: water is a global layer for now).
@@ -68,7 +68,7 @@ export function createGroundLayer(scene, { terrain, material, size = 8000, tileB
     addTile(id, bounds, { near = true, tileCut = null } = {}) {
       this.removeTile(id);
       if (generic) {
-        // `tileCut`: the water cut of this tile (the `water` layer, tools/cph-geodata/city_water.py): meshed at the fine lattice
+        // `tileCut`: the water cut of this tile (the `water` layer, tools/geodata/city_water.py): meshed at the fine lattice
         const mesh = toMesh(buildTileGroundArrays(terrain, { cut, tileCut, region: bounds, step: near || tileCut || cutTouchesRegion(cut, bounds) ? 1 : 2, uvSize: size }), `ground-${id}`);
         group.add(mesh);
         tiles.set(id, mesh);

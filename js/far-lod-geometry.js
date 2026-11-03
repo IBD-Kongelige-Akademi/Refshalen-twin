@@ -1,6 +1,6 @@
 // js/far-lod-geometry.js
 // The geometry side of the far ring (docs/citywide-plan.md, C5). Pure: no three.js, no fetch, so it runs in node (the tests) and
-// could run in a worker. Reads the blocks tools/cph-geodata/far_lod.py writes into data/city/far.bin (the layout is in its
+// could run in a worker. Reads the blocks tools/geodata/far_lod.py writes into data/city/far.bin (the layout is in its
 // docstring) and builds typed arrays:
 //   farTileArrays(buf, off, len, { wall, roof })  the merged prisms of one tile: walls and flat roofs, one tone per face group
 //   farGroundArrays(buf, off, len, bounds)         the tile's 16 x 16 ground grid, coloured water / park / urban by height and the park bits

@@ -9,8 +9,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { buildRoadIndex, bikeCheck, edgeCheck, laneRule } from './oneway-check.mjs';
 import { alongRoad, bikeBanned, carDirection, hasContraflow, stripDirection } from '../../js/bike-direction.js';
-import { applyStreets } from '../../js/layout-cph.js';
-import { cycleStrips } from '../../js/road-width-cph.js';
+import { applyStreets } from '../../js/layout.js';
+import { cycleStrips } from '../../js/road-width.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const arg = (k, d) => { const i = process.argv.indexOf(`--${k}`); return i > 0 ? process.argv[i + 1] : d; };

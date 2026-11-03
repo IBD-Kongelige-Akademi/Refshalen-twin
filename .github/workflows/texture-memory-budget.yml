@@ -31,4 +31,4 @@ jobs:
       - name: Check static instance compaction
         run: node --test tests/static-instance-cache.test.mjs
       - name: Check collision geometry and actor interactions
-        run: node --test tests/collision-shapes.test.mjs tests/static-colliders.test.mjs tests/city-collisions.test.mjs tests/collisions-city.test.mjs tests/controllers.test.cjs tests/traffic.test.cjs tests/traffic-performance.test.cjs tests/cph-boot.test.cjs tests/goboat-navigation.test.mjs tests/goboat-harbour.test.mjs
+        run: node --test tests/collision-shapes.test.mjs tests/static-colliders.test.mjs tests/city-collisions.test.mjs tests/collisions-city.test.mjs tests/controllers.test.cjs tests/traffic.test.cjs tests/traffic-performance.test.cjs tests/city-boot.test.cjs tests/goboat-navigation.test.mjs tests/goboat-harbour.test.mjs

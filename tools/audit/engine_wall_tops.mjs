@@ -2,14 +2,14 @@
 // (the key of the appearance atlas strips) the ground and the top of the cleaned wall it lands on (js/building-geometry.js
 // addBuilding opts.quads: the roofer LoD2 eave of that edge, or the DSM/BBR eave, and the roofer wall pieces above it), as the tile streamer assembles a building
 // (js/tile-data.js buildings(): street-layout footprint fixes, terrain ground; js/buildings-real.js: no LoD2 for a fixed footprint).
-// The atlas pipeline's Python port (tools/cph-geodata/engine_walls.py) is checked against this dump.
+// The atlas pipeline's Python port (tools/geodata/engine_walls.py) is checked against this dump.
 // Usage: node tools/audit/engine_wall_tops.mjs <tiles dir> <tile id> [...tile ids] > out.json
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createAccumulator, addBuilding, cleanRing } from '../../js/building-geometry.js';
 import { mapObservedEdges } from '../../js/appearance.js';
 import { parseLod2Record } from '../../js/lod2-geometry.js';
-import { applyStreets, applyTerrainGround } from '../../js/layout-cph.js';
+import { applyStreets, applyTerrainGround } from '../../js/layout.js';
 
 const [tilesDir, ...tiles] = process.argv.slice(2);
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'));

@@ -1,7 +1,7 @@
 // js/city-config.js
 // Aalborg spatial configuration: the local frame, the playable bounds and the teleport presets the engine core
 // (controllers, cameras, materials, gamepad) relies on. The frame follows docs/cph-geodata-schema.md and mirrors
-// tools/cph-geodata/frame.py (keep the two in step).
+// tools/geodata/frame.py (keep the two in step).
 //
 // Local frame: 1 unit = 1 m, x = east, z = south (north = -z), y up. Source CRS EPSG:25832, vertical DVR90.
 //   x = E - origin[0];  z = -(N - origin[1]);  y = DVR90 - origin[2]

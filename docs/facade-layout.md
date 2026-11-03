@@ -2,7 +2,7 @@
 
 Up close (under 45 m, `js/facade-lod.js PHOTO.close0`) every facade is the procedural one. Until now that facade guessed its window grid from the storey count and a preset bay width, so up close a building showed windows where the real ones are not. The facade photos fade in only between 45 and 80 m. A building with a Skråfoto atlas now gets a window grid fitted to that photo. The procedural shader draws the windows, doors and shopfronts at the measured columns and storeys, and the photo crossfade puts its own windows on top of them.
 
-Step 1 of the better-buildings plan. The data is a tile layer (`windows`). The extractor is `tools/cph-geodata/facade_layout.py`, and the checks are `tools/cph-geodata/facade_layout_check.py`. The engine pieces are `js/facade-layout.js`, `js/building-geometry.js` (vertex words) and `js/tsl-materials.js facadeCell`.
+Step 1 of the better-buildings plan. The data is a tile layer (`windows`). The extractor is `tools/geodata/facade_layout.py`, and the checks are `tools/geodata/facade_layout_check.py`. The engine pieces are `js/facade-layout.js`, `js/building-geometry.js` (vertex words) and `js/tsl-materials.js facadeCell`.
 
 ## Extraction
 
@@ -60,7 +60,7 @@ A change that an older engine would misread gets a new format number. The engine
 
 ## Accuracy
 
-Measured with `tools/cph-geodata/facade_layout_check.py`.
+Measured with `tools/geodata/facade_layout_check.py`.
 
 **Nyhavn 9–17 against the photo-traced fronts** (`nyhavn`): 80 traced openings (81 without the one round window). An opening counts as found when it matches a drawn opening one to one at IoU ≥ 0.5 (or ≥ 0.3). The traced fronts come from street photos registered by hand. On two fronts they sit 0.5 to 1.1 m off the atlas: the cream front is traced 1.1 m higher and with taller storeys than the Skråfoto strip shows. So the table also gives the score after the best rigid shift of each traced front (within ±2 m). The engine draws the atlas frame, so for the crossfade the atlas is the reference.
 

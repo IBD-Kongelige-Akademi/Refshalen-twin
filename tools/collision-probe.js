@@ -399,7 +399,7 @@
       { controllerColliders: controller.colliders?.length ?? null });
     for (const spot of spots) {
       await goto({ ...spot, mode: 'person', warm: 90, dt });
-      // the lamp solids are the drawn poles (js/street-furniture-cph.js): a mast, or a wire lamp without its wire on a tube pole, is
+      // the lamp solids are the drawn poles (js/street-furniture.js): a mast, or a wire lamp without its wire on a tube pole, is
       // solid; a lamp hanging from its wire is not. Over every resident tile, both ways.
       const plan = world.furniture?.plan?.lamps || [];
       const keyOf = (x, z) => `${Math.round(x * 100)}:${Math.round(z * 100)}`;

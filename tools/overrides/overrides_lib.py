@@ -53,7 +53,7 @@ class TwinFrame:
             self._buildings[tid] = {b['id']: b for b in json.loads(p.read_text())['buildings']} if p.exists() else {}
         return self._buildings[tid]
 
-    # terrain: the stream terrain's sampler (js/terrain-cph.js createChunkSampler): cell centres, bilinear, 0 where no chunk
+    # terrain: the stream terrain's sampler (js/terrain.js createChunkSampler): cell centres, bilinear, 0 where no chunk
     def _chunk(self, tid):
         if tid not in self._terrain:
             p = self.data / 'tiles' / tid / 'terrain.json'

@@ -1,4 +1,4 @@
-import { pointInRing } from './polygon-cph.js';
+import { pointInRing } from './polygon.js';
 
 // Kaffesalonen's floating dock, OSM way 146419897, in the Copenhagen local frame.
 export const SWAN_PIER_RING = Object.freeze([

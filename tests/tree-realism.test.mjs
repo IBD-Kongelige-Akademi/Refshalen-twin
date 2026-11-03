@@ -3,9 +3,9 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import * as data from '../js/street-furniture-data.js';
 import * as season from '../js/tree-season.js';
-import { resolveGenus } from '../js/tree-species-cph.js';
+import { resolveGenus } from '../js/tree-species.js';
 import { treeCapacities, originalTreeBudget, selectTreeDraws, treeVertexBufferCount } from '../js/tree-budget.js';
-import { groundField, lakeDistanceFrom } from '../js/ground-field-cph.js';
+import { groundField, lakeDistanceFrom } from '../js/ground-field.js';
 import { loadTreeGeometry, loadTreeShadow } from './helpers/tree-geometry.cjs';
 
 const read = name => JSON.parse(readFileSync(new URL(`./fixtures/cph/${name}.json`, import.meta.url)));

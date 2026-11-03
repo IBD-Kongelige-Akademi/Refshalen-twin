@@ -1,7 +1,7 @@
 // js/street-furniture-data.js
 // Street furniture of the Copenhagen twin, as pure data (no three.js, headless-testable): maps data/cph-furniture.json
-// (tools/cph-geodata/furniture.py) to placed items with a ground height, derives the parked cars, bikes, bus-stop
-// parts and wire spans, and indexes everything in quadtrees for the radius queries js/street-furniture-cph.js runs.
+// (tools/geodata/furniture.py) to placed items with a ground height, derives the parked cars, bikes, bus-stop
+// parts and wire spans, and indexes everything in quadtrees for the radius queries js/street-furniture.js runs.
 // Frame: x east, z south, y up. `yaw` is the direction an item faces: model +z -> (sin yaw, cos yaw), i.e. rotation.y.
 
 import { Quadtree } from './quadtree.js';
@@ -122,7 +122,7 @@ export function crownOf(height, crownRadius, style) {
 export function mapTrees(trees, groundHeight, { resolve = null } = {}) {
   const out = [];
   for (const t of trees || []) {
-    // `resolve(tree) -> { genus, source }` gives the laser-detected crowns without a species a context default (tree-species-cph.js)
+    // `resolve(tree) -> { genus, source }` gives the laser-detected crowns without a species a context default (tree-species.js)
     const r = resolve ? resolve(t) : null;
     const genus = r ? r.genus : t.genus;
     const style = treeStyle(genus);
@@ -179,7 +179,7 @@ export function wireSpan(span, lamp, base, segments = 10, endGround = null, anch
   const [ax, az, bx, bz] = span;
   const len = Math.hypot(bx - ax, bz - az) || 1;
   const t = Math.max(0.08, Math.min(0.92, ((lamp.x - ax) * (bx - ax) + (lamp.z - az) * (bz - az)) / (len * len)));
-  // each anchor hangs WIRE_ANCHOR_Y over the ground at ITS facade (the street rises and falls: js/terrain-cph.js)
+  // each anchor hangs WIRE_ANCHOR_Y over the ground at ITS facade (the street rises and falls: js/terrain.js)
   const hA = (endGround ? endGround[0] - base : 0) + (anchorH ? anchorH[0] : WIRE_ANCHOR_Y) + (hash2(ax, az, 3) - 0.5) * 0.6;
   const hB = (endGround ? endGround[1] - base : 0) + (anchorH ? anchorH[1] : WIRE_ANCHOR_Y) + (hash2(bx, bz, 3) - 0.5) * 0.6;
   const sag = Math.max(0.25, len * WIRE_SAG_RATIO);
@@ -343,7 +343,7 @@ const place_ = (items, groundHeight) =>
 
 /** All placed furniture of the document, with ground heights. */
 export function buildFurniturePlan(doc, groundHeight = null, { seed = 1, place = null, resolveTree = null } = {}) {
-  // `place(doc)` re-places the items against the street layout (js/placement-cph.js placeFurniture); its report rides along
+  // `place(doc)` re-places the items against the street layout (js/placement.js placeFurniture); its report rides along
   let report = null;
   if (place) {
     const placed = place(doc);

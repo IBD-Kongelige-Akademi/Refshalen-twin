@@ -3,18 +3,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
-import { buildTileWaterArrays } from '../js/water-tiles-cph.js';
-import { buildTileGroundArrays } from '../js/terrain-cph.js';
-import { pointInRing } from '../js/polygon-cph.js';
+import { buildTileWaterArrays } from '../js/water-tiles.js';
+import { buildTileGroundArrays } from '../js/terrain.js';
+import { pointInRing } from '../js/polygon.js';
 import { tileOfLocal, tileBoundsLocal } from '../js/tile-grid.js';
 
-// The citywide water data (tools/cph-geodata/city_water.py): runs against data/city + data/tiles when they hold it, otherwise skipped.
+// The citywide water data (tools/geodata/city_water.py): runs against data/city + data/tiles when they hold it, otherwise skipped.
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const headerPath = path.join(ROOT, 'data/city/water.json');
 const have = fs.existsSync(headerPath) && fs.existsSync(path.join(ROOT, 'data/city/post.json'));
 const header = have ? JSON.parse(fs.readFileSync(headerPath, 'utf8')) : null;
 const layer = (id) => JSON.parse(fs.readFileSync(path.join(ROOT, 'data/tiles', id, 'water.json'), 'utf8'));
-const skip = !have && 'run uv run tools/cph-geodata/city_water.py after the tile compiler';
+const skip = !have && 'run uv run tools/geodata/city_water.py after the tile compiler';
 
 test('the header: levels per body, the sea level, the Soerne override with the district levels', { skip }, () => {
   assert.equal(header.version, 'cph-water/1');

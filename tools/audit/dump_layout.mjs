@@ -1,23 +1,23 @@
 // Dumps the runtime layout the engine derives from the data files, using the engine's own pure modules:
-// carriageway half-widths (road-width-cph.js), cycle-track sides, the ground-height field (road-surfaces-cph.js), the
+// carriageway half-widths (road-width.js), cycle-track sides, the ground-height field (road-surfaces.js), the
 // placed street-furniture plan (street-furniture-data.js: parked cars, lamps with wire spans, props, trees) and a few
 // height-profile probes. Output: JSON consumed by tools/audit/audit.py.
 // Usage: node tools/audit/dump_layout.mjs [out.json]
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import * as widthMod from '../../js/road-width-cph.js';
-import { vehicularRoads, buildGroundHeightField, cycleTrackIndex, buildRoadSurfaceArrays } from '../../js/road-surfaces-cph.js';
+import * as widthMod from '../../js/road-width.js';
+import { vehicularRoads, buildGroundHeightField, cycleTrackIndex, buildRoadSurfaceArrays } from '../../js/road-surfaces.js';
 
 const { carriagewayWidth } = widthMod;
 import { buildFurniturePlan } from '../../js/street-furniture-data.js';
 
 // The terrain / layout modules are optional so this dump can also measure an older engine (the "before" numbers).
 const optional = (p) => import(p).catch(() => null);
-const terrainMod = await optional('../../js/terrain-cph.js');
-const layoutMod = await optional('../../js/layout-cph.js');
-const zonesMod = await optional('../../js/zones-cph.js');
-const placeMod = await optional('../../js/placement-cph.js');
+const terrainMod = await optional('../../js/terrain.js');
+const layoutMod = await optional('../../js/layout.js');
+const zonesMod = await optional('../../js/zones.js');
+const placeMod = await optional('../../js/placement.js');
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const out = process.argv[2] || resolve(root, 'tools/audit/out/layout.json');
@@ -56,10 +56,10 @@ for (const r of geo.roads) {
   });
 }
 
-// lake walls: height of the wall top over the water at every shore vertex (js/lakes-cph.js), measured level per lake
+// lake walls: height of the wall top over the water at every shore vertex (js/lakes.js), measured level per lake
 let lakeWalls = null;
 if (terrain && !terrain.flat) {
-  const { buildLakeArrays } = await import('../../js/lakes-cph.js');
+  const { buildLakeArrays } = await import('../../js/lakes.js');
   const arrays = buildLakeArrays(read('data/cph-lakes.json'), { terrain });
   lakeWalls = { level: arrays.level, freeboards: arrays.freeboards.map((f) => ({ id: f.id, x: +f.x.toFixed(1), z: +f.z.toFixed(1), free: +f.free.toFixed(2), natural: !!f.natural, abutment: !!f.abutment })), basins: arrays.basins };
 }
@@ -68,12 +68,12 @@ if (terrain && !terrain.flat) {
 let zones = null;
 if (zonesMod && placeMod && streetsDoc) {
   const lakesDoc = read('data/cph-lakes.json');
-  const { applySurfaceCuts } = await import('../../js/lakes-cph.js');
+  const { applySurfaceCuts } = await import('../../js/lakes.js');
   zones = zonesMod.createZoneMap({ geo, lakes: lakesDoc, surfaces: applySurfaceCuts(surfaces, layoutMod.mergeSurfaceCuts(lakesDoc.surface_cuts, geo.surfaceCuts)) });
 }
-// untyped crowns get the context genus the engine gives them (js/tree-species-cph.js; the Soerne avenues are lime / chestnut)
-const { resolveGenus } = await import('../../js/tree-species-cph.js').catch(() => ({}));
-const { groundField, lakeDistanceFrom } = await import('../../js/ground-field-cph.js').catch(() => ({}));
+// untyped crowns get the context genus the engine gives them (js/tree-species.js; the Soerne avenues are lime / chestnut)
+const { resolveGenus } = await import('../../js/tree-species.js').catch(() => ({}));
+const { groundField, lakeDistanceFrom } = await import('../../js/ground-field.js').catch(() => ({}));
 const lakeDistance = groundField ? lakeDistanceFrom(groundField(read('data/cph-lakes.json'), [])) : null;
 const plan = buildFurniturePlan(furniture, ground, { seed: 1, place: zones ? (d) => placeMod.placeFurniture(d, { zones, geo }) : null, resolveTree: resolveGenus ? (t) => resolveGenus(t, { lakeDistance }) : null });
 const slim = (list, keys) => list.map((i) => Object.fromEntries(keys.map((k) => [k, i[k]])));

@@ -305,7 +305,7 @@ function selectPhotoSet(candidates, x, z, p = PHOTO, currentTiers = new Map(), y
   return { want, qualityById, residentBytes, density, inRange };
 }
 
-/** Atlas file the photo walls are read from: the processed RGBA look atlas (tools/cph-geodata/facade_look.py) first. */
+/** Atlas file the photo walls are read from: the processed RGBA look atlas (tools/geodata/facade_look.py) first. */
 const lookFile = (file) => file.replace(/^tex\//, 'tex-look/').replace(/\.jpe?g$/i, '.webp');
 
 const bytesOf = (entry) => entry?.bytes || 0;

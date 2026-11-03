@@ -52,7 +52,7 @@ function keyboardHarness(overrides = {}, moduleImports = {}) {
       './goboat.js': { createGoBoat: () => ({ group: {} }) },
       './goboat-piers.js': { createGoBoatPiers: () => null, normalizeGoBoatPierRecords: records => records, GOBOAT_PIER_RECORDS: [] },
       './goboat-navigation.js': goBoatNavigationModule,
-      './lakes-cph.js': { WATER: { surfaceY: -0.8 } },
+      './lakes.js': { WATER: { surfaceY: -0.8 } },
       './pedestrians.js': {},
       './vehicle-lights.js': {},
       './collision-shapes.js': collisionShapesModule,

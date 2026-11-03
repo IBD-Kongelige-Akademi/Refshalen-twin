@@ -25,7 +25,7 @@ import {
   confineSwanMotion,
   createSwanNavigation
 } from './swan-navigation.js';
-import { WATER } from './lakes-cph.js';
+import { WATER } from './lakes.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import { collisionBody, buildingContact } from './collision-shapes.js';

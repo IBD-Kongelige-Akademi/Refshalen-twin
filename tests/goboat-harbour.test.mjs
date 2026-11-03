@@ -5,7 +5,7 @@ import { createGoBoatNavigation, confineGoBoatMotion, goBoatWaterFromCity, point
 import { GOBOAT_PIER_RECORDS, normalizeGoBoatPierRecords, makeFleetLayout, boatRing, isGoBoatPierBuilding } from '../js/goboat-pier-data.js';
 import { tileOfLocal, tileBoundsLocal } from '../js/tile-grid.js';
 
-// The real harbour (R2 v3 data, tools/cph-geodata/city_water.py): the sea-level `far` pieces of data/city/water.json for the inner harbour
+// The real harbour (R2 v3 data, tools/geodata/city_water.py): the sea-level `far` pieces of data/city/water.json for the inner harbour
 // tiles, and the full-resolution water layers (polys only) of the tiles around the Islands Brygge pier, Langebro and Christianshavn.
 const fixture = JSON.parse(fs.readFileSync(new URL('./fixtures/goboat-harbour.json', import.meta.url), 'utf8'));
 const tileGrid = { tileOf: tileOfLocal, boundsOf: tileBoundsLocal };

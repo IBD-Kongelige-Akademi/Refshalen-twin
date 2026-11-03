@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 import { mrt, output, normalView, vec2, roughness } from 'three/tsl';
-import * as T from '../js/tree-geometry-cph.js';
+import * as T from '../js/tree-geometry.js';
 import { treeVertexBufferCount } from '../js/tree-budget.js';
 import { TREE_STYLES } from '../js/street-furniture-data.js';
 

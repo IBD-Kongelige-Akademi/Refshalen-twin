@@ -1,9 +1,9 @@
-// Kerbs inside carriageways: samples every kerb line the engine builds (road-surfaces-cph.js, kerb layer `runs`) and flags
+// Kerbs inside carriageways: samples every kerb line the engine builds (road-surfaces.js, kerb layer `runs`) and flags
 // the samples that lie deeper than `depth` m inside a vehicular carriageway, measured against the asphalt quads the engine
 // draws (createCarriagewayIndex: inside a quad and farther than `depth` from both of its kerb-side edges). Pure; used by
-// tools/audit/kerbs.mjs and tests/kerbs-cph.test.mjs.
-import { rightNormals } from '../../js/road-width-cph.js';
-import { createCarriagewayIndex } from '../../js/road-surfaces-cph.js';
+// tools/audit/kerbs.mjs and tests/kerbs.test.mjs.
+import { rightNormals } from '../../js/road-width.js';
+import { createCarriagewayIndex } from '../../js/road-surfaces.js';
 
 /** Points along the kerb's centre line every `step` m: [{x, z, tx, tz}] (tx, tz = unit tangent). */
 export function kerbSamples(run, step = 1) {

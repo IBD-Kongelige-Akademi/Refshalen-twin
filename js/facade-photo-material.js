@@ -7,7 +7,7 @@ import { cityUniforms, apartmentOccupancy, apartmentLight, bumpNormal, canyonSky
 import { PHOTO } from './facade-lod.js';
 
 // js/facade-photo-material.js
-// Wall photos (the processed RGBA look atlases, tools/cph-geodata/facade_look.py) as a lit overlay on the extruded wall:
+// Wall photos (the processed RGBA look atlases, tools/geodata/facade_look.py) as a lit overlay on the extruded wall:
 //   rgb    de-lit photo, normalised to the calibrated tone (the base albedo); mapped through the same gain + soft shoulder as
 //          the procedural walls, so photo and procedural facades meet without a step in brightness
 //   alpha  0 = unobserved texel (the procedural wall shows through), 128 = observed wall, 255 = window blob. Inside a blob the

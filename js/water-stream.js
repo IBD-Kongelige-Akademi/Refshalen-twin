@@ -1,25 +1,25 @@
 import * as THREE from 'three/webgpu';
 import { uniform, NodeUpdateType } from 'three/tsl';
-import { createWaterMaterial, createLakeWallMaterial, patchPlanarReflector, toGeometry } from './water-cph.js';
-import { applyGroundWindow } from './ground-shader-cph.js';
-import { buildTileWaterArrays, shoreWindow, groundWindow, windowOrigin } from './water-tiles-cph.js';
+import { createWaterMaterial, createLakeWallMaterial, patchPlanarReflector, toGeometry } from './water.js';
+import { applyGroundWindow } from './ground-shader.js';
+import { buildTileWaterArrays, shoreWindow, groundWindow, windowOrigin } from './water-tiles.js';
 import { tileBoundsLocal, SEA_LEVEL_LOCAL } from './tile-grid.js';
 import { disposeTree } from './dispose-tree.js';
 import { sidePlanes, boxVisible } from './reflect-gate.js';
 
 // js/water-stream.js
 // The generic water of the streamed city (milestone C4): every harbour basin, canal, lake and pond that is not one of the Soerne. The `water`
-// layer of a tile (data/tiles/<id>/water.json, tools/cph-geodata/city_water.py, js/water-tiles-cph.js) becomes one water-surface mesh and one
+// layer of a tile (data/tiles/<id>/water.json, tools/geodata/city_water.py, js/water-tiles.js) becomes one water-surface mesh and one
 // shore-wall mesh (granite quay + coping, or a grassed bank) per tile, built with the tile and removed with it, all sharing ONE water material and
 // ONE wall material. The ground is cut open under the water by the ground layer (js/ground-stream.js reads the same payload).
 //
 // Shore field and ground raster follow the camera: the water shader's soft shoreline and the ground shader's grass / lake path read 1024 x 1024
-// window rasters (js/water-tiles-cph.js) re-made when the camera has moved 384 m or a tile came or went. The shoreline field is rasterised from the
+// window rasters (js/water-tiles.js) re-made when the camera has moved 384 m or a tile came or went. The shoreline field is rasterised from the
 // far-ring water pieces of the city header (`water.far`, every tile, always available), the green mask from the resident tiles' `green` polygons.
 //
 // Reflections: ONE planar reflector for all generic water, at the level of the water nearest to the camera (every other level reflects the sky
 // instead, see createWaterMaterial `window`); it only runs when water of this layer is within PLANAR_RANGE m of a camera below PLANAR_CEILING m,
-// `?water=simple` never. The Soerne (js/water-cph.js buildLakes) have their own reflector; the world arbitrates (one at a time).
+// `?water=simple` never. The Soerne (js/water.js buildLakes) have their own reflector; the world arbitrates (one at a time).
 
 const WINDOW_N = 1024;
 const WINDOW_CELL = 1.5;

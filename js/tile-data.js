@@ -11,8 +11,8 @@
 //                          street layout applied, from its `roads` and `streets` layers) and tileContext(id, ring)
 
 import { applyAppearance, createGeodataAssembler, createFurnitureAssembler, createSurfacesAssembler, createVegetationAssembler, createEntrancesAssembler, createVenuesAssembler } from './tile-store.js';
-import { applyStreets, applyTerrainGround, mergeSurfaceCuts } from './layout-cph.js';
-import { applySurfaceCuts } from './lakes-cph.js';
+import { applyStreets, applyTerrainGround, mergeSurfaceCuts } from './layout.js';
+import { applySurfaceCuts } from './lakes.js';
 import { tileOfLocal, tileBoundsLocal } from './tile-grid.js';
 import { neighbourIds } from './tile-rings.js';
 import { readOverrideLayer } from './detail-overrides.js';
@@ -34,7 +34,7 @@ export const ownerOfFlat = (flat) => (flat?.length >= 2 ? tileOfLocal(...bboxCen
 
 /**
  * The city document the tiles hang off: `meta.geodata` plus the road graph and empty lists (what the tiles bring is held per tile).
- * `graphFix` (the street layout's node moves, link widths and dropped links, indices of THIS graph; tools/cph-geodata/tile_streets.py
+ * `graphFix` (the street layout's node moves, link widths and dropped links, indices of THIS graph; tools/geodata/tile_streets.py
  * writes it for the citywide graph) is applied to the graph here.
  */
 export function createBaseGeo(meta, roadGraph, graphFix = null) {

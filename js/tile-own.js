@@ -1,7 +1,7 @@
 // js/tile-own.js
 // Tile builds read a CONTEXT document (the tile and the tiles around it, so junctions, kerbs, party walls and zones come out
 // the same as in the whole-district build) but may only EMIT geometry for the items the tile owns (ownership by centroid,
-// tools/cph-geodata/tile_split.py). `doc.own = { <list name>: Set<item> }` marks the owned items; a document without `own`
+// tools/geodata/tile_split.py). `doc.own = { <list name>: Set<item> }` marks the owned items; a document without `own`
 // (the district build, tests) owns everything.
 
 /** The items of `doc[key]` the build may emit. */

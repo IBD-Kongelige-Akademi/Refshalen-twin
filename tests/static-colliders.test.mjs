@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { buildStaticColliders, createStaticIndex } from '../js/static-colliders.js';
 import { buildingContact, collisionBody } from '../js/collision-shapes.js';
 import { createAccumulator, addBuilding } from '../js/building-geometry.js';
-import { createTerrain } from '../js/terrain-cph.js';
+import { createTerrain } from '../js/terrain.js';
 
 const square = (x0, z0, x1, z1) => [x0, z0, x1, z0, x1, z1, x0, z1];
 
@@ -92,7 +92,7 @@ test('furniture colliders use placed coordinates, solid trunks, thin poles, and 
     carSpecs: { estate: { width: 1.9, length: 4.8, height: 1.6 } }
   });
   assert.equal(colliders.length, 4, 'wire mounted luminaires do not invent a street-level pole');
-  // a wire lamp without wire geometry is drawn on a tube pole (js/street-furniture-cph.js): that pole is solid
+  // a wire lamp without wire geometry is drawn on a tube pole (js/street-furniture.js): that pole is solid
   const bracket = buildStaticColliders({}, { furniturePlan: { ...furniturePlan, lamps: [{ x: 20, y: 0, z: 4, mount: 'wire', wire: null, bracket: true }], cars: [], bollards: [], trees: [] } });
   assert.equal(bracket.length, 1);
   assert.equal(bracket[0].type, 'lamp');

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One Cloud Run Job task of the citywide Skraafoto appearance run (see tools/cph-geodata/appearance_city*.py).
+"""One Cloud Run Job task of the citywide Skraafoto appearance run (see tools/geodata/appearance_city*.py).
 
 MODE (env, per execution)
   tones     one 1 km cell per task (CLOUD_RUN_TASK_INDEX into $CELLS_URI): STAC + COG overview windows + DHM blocks + z-buffer + observations
@@ -30,7 +30,7 @@ from pathlib import Path
 
 APP = Path("/app") if Path("/app/tools").exists() else Path(__file__).resolve().parents[3]
 os.environ.setdefault("APPEARANCE_WORK", "/work")
-sys.path.insert(0, str(APP / "tools" / "cph-geodata"))
+sys.path.insert(0, str(APP / "tools" / "geodata"))
 
 from google.cloud import storage  # noqa: E402
 

@@ -40,9 +40,9 @@ PRICE_VCPU_S, PRICE_GIB_S = R.PRICE_VCPU_S, R.PRICE_GIB_S
 
 def stage(dest: Path) -> None:
     import shutil
-    for src in sorted((ROOT / "tools/cph-geodata").glob("*.py")):
-        (dest / "tools/cph-geodata").mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src, dest / "tools/cph-geodata" / src.name)
+    for src in sorted((ROOT / "tools/geodata").glob("*.py")):
+        (dest / "tools/geodata").mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dest / "tools/geodata" / src.name)
     d = dest / ".claude/skills/building-case-to-3d/scripts"
     d.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(ROOT / ".claude/skills/building-case-to-3d/scripts/skraafoto.py", d / "skraafoto.py")
@@ -81,7 +81,7 @@ def cmd_build(a):
 
 
 def tile_inputs(tiles: Path, t: str) -> list[tuple[str, bytes, str]]:
-    """The per-tile inputs: buildings.json, and what the atlas needs for the engine's wall frame (tools/cph-geodata/engine_walls.py):
+    """The per-tile inputs: buildings.json, and what the atlas needs for the engine's wall frame (tools/geodata/engine_walls.py):
     the terrain layer's building grounds, the street layout's footprint fixes, the LoD2 index + records."""
     d, out = tiles / t, []
     if (d / "buildings.json").exists():
@@ -108,7 +108,7 @@ def cmd_inputs(a):
         jobs.append(("input/cph-geodata.json", geo.read_bytes(), "application/json"))
     with cf.ThreadPoolExecutor(8) as ex:
         list(ex.map(lambda j: R.gcs_put(P + j[0], j[1], j[2]), jobs))
-    sys.path.insert(0, str(ROOT / "tools/cph-geodata"))
+    sys.path.insert(0, str(ROOT / "tools/geodata"))
     import appearance_city as C
     from appearance_city_atlas import cell_priority
     cells = sorted(C.all_cells(idx["tiles"]), key=cell_priority)
@@ -233,7 +233,7 @@ def cmd_sync(a):
     desc = sum(1 for t in tiles.iterdir() if (t / "appearance.json").exists()
                for b in json.loads((t / "appearance.json").read_text())["buildings"].values() if b.get("atlas"))
     print(f"tile layers: {n / 1e6:.1f} MB, {desc} buildings with an atlas descriptor")
-    sys.path.insert(0, str(ROOT / "tools/cph-geodata"))
+    sys.path.insert(0, str(ROOT / "tools/geodata"))
     from appearance_city_atlas import CENTRE_UTM
     look = ROOT / "data" / "tex-look"
     want = [i for i in R.gcs_list(P + "tex-look/")]

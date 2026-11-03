@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openTileStore, assembleArea, createTileLod2 } from '../js/tile-store.js';
-import { decodeGrid, createTerrain } from '../js/terrain-cph.js';
+import { decodeGrid, createTerrain } from '../js/terrain.js';
 import { CPH_FRAME } from '../js/city-config.js';
 import { ROOT, TILES_URL, isDistrict } from './helpers/district-tiles.mjs';
 
@@ -43,7 +43,7 @@ test('tile LoD2 serves records lazily from the owning tile', async () => {
 });
 
 const haveTiles = isDistrict;
-test('the district assembled from data/tiles equals the monolithic files', { skip: !haveTiles && 'run uv run tools/cph-geodata/tile_split.py first' }, async () => {
+test('the district assembled from data/tiles equals the monolithic files', { skip: !haveTiles && 'run uv run tools/geodata/tile_split.py first' }, async () => {
   const store = await openTileStore({ fetchImpl: fileFetch, baseUrl: TILES_URL });
   assert.ok(store);
   const ids = store.tilesForLocalBbox(CPH_FRAME.bbox, 25);

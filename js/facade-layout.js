@@ -1,5 +1,5 @@
 // js/facade-layout.js
-// Measured window layouts (tools/cph-geodata/facade_layout.py, the tile layer `windows`, format cph-facade-layout/1, docs/facade-layout.md):
+// Measured window layouts (tools/geodata/facade_layout.py, the tile layer `windows`, format cph-facade-layout/1, docs/facade-layout.md):
 // a regular window grid per photographed wall strip, fitted to the Skraafoto look atlas, that the procedural facade shader draws instead
 // of the grid it guesses from the storey count. Pure (no three.js): runs in the build workers and in node tests.
 //

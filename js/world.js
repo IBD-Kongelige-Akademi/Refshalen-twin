@@ -3,26 +3,26 @@ import { CPH_FRAME, setCityBounds, getDataBbox } from './city-config.js';
 import { buildRealBuildings } from './buildings-real.js';
 import { loadLod2 } from './lod2-geometry.js';
 import { createTrafficSystem } from './traffic.js';
-import { buildCphRoadSurfaces } from './road-surfaces-cph.js';
+import { buildCphRoadSurfaces } from './road-surfaces.js';
 import { createCyclistSystem } from './cyclists.js';
 import { buildDirectionOverlay } from './direction-overlay.js';
-import { buildSignalHeads } from './signal-heads-cph.js';
-import { createWalkSpace } from './walk-space-cph.js';
-import { buildLakes } from './water-cph.js';
+import { buildSignalHeads } from './signal-heads.js';
+import { createWalkSpace } from './walk-space.js';
+import { buildLakes } from './water.js';
 import { buildBridgeDLB, filterDLBFurniture } from './bridge-dlb.js';
 import { setCalibration } from './appearance.js';
-import { applySurfaceCuts } from './lakes-cph.js';
+import { applySurfaceCuts } from './lakes.js';
 import { loadCphFurniture } from './street-furniture-data.js';
-import { loadCphTerrain, createTerrain, createStreamTerrain, FLAT_TERRAIN, buildTerrainMeshArrays } from './terrain-cph.js';
-import { applyTerrainGround, applyStreets, loadCphStreets, mergeSurfaceCuts } from './layout-cph.js';
-import { createStreetFurniture } from './street-furniture-cph.js';
-import { createZoneMap } from './zones-cph.js';
-import { placeFurniture } from './placement-cph.js';
-import { createGrass } from './grass-cph.js';
+import { loadCphTerrain, createTerrain, createStreamTerrain, FLAT_TERRAIN, buildTerrainMeshArrays } from './terrain.js';
+import { applyTerrainGround, applyStreets, loadCphStreets, mergeSurfaceCuts } from './layout.js';
+import { createStreetFurniture } from './street-furniture.js';
+import { createZoneMap } from './zones.js';
+import { placeFurniture } from './placement.js';
+import { createGrass } from './grass.js';
 import { openTileStore, createTileLod2, createFurnitureAssembler } from './tile-store.js';
-import { createRoadSurfaceLayer } from './road-surfaces-cph.js';
-import { createTiledHeightField } from './ground-height-cph.js';
-import { createTiledLawnMask } from './grass-layout-cph.js';
+import { createRoadSurfaceLayer } from './road-surfaces.js';
+import { createTiledHeightField } from './ground-height.js';
+import { createTiledLawnMask } from './grass-layout.js';
 import { tileOfLocal, tileBoundsLocal } from './tile-grid.js';
 import { createBaseGeo, graphFixFits, createTileData } from './tile-data.js';
 import { isGoBoatPierBuilding } from './goboat-pier-data.js';
@@ -40,7 +40,7 @@ import { createAgentRegion, createLaneIndex } from './agent-region.js';
 import { buildRoadNetwork, dropCoveredServiceLinks } from './road-network.js';
 import { buildCyclistNetworkFor } from './cyclists.js';
 import { loadFarLayer } from './far-lod.js';
-import { applyPlainGround } from './ground-shader-cph.js';
+import { applyPlainGround } from './ground-shader.js';
 import { BODY_SPECS } from './actor-models.js';
 import { createCityCollisions, createCollisionActor } from './city-collisions.js';
 import { buildStaticColliders, createStaticIndex, createTiledStaticIndex } from './static-colliders.js';
@@ -58,7 +58,7 @@ const CPH_LAKES_URL = './data/cph-lakes.json';
 const CPH_VEGETATION_URL = './data/cph-vegetation.json';
 const COLLIDING_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'helicopter']);
 
-/** Optional ground-surface register and road markings (tools/cph-geodata/surfaces.py); null when absent. */
+/** Optional ground-surface register and road markings (tools/geodata/surfaces.py); null when absent. */
 async function loadCphSurfaces(url = CPH_SURFACES_URL, fetchImpl = globalThis.fetch) {
   try {
     const response = await fetchImpl(url, { cache: 'no-cache' });
@@ -71,7 +71,7 @@ async function loadCphSurfaces(url = CPH_SURFACES_URL, fetchImpl = globalThis.fe
   }
 }
 
-/** Optional measured lawns and planting (tools/cph-geodata/vegetation.py: CIR NDVI + DHM point cloud); null when absent. */
+/** Optional measured lawns and planting (tools/geodata/vegetation.py: CIR NDVI + DHM point cloud); null when absent. */
 async function loadCphVegetation(url = CPH_VEGETATION_URL, fetchImpl = globalThis.fetch) {
   try {
     const response = await fetchImpl(url, { cache: 'no-cache' });
@@ -90,7 +90,7 @@ function withVegetation(surfacesDoc, vegetation) {
   return { ...surfacesDoc, surfaces: [...surfacesDoc.surfaces, ...vegetation.surfaces] };
 }
 
-/** Optional lake document (tools/cph-geodata/lakes.py): lake outlines, bridge strips and surface cuts; null when absent. */
+/** Optional lake document (tools/geodata/lakes.py): lake outlines, bridge strips and surface cuts; null when absent. */
 async function loadCphLakes(url = CPH_LAKES_URL, fetchImpl = globalThis.fetch) {
   try {
     const response = await fetchImpl(url, { cache: 'no-cache' });
@@ -467,7 +467,7 @@ function createLocator(geo) {
 
 async function buildWorld(scene, { markInit = () => {}, debug = '', geoUrl = CPH_GEODATA_URL, water = '', treeDate, stream = null, start = null, tilesUrl = null, adoptMesh = null } = {}) {
   setCalibration(!debug.split(',').includes('nocal'));
-  // Tiled layers (data/tiles/index.json, tools/cph-geodata/tile_split.py) when they exist: the tile streamer keeps the tiles around
+  // Tiled layers (data/tiles/index.json, tools/geodata/tile_split.py) when they exist: the tile streamer keeps the tiles around
   // the camera resident (buildStreamedWorld). `?debug=notiles` (and a custom geodata URL) load the monolithic data/cph-*.json
   // instead: the whole district is built once, as before.
   const store = debug.split(',').includes('notiles') || geoUrl !== CPH_GEODATA_URL ? null : await openStore(tilesUrl);
@@ -636,13 +636,13 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   // road graph (every tile's roads, pavements and cycle tracks stream with the tile): the street layout's graph fixes are the ones that
   // belong to THIS graph (data/city/streets.json refers to the district's numbering, tile_streets.py renumbers it)
   const legacyFix = city.streets?.graph && graphFixFits(city.streets.graph, city.roadGraph) ? city.streets.graph : null;
-  if (city.streets?.graph && !legacyFix) console.info('[cph] data/city/streets.json numbers another road graph: its graph fixes are skipped (tools/cph-geodata/tile_streets.py renumbers them)');
+  if (city.streets?.graph && !legacyFix) console.info('[cph] data/city/streets.json numbers another road graph: its graph fixes are skipped (tools/geodata/tile_streets.py renumbers them)');
   const { geo } = createBaseGeo(city.meta, city.roadGraph, flags.has('nostreets') ? null : city.streetsGraph || legacyFix);
   checkGeodata(geo);
   globalThis.CPH_GEO = geo;
   markInit(`geodata(${geo.roadGraph.links.length} links)`);
 
-  // The generic water (data/city/water.json, tools/cph-geodata/city_water.py): bodies come per tile; the Soerne are the district's hand-made lakes
+  // The generic water (data/city/water.json, tools/geodata/city_water.py): bodies come per tile; the Soerne are the district's hand-made lakes
   // (`override`: the lake document of data/cph-lakes.json, unclipped, with the levels and deck heights the terrain header would carry)
   const cityWater = city.water && !flags.has('nowater') ? city.water : null;
   const override = cityWater?.override?.lakes?.length ? cityWater.override : null;

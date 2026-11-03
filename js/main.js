@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, roughness, vec2, vec4, mix, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
-import { ssrReflectionWeight } from './surface-materials-cph.js';
+import { ssrReflectionWeight } from './surface-materials.js';
 import { createPostProcessing } from './post-processing.js';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { isTypingInField, TELEPORT_LOCATIONS } from './city-config.js';
@@ -709,7 +709,7 @@ async function initApp() {
 
   // Handle for the headless verification scripts and the console (not used by the engine)
   globalThis.__twin = { scene, renderer, cameraSystem, controllerManager, lightingSystem, world, aoEnabled, aoPass };
-  // `?hooks` exposes the running twin to headless checks (tools/cph-m3-check.py): a free camera and the live systems
+  // `?hooks` exposes the running twin to headless checks (tools/m3-check.py): a free camera and the live systems
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
     const updateCamera = cameraSystem.update.bind(cameraSystem);

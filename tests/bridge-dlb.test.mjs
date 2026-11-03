@@ -2,8 +2,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { buildBridgeDLBGeometry, filterDLBFurniture, layoutBridgeDLB } from '../js/bridge-dlb-geometry.js';
-import { buildLakeArrays, inLake } from '../js/lakes-cph.js';
-import { createTerrain, FLAT_TERRAIN } from '../js/terrain-cph.js';
+import { buildLakeArrays, inLake } from '../js/lakes.js';
+import { createTerrain, FLAT_TERRAIN } from '../js/terrain.js';
 
 const read = (path) => JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8'));
 const geo = read('./fixtures/cph/cph-geodata.json');

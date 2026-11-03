@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
-import { applyStreets } from '../js/layout-cph.js';
-import { createZoneMap } from '../js/zones-cph.js';
-import { createRoadIndex, placeFurniture } from '../js/placement-cph.js';
+import { applyStreets } from '../js/layout.js';
+import { createZoneMap } from '../js/zones.js';
+import { createRoadIndex, placeFurniture } from '../js/placement.js';
 import { buildFurniturePlan, composeYaw, indexItems } from '../js/street-furniture-data.js';
 import { CAR_BODY_TYPES } from '../js/vehicle-fleet.js';
 import { loadVehicleMaterials } from './helpers/vehicle-material.cjs';
@@ -16,7 +16,7 @@ const vertex = (material, env) => material.positionNode ? material.positionNode.
 
 test('parked near and far cars contain no taxi signs or shared taxi material', () => {
   // Execute the renderer's construction path, including its spec and material-cache choices.
-  const source = readFileSync(new URL('../js/street-furniture-cph.js', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../js/street-furniture.js', import.meta.url), 'utf8');
   const start = source.indexOf('  const carSets = {}');
   const end = source.indexOf('// ------------------------------------------------------------------------------------------- props', start);
   assert.ok(start >= 0 && end > start);

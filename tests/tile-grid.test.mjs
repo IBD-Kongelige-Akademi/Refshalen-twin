@@ -7,7 +7,7 @@ test('origin constants match city-config', () => {
   assert.deepEqual([ORIGIN_E, ORIGIN_N], [CPH_FRAME.origin[0], CPH_FRAME.origin[1]]);
 });
 
-test('tile ids and bounds (same numbers as tools/cph-geodata/tests/test_frame.py)', () => {
+test('tile ids and bounds (same numbers as tools/geodata/tests/test_frame.py)', () => {
   assert.equal(tileOfPoint(556000, 6323100), '1112_12646');
   assert.deepEqual(tileBoundsUtm('1112_12646'), [556000, 6323000, 556500, 6323500]);
   assert.deepEqual(tileBoundsLocal('1112_12646'), [0, -400, 500, 100]);

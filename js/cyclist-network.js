@@ -3,7 +3,7 @@
 // in the viewer (js/cyclists.js draws it) and headless in tests/cyclists.test.mjs.
 //
 // Lanes come from data/cph-geodata.json:
-//  - roads with cycleTrack left/right/both: a raised track beside the carriageway (the strip road-surfaces-cph.js
+//  - roads with cycleTrack left/right/both: a raised track beside the carriageway (the strip road-surfaces.js
 //    draws), ridden on the right-hand side of the direction of travel: a "right" track carries the road's drawn
 //    direction, a "left" one the opposite, "both" two lanes;
 //  - cycleTracks (KK cykelsti centrelines): ridden the way their side of the nearest road dictates, both ways when no
@@ -15,7 +15,7 @@
 // stop at red at signalised junctions and use the early green of signal-plan.js.
 
 import { bikePhase } from './signal-plan.js';
-import { carriagewayWidth, cycleStrips, movingHalfWidth, slicePts } from './road-width-cph.js';
+import { carriagewayWidth, cycleStrips, movingHalfWidth, slicePts } from './road-width.js';
 import { bikeBanned, bikeCarriageway, hasContraflow, stripCoverage, stripDirection } from './bike-direction.js';
 
 export const CYCLE_STRIP = { kerb: 0.18, width: 2.2 };
@@ -24,7 +24,7 @@ const SNAP = 5; // lane ends within this many metres share a junction
 const SIGNAL_REACH = 24; // a lane ending this near a signalised junction obeys its bike lights
 const STOP_BEFORE = 1.5; // metres short of the junction centre the stop line stands
 const HALF = 0.9; // half the length of a bicycle with rider
-const PARKED_CAR_DEPTH = 1.95 + 0.12; // m a parallel-parked car takes from the kerb (js/placement-cph.js CAR.w + KERB_GAP)
+const PARKED_CAR_DEPTH = 1.95 + 0.12; // m a parallel-parked car takes from the kerb (js/placement.js CAR.w + KERB_GAP)
 
 // ---- geometry -----------------------------------------------------------------------------------------------------
 function rightNormals(pts) {
@@ -155,7 +155,7 @@ export function buildCyclistNetwork(geo, signalNodes = []) {
     // directions join up with the tracks round the corner
     if (hasContraflow(r) && !bikeBanned(r)) {
       const cov = stripCoverage(r, strips);
-      // ridden 0.85 m off the kerb, unless the street has room to park there (js/placement-cph.js puts parked cars between the moving
+      // ridden 0.85 m off the kerb, unless the street has room to park there (js/placement.js puts parked cars between the moving
       // strip and the kerb): then just inside the parked cars' inner side
       const parkingInner = hw - PARKED_CAR_DEPTH;
       const parks = parkingInner >= movingHalfWidth(r) + 0.05;

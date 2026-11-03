@@ -24,7 +24,7 @@ ap.add_argument('--pairs', action='store_true', help='only compose the pairs fro
 ap.add_argument('--plan', action='store_true', help='only print the stops')
 args = ap.parse_args()
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(root, 'tools/cph-geodata'))
+sys.path.insert(0, os.path.join(root, 'tools/geodata'))
 out = args.out if os.path.isabs(args.out) else os.path.join(root, args.out)
 W, H = (int(v) for v in args.size.split('x'))
 TILES = os.path.join(root, 'data/tiles')

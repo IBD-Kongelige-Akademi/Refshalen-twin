@@ -4,10 +4,10 @@
 import assert from 'node:assert/strict';
 import * as THREE from 'three/webgpu';
 import { mrt, output, normalView, roughness, vec2, vec3, vec4, float, positionView, smoothstep, ShadowNode } from 'three/tsl';
-import { createRoadSurfaceMaterials, ssrReflectionWeight } from '../js/surface-materials-cph.js';
+import { createRoadSurfaceMaterials, ssrReflectionWeight } from '../js/surface-materials.js';
 import { cityUniforms, createContactShadowMaterial, createCarFlareMaterial } from '../js/tsl-materials.js';
-import { createLakeWallMaterial, createWaterMaterial } from '../js/water-cph.js';
-import { applyGroundField } from '../js/ground-shader-cph.js';
+import { createLakeWallMaterial, createWaterMaterial } from '../js/water.js';
+import { applyGroundField } from '../js/ground-shader.js';
 import { createPhotoMaterial } from '../js/facade-photo-material.js';
 
 const renderer = new THREE.WebGPURenderer({ canvas: { width: 1440, height: 900, style: {}, addEventListener() {} } });

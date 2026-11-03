@@ -69,7 +69,7 @@ for (const part of acc.detailParts) {
   if (invalid) badParts++;
 }
 // Main colour pass, two sun shadow cascades, and the lake reflection colour pass.
-// water-cph.js disables shadow updates during reflection. Counting every detail in all four is conservative.
+// water.js disables shadow updates during reflection. Counting every detail in all four is conservative.
 const detailTriangles = Object.values(kindTriangles).reduce((sum, n) => sum + n, 0);
 const renderedUpperEstimate = detailTriangles * 4;
 const budgetLimit = 6_000_000 * 0.08;

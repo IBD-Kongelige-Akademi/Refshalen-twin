@@ -1,13 +1,13 @@
 # Tree sizes and autumn on main’s species models
 
-Implemented against the current furniture data and main’s `tree-geometry-cph.js`
+Implemented against the current furniture data and main’s `tree-geometry.js`
 models. The old renderer in `.trees-v1.patch` was not ported.
 
 ## Regenerated data
 
-`tools/cph-geodata/tree_canopy.py` reads the shared CIR, class-5 rasters and LAZ
+`tools/geodata/tree_canopy.py` reads the shared CIR, class-5 rasters and LAZ
 files without modifying them. Its derived height cache defaults to
-`.context/tree-heights.npz`. Run with `python3 tools/cph-geodata/tree_canopy.py`
+`.context/tree-heights.npz`. Run with `python3 tools/geodata/tree_canopy.py`
 in an environment with the dependencies listed in the script, or with `uv run`.
 
 | Result | Value |

@@ -6,7 +6,7 @@ import { FAR_GRID, readFarHeader, farHeights, farTileArrays, farGroundArrays, fa
 import { tileBoundsLocal } from '../js/tile-grid.js';
 import { ROOT } from './helpers/district-tiles.mjs';
 
-// A tile block in the layout tools/cph-geodata/far_lod.py writes (see its docstring).
+// A tile block in the layout tools/geodata/far_lod.py writes (see its docstring).
 function block({ buildings, heights = null, parks = [] }) {
   const n = FAR_GRID + 1;
   const parts = [];
@@ -118,9 +118,9 @@ test('far water: polygons at their level, triangulated with the right area', () 
   assert.ok(Math.abs(area - (5000 + 50)) < 1e-6, String(area));
 });
 
-// far_lod.py's own output (the dev far layer next to a tile set, made with: uv run tools/cph-geodata/far_lod.py --tiles <set>/tiles --city <set>/city)
+// far_lod.py's own output (the dev far layer next to a tile set, made with: uv run tools/geodata/far_lod.py --tiles <set>/tiles --city <set>/city)
 const FAR_DIR = [process.env.CPH_TILES && path.join(ROOT, path.dirname(process.env.CPH_TILES), 'city'), path.join(ROOT, 'data/city')].filter(Boolean).find((d) => d && fs.existsSync(path.join(d, 'far.json')) && fs.existsSync(path.join(d, 'far.bin')));
-test('far.bin written by far_lod.py: every tile block decodes to sane geometry', { skip: !FAR_DIR && 'run tools/cph-geodata/far_lod.py first' }, () => {
+test('far.bin written by far_lod.py: every tile block decodes to sane geometry', { skip: !FAR_DIR && 'run tools/geodata/far_lod.py first' }, () => {
   const header = JSON.parse(fs.readFileSync(path.join(FAR_DIR, 'far.json'), 'utf8'));
   const raw = fs.readFileSync(path.join(FAR_DIR, 'far.bin'));
   const buf = raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength);

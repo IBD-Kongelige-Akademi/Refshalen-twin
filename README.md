@@ -34,7 +34,7 @@ Lighting uses 26 October 2026 in Europe/Copenhagen: Golden Hour at 16:10, Midday
 | `?wet=0.7` | Overrides ground wetness from 0 to 1; clear presets default to dry. |
 | `?ao=1` | Enables half-resolution GTAO at 0.6 strength. It remains opt-in pending a GPU cost measurement. |
 
-Citywide (the streamed tile index): every harbour basin, canal, lake and pond that is not one of the Soerne is generic water, a post-process like the far layer: `uv run tools/cph-geodata/city_water.py --fetch` (GeoDanmark soe / bassin / rekreativtomraade / begravelsesomraade / skov and OSM landuse into `data/raw/city/water/`, once) and `uv run tools/cph-geodata/city_water.py` write `data/city/water.json` and a `water` layer per tile (surface, quay walls or banks, the ground cut under the water, parks as grass). The Soerne stay the district's hand-made lakes. Details and limits: `docs/citywide-plan.md` (C4). `?water=simple` drops the planar reflection here too, `?debug=nowater` shows the ground without any water.
+Citywide (the streamed tile index): every harbour basin, canal, lake and pond that is not one of the Soerne is generic water, a post-process like the far layer: `uv run tools/geodata/city_water.py --fetch` (GeoDanmark soe / bassin / rekreativtomraade / begravelsesomraade / skov and OSM landuse into `data/raw/city/water/`, once) and `uv run tools/geodata/city_water.py` write `data/city/water.json` and a `water` layer per tile (surface, quay walls or banks, the ground cut under the water, parks as grass). The Soerne stay the district's hand-made lakes. Details and limits: `docs/citywide-plan.md` (C4). `?water=simple` drops the planar reflection here too, `?debug=nowater` shows the ground without any water.
 
 Water levels come from the DTM over the lakes. `data/cph-lakes.json` stores basin polygons and their measured levels, allowing basins separated by bridges to keep distinct elevations while nearby levels snap together. Lake outlines cut through the terrain or ground mesh; developed shores use quay walls and coping, while natural shores use bank geometry. A shared ground-field shader shades fine gravel along the lake edge and grass over measured park areas.
 
@@ -98,30 +98,30 @@ Headless browser check (Playwright; boots the twin, asserts the HUD and console,
 uv run --with playwright python tools/shoot-m2.py --verify --query hooks --out docs/cleanup
 ```
 
-Facade look: photo walls are on by default between about 14 m and 150 m of the camera (procedural brick, plaster and windows closer, tone + procedural beyond; `?tex=0` turns the photos off). They need `data/tex/` (photo atlases) and the processed `data/tex-look/` (`uv run --with pillow --with numpy --with scipy python tools/cph-geodata/facade_look.py`); without them the twin falls back to the procedural facades. Ground-floor shopfronts come from `data/cph-groundfloor.json` (`uv run --with requests --with pyproj python tools/cph-geodata/groundfloor.py`). Facade shots: `uv run --with playwright python tools/shoot-look.py --out docs/look/facades/x [--perf]`.
+Facade look: photo walls are on by default between about 14 m and 150 m of the camera (procedural brick, plaster and windows closer, tone + procedural beyond; `?tex=0` turns the photos off). They need `data/tex/` (photo atlases) and the processed `data/tex-look/` (`uv run --with pillow --with numpy --with scipy python tools/geodata/facade_look.py`); without them the twin falls back to the procedural facades. Ground-floor shopfronts come from `data/cph-groundfloor.json` (`uv run --with requests --with pyproj python tools/geodata/groundfloor.py`). Facade shots: `uv run --with playwright python tools/shoot-look.py --out docs/look/facades/x [--perf]`.
 
 ## Rebuild the data
 
 `data/cph-geodata.json` is generated and never edited by hand:
 
 ```sh
-uv run tools/cph-geodata/build.py --env-file <path>   # a .env with DHM_TERRAIN_TOKEN (or GSEARCH_TOKEN) for DHM heights
+uv run tools/geodata/build.py --env-file <path>   # a .env with DHM_TERRAIN_TOKEN (or GSEARCH_TOKEN) for DHM heights
 ```
 
-Raw downloads are cached under `data/raw/`, so reruns are offline. See `tools/cph-geodata/build.py` for options. `tools/cph-geodata/frame.py` is the one place for the origin, the district bbox and the 500 m tile grid; compiler steps accept `--bbox` / `--tile` for another area.
+Raw downloads are cached under `data/raw/`, so reruns are offline. See `tools/geodata/build.py` for options. `tools/geodata/frame.py` is the one place for the origin, the district bbox and the 500 m tile grid; compiler steps accept `--bbox` / `--tile` for another area.
 
 The twin loads per-tile layers when `data/tiles/index.json` exists (generated, gitignored, otherwise the files above are used):
 
 ```sh
-uv run tools/cph-geodata/tile_split.py   # data/cph-*.json + data/lod2 -> data/tiles/<e500>_<n500>/, data/city/ (format: docs/cph-geodata-schema.md)
+uv run tools/geodata/tile_split.py   # data/cph-*.json + data/lod2 -> data/tiles/<e500>_<n500>/, data/city/ (format: docs/cph-geodata-schema.md)
 ```
 
 The whole of Københavns + Frederiksberg Kommune (496 tiles, `data/city/tiles.json`) is compiled by one resumable script that writes the same tile format directly:
 
 ```sh
-uv run tools/cph-geodata/build_city.py --workers 4            # all stages; secrets come from tools/adc-secret.sh (never printed)
-uv run tools/cph-geodata/build_city.py --stage cells --cells 6176_723   # one 1 km cell; every stage and cell has a done-marker under data/city/work/state/
-uv run tools/cph-geodata/build_city.py --stage vegetation --veg-limit 20 --veg-workers 6   # LiDAR + CIR streamed per cell, then deleted
+uv run tools/geodata/build_city.py --workers 4            # all stages; secrets come from tools/adc-secret.sh (never printed)
+uv run tools/geodata/build_city.py --stage cells --cells 6176_723   # one 1 km cell; every stage and cell has a done-marker under data/city/work/state/
+uv run tools/geodata/build_city.py --stage vegetation --veg-limit 20 --veg-workers 6   # LiDAR + CIR streamed per cell, then deleted
 ```
 
 Stages: `fetch fetch2` (citywide sources, cached in `data/raw/city/`), `buildings0`, `geo` (roads, one connected road graph, points), `cells` (DHM heights and terrain per 1 km cell), `surfaces furniture groundfloor streets entrances vegetation`, `index`, `report` (`data/city/coverage.md`: coverage, sources, Frederiksberg substitutions, what is still queued). Raw data stays under `data/raw/` and is never committed; keep an eye on `df -h`: the script stops below 5 GB free.
@@ -154,39 +154,39 @@ It requires the streamed city and fails if it falls back to the smaller district
 `data/cph-surfaces.json` (ground-material polygons and road markings, M4) is a separate generated file:
 
 ```sh
-uv run tools/cph-geodata/surfaces.py   # KK dp_belaegninger + afmaerkning_total + blaa_cykelfelt, OSM squares
+uv run tools/geodata/surfaces.py   # KK dp_belaegninger + afmaerkning_total + blaa_cykelfelt, OSM squares
 ```
 
 It carries classes `kbh_fortov, raadhus, asphalt_road, asphalt_cycle, cobbles, setts, gravel, grass, other` per surface
 (with `src`/`conf`) and marking `kind`s `white, crossing, arrow, symbol, bay, bump, bluecycle, yellow, service, ramp, red`.
 The twin renders Københavnerfortov (slab rows with a sett line between, parallel to the kerb), Rådhusbelægning, cobbles
-and setts procedurally (`js/surface-materials-cph.js`); pavements are the Københavnerfortov unless the register or a
+and setts procedurally (`js/surface-materials.js`); pavements are the Københavnerfortov unless the register or a
 plaza-sized polygon says otherwise. Without the file the twin still boots (pavements and lane paint only).
 
 `data/cph-vegetation.json` (lawns and planting) is measured, not taken from a register: the colour-infrared orthophoto gives
 NDVI and the DHM point cloud gives what stands above the ground (class 5 crowns, class 3/4 shrubs); the ground under park
 crowns is lawn by the KK park register. The twin appends these polygons to the surfaces as `grass` ground and grows tufts
-on them around the camera (`js/grass-cph.js`: one instanced draw call, 49 tiles of 8 m refilled as you move, wind and
-fade in the shader; `?debug=nograss` switches both off). Method, thresholds and QA: `tools/cph-geodata/vegetation.py`.
+on them around the camera (`js/grass.js`: one instanced draw call, 49 tiles of 8 m refilled as you move, wind and
+fade in the shader; `?debug=nograss` switches both off). Method, thresholds and QA: `tools/geodata/vegetation.py`.
 
 ```sh
-python3 tools/cph-geodata/vegetation_rasters.py   # DHM Punktsky class counts at 1 m (pdal; tiles from tools/lod2/fetch.py)
-uv run tools/cph-geodata/vegetation_cir.py        # CIR orthophoto -> NDVI (Dataforsyningen token from ADC `gsearch-token`)
-uv run tools/cph-geodata/vegetation.py
+python3 tools/geodata/vegetation_rasters.py   # DHM Punktsky class counts at 1 m (pdal; tiles from tools/lod2/fetch.py)
+uv run tools/geodata/vegetation_cir.py        # CIR orthophoto -> NDVI (Dataforsyningen token from ADC `gsearch-token`)
+uv run tools/geodata/vegetation.py
 uv run --with playwright python tools/shoot-grass.py   # shots and cost into docs/grass/
 ```
 
 `data/cph-furniture.json` (street furniture, M4) is another separate generated file:
 
 ```sh
-uv run tools/cph-geodata/furniture.py   # KK WFS + Citelum lamp GPKGs + Movia stops; `?debug=nofurniture` skips it in the viewer
+uv run tools/geodata/furniture.py   # KK WFS + Citelum lamp GPKGs + Movia stops; `?debug=nofurniture` skips it in the viewer
 uv run --with playwright python tools/shoot-m2.py --furniture   # shots + fps into docs/m4-furniture
 uv run --with playwright python tools/shoot-m2.py --oneway      # traffic direction: live car check + contraflow / track / arrow-overlay shots into docs/oneway
 node tools/audit/oneway.mjs                                     # cars and cyclists against the one-way / bicycle-direction data (10 simulated minutes)
 ```
 
 Look shots for lakes, trees and night lighting: `uv run --with playwright python tools/shoot-look.py --tag after` (docs/look/lakes-trees).
-`uv run tools/cph-geodata/basins.py` adds the per-basin water levels to `data/cph-lakes.json` (after `lakes.py`).
+`uv run tools/geodata/basins.py` adds the per-basin water levels to `data/cph-lakes.json` (after `lakes.py`).
 
 ## Hosting the citywide data
 

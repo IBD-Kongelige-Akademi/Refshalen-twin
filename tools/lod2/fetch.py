@@ -5,7 +5,7 @@
     uv run --project tools/lod2 python tools/lod2/fetch.py --bbox 715000 6170000 735000 6185000   # EPSG:25832, e.g. the commune
 
 The API key (Datafordeler FileDownloads GetPointCloudFile) is read from $DATAFORDELER_GRAPHQL_API_KEY or, if unset,
-from the environment or .env (DATAFORDELER_GRAPHQL_API_KEY, tools/cph-geodata/envsecret.py). It is never printed.
+from the environment or .env (DATAFORDELER_GRAPHQL_API_KEY, tools/geodata/envsecret.py). It is never printed.
 Existing tiles are skipped; tiles are written to <tile>.laz.part and renamed when complete (the server ignores Range, so an interrupted tile restarts).
 `--seed DIR` (repeatable) copies tiles already cached elsewhere (APFS clone) instead of downloading them.
 """
@@ -21,7 +21,7 @@ import sys
 import time
 
 import common
-import envsecret  # noqa: E402  (tools/cph-geodata, on the path through common)
+import envsecret  # noqa: E402  (tools/geodata, on the path through common)
 
 URL = "https://api.datafordeler.dk/FileDownloads/GetPointCloudFile?apiKey={key}&FileName={name}"
 DEFAULT_SEEDS = [

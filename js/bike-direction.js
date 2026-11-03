@@ -1,5 +1,5 @@
 // js/bike-direction.js
-// Which way cars and bicycles may travel along a road of data/cph-geodata.json (tools/cph-geodata/bikedir.py writes it).
+// Which way cars and bicycles may travel along a road of data/cph-geodata.json (tools/geodata/bikedir.py writes it).
 // Pure, no three.js: the cyclist network, the road surfaces (contraflow paint) and the audit all read directions here.
 //
 // A road's `pts` run with its traffic (oneway=-1 ways are re-oriented by the compiler), so `carDir` is "fwd" (one-way) or

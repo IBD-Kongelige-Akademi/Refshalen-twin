@@ -1,5 +1,5 @@
 // js/entrances.js
-// Building entrances from real address data (data/cph-entrances.json, tools/cph-geodata/entrances.py): DAR husnummer
+// Building entrances from real address data (data/cph-entrances.json, tools/geodata/entrances.py): DAR husnummer
 // `adgangspunkt` snapped to a wall. Pure (no three.js):
 //   createEntranceIndex(doc)            entries per building id, ready for the ground-floor classifier and the door builder
 //   placeDoors(b, rings, entries)       each entry on the nearest *cleaned* wall edge: { edgeNo, x, z, nx, nz, tx, tz, ... }

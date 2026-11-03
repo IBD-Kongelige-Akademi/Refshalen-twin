@@ -7,7 +7,7 @@ import { buildStaticColliders, createStaticIndex, createTiledStaticIndex } from 
 import { dropCoveredServiceLinks } from '../js/road-network.js';
 import { createPedestrianRoutes } from '../js/pedestrian-routes.js';
 import { buildCyclistNetwork } from '../js/cyclist-network.js';
-import { createRoadIndex } from '../js/placement-cph.js';
+import { createRoadIndex } from '../js/placement.js';
 
 const square = (id, x, z, h = 5) => ({ id, ring: [x - h, z - h, x + h, z - h, x + h, z + h, x - h, z + h], ground: 0, eave: 10, roof: 'flat' });
 const person = (x, z, extra = {}) => createCollisionActor({

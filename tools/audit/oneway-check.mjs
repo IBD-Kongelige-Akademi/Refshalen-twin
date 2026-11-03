@@ -1,7 +1,7 @@
 // Independent traffic-direction checks for the Copenhagen twin: judge where a car or a bicycle IS (position + heading) against the
 // compiled road data (data/cph-geodata.json roads: carDir, bike, pts), without reading how the engine built its lanes. Shared by
 // tools/audit/oneway.mjs (node sim of the cyclists, static network checks) and tools/shoot-m2.py --oneway (cars in the browser).
-import { carriagewayWidth } from '../../js/road-width-cph.js';
+import { carriagewayWidth } from '../../js/road-width.js';
 import { bikeCarriageway, carDirection, hasContraflow, stripDirection } from '../../js/bike-direction.js';
 
 const VEH = new Set(['primary', 'secondary', 'residential', 'service']);

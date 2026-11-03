@@ -1,5 +1,5 @@
 // Pure collision shapes shared by the static world and moving actors.
-import { pointInRing } from './polygon-cph.js';
+import { pointInRing } from './polygon.js';
 
 const EPSILON = 1e-10;
 // Math.hypot is a builtin call that TurboFan does not inline (its numbers get boxed): the plain square root is inlined
