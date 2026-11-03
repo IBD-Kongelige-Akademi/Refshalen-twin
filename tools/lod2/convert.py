@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """roofer CityJSONSeq (LoD2.2) -> per-building roof/wall triangle meshes in the twin's local frame -> data/lod2/<tile>.bin.
 
-Local frame: x = E - 723900, z = -(N - 6176500), y = DVR90 - 6.84 (docs/cph-geodata-schema.md).
+Local frame: x = E - origin E, z = -(N - origin N), y = DVR90 - origin height (tools/geodata/frame.py, docs/cph-geodata-schema.md).
 
 Binary layout (little-endian), one record per building, addressed by index.json (`offset`, `length` in bytes):
 

@@ -9,7 +9,7 @@ Runtime layout comes from the engine's own pure JS modules (tools/audit/dump_lay
 ground-height field, placed street-furniture plan incl. parked cars and wire spans); everything else is rebuilt from
 the data files with the same rules the engine uses (road-surfaces.js: carriageway = centreline ribbon of
 carriagewayWidth(), cycle track = 0.15 m kerb + 2.2 m strip beside it, pavement = geo.sidewalks, water = lakes minus
-bridges). Frame: x = E - 723900, z = -(N - 6176500).
+bridges). Frame: x = E - origin E, z = -(N - origin N) (tools/geodata/frame.py).
 
   node tools/audit/dump_layout.mjs            # (run automatically if tools/audit/out/layout.json is missing)
   uv run tools/audit/audit.py                 # writes docs/qa/audit-tables.md, docs/qa/results.json, docs/qa/sweep-points.json

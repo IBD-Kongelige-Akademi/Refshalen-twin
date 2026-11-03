@@ -1,6 +1,6 @@
 """Shared constants and helpers for the LoD2 pipeline (tools/lod2).
 
-Frame (docs/cph-geodata-schema.md): local x = E - 723900, z = -(N - 6176500), y = DVR90 - 6.84.
+Frame (docs/cph-geodata-schema.md): local x = E - origin E, z = -(N - origin N), y = DVR90 - origin height (tools/geodata/frame.py).
 Tile id is "<N km>_<E km>", as in the Punktsky file name PUNKTSKY_1km_<N>_<E>.laz.
 """
 from __future__ import annotations

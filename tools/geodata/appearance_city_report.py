@@ -220,7 +220,7 @@ def coverage() -> str:
           f"{gable:,} of {nw:,} photo walls ({pct(gable, nw)}) run on above their eave over the roofer gable / step pieces (`eave_m` < `h_m`). "
           "`node tools/audit/engine_wall_tops.mjs` dumps the engine's frame to check a run against.", ""]
     L += ["## Where the atlases live and how the engine gets them", "",
-          "- Produced by the Cloud Run job `cph-skraafoto` (`tools/cloud/skraafoto/`, mode `atlas`, then `attach`) into `gs://lun-integrations-dev-cph-twin/skraafoto/tex-look/<gdk_id>.webp`; tile layers (`skraafoto/tiles/<tile>/appearance.json`) next to them, `skraafoto/attach.done` once the descriptors are merged.",
+          "- Produced by the Cloud Run job `cph-skraafoto` (`tools/cloud/skraafoto/`, mode `atlas`, then `attach`) into `gs://$TWIN_GCS_BUCKET/skraafoto/tex-look/<gdk_id>.webp`; tile layers (`skraafoto/tiles/<tile>/appearance.json`) next to them, `skraafoto/attach.done` once the descriptors are merged.",
           "- `python3 tools/cloud/skraafoto/cloudctl.py sync` copies the tile layers into `data/tiles/<tile>/appearance.json` (refused while attach is older than the atlas run) and up to `--atlas-cap-gb` of inner-city atlases into `data/tex-look/`.",
           "- The engine reads atlases from the data base URL (`js/data-config.js`: `./data` locally, the R2 bucket `cph-twin-data` in the deployment, uploaded by `tools/hosting/upload_r2.py`); a 404 leaves that building on its tone facade.", ""]
     sizes = sum(p.stat().st_size for p in C.TILES.glob("*/appearance.json"))

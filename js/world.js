@@ -423,7 +423,7 @@ function nearLane(lane, x, z, r) {
 // Name of the nearest named street (roadGraph link) within 40 m, for the HUD location sign
 function createLocator(geo) {
   const rg = geo?.roadGraph;
-  if (!rg) return () => 'Copenhagen';
+  if (!rg) return () => 'Aalborg';
   const N = rg.nodes;
   const CELL = 64;
   const cells = new Map();
@@ -461,7 +461,7 @@ function createLocator(geo) {
         }
       }
     }
-    return name ? `Copenhagen · ${name}` : 'Copenhagen';
+    return name ? `Aalborg · ${name}` : 'Aalborg';
   };
 }
 

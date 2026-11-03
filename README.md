@@ -1,24 +1,22 @@
-# Copenhagen Twin
+# Aalborg Twin
 
-A walkable, drivable and bikeable real-time 3D twin of Søerne and inner Nørrebro in Copenhagen (about 1.5 × 1.5 km around Nørre Søgade, Dronning Louises Bro, Peblinge Sø and Blågårds Plads), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
+A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Limfjord (Budolfi, Jomfru Ane Gade, Aalborghus, the harbour front, Utzon Center and Limfjordsbroen), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
 
-- Buildings at their real footprints and heights (GeoDanmark *Bygning*, BBR, DHM), with facades driven by measured parameters.
-- Real streets, cycle tracks and signals, with cars, buses, pedestrians and cyclists on the real road graph, stopping for signal plans.
-- Four ways to move: on foot, by car, by bicycle and by helicopter. Cameras, time of day and teleport presets (Nørre Søgade 37, Dronning Louises Bro, Peblinge Sø, Nørrebrogade, Blågårds Plads). Speeds are shown in km/h.
-- Nørre Søgade 37 can be inserted as a drawing-accurate hero building.
+Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
-Status and plan: [docs/PLAN.md](docs/PLAN.md). Data format: [docs/cph-geodata-schema.md](docs/cph-geodata-schema.md).
+**Status: phase 1 of the Aalborg plan.** The Copenhagen data is gone and the frame is Aalborg's (origin E 556000, N 6323100, EPSG:25832; district E 555000–557000, N 6322000–6324000), so the viewer boots to an empty ground plane at Gammel Torv. Buildings, terrain and roads arrive in phases 2–3. The engine tests still run on Copenhagen data kept as fixtures under `tests/fixtures/cph/`. The rest of this README describes the upstream engine and is rewritten for Aalborg in phase 4.
+
+Data format: [docs/cph-geodata-schema.md](docs/cph-geodata-schema.md).
 
 ## Run it
 
-You need a browser with WebGPU (current Chrome, Edge or Safari Technology Preview) and Python 3 for a static file server.
+You need a browser with WebGPU (current Chrome or Edge) and Python 3 for a static file server.
 
 ```sh
-bash tools/link-heroes.sh        # optional: links the hero glTFs named in data/cph-geodata.json into data/heroes/
 python3 -m http.server           # then open http://localhost:8000/
 ```
 
-Live demo: https://martincollignon.github.io/copenhagen-twin/
+Build scripts read their credentials from the environment or from a `.env` file in the repo root (gitignored): copy `.env.example` and fill in the Dataforsyningen token and the Datafordeler API key. Nothing is printed.
 
 Useful query parameters: `?debug=footprints` draws the geodata's buildings, water and parks as flat polygons, `?debug=nobuildings` and `?debug=noroads` skip those layers, `?hooks` exposes the running scene as `globalThis.__twin` for headless checks.
 
@@ -119,7 +117,7 @@ uv run tools/geodata/tile_split.py   # data/cph-*.json + data/lod2 -> data/tiles
 The whole of Københavns + Frederiksberg Kommune (496 tiles, `data/city/tiles.json`) is compiled by one resumable script that writes the same tile format directly:
 
 ```sh
-uv run tools/geodata/build_city.py --workers 4            # all stages; secrets come from tools/adc-secret.sh (never printed)
+uv run tools/geodata/build_city.py --workers 4            # all stages; secrets come from the environment or .env (never printed)
 uv run tools/geodata/build_city.py --stage cells --cells 6176_723   # one 1 km cell; every stage and cell has a done-marker under data/city/work/state/
 uv run tools/geodata/build_city.py --stage vegetation --veg-limit 20 --veg-workers 6   # LiDAR + CIR streamed per cell, then deleted
 ```
@@ -190,7 +188,7 @@ Look shots for lakes, trees and night lighting: `uv run --with playwright python
 
 ## Hosting the citywide data
 
-The app (index.html, css, js) is deployed by GitHub Pages; the citywide data is too big for Pages (1 GB limit) and for git, so it sits on a static host: Cloudflare R2 bucket `cph-twin-data` on the personal Cloudflare account, public through https://pub-d3c994d177d048d5b64ecfc3df496b48.r2.dev. It is **packed**: a visit used to cost 1.5 to 5k requests (about 12 files per tile plus one webp per facade atlas), more than hosts with per-IP or per-bucket request limits allow (r2.dev, a Hugging Face dataset with 3,000 resolve requests per 5 minutes per IP). Packed, the same visit costs about 170.
+The app (index.html, css, js) is deployed by GitHub Pages; the citywide data is too big for Pages (1 GB limit) and for git, so it sits on a static host with HTTP Range: a Cloudflare R2 bucket (`R2_BUCKET`) behind a custom domain (`R2_PUBLIC_URL`, the repository variable `DATA_URL`), set up in phase 7. It is **packed**: a visit used to cost 1.5 to 5k requests (about 12 files per tile plus one webp per facade atlas), more than hosts with per-IP or per-bucket request limits allow (r2.dev, a Hugging Face dataset with 3,000 resolve requests per 5 minutes per IP). Packed, the same visit costs about 170.
 
 ```
 <base>/manifest.json       the root, served no-cache: which pack holds which file, the packs of every tile
@@ -206,40 +204,34 @@ A pack is `CPHPACK1`, a u32 header length, a JSON header (entry name, type, enco
 
 **Building and publishing.** Two steps:
 
-1. `python3 tools/hosting/build_packs.py [--out .context/packs/<v>]` packs data/tiles, data/city and the facade atlases (from gs://lun-integrations-dev-cph-twin/skraafoto/tex-look, only the atlases the tiles describe, cached in `~/.cache/cph-twin/tex-look`; ADC token over REST, never the gcloud CLI) into a directory: about 740 files, 1 GB. `--core-block` / `--detail-block` (default 2) and `--groups single` trade requests for bytes, `--chunk` sizes the atlas chunks.
+1. `python3 tools/hosting/build_packs.py [--out .context/packs/<v>]` packs data/tiles, data/city and the facade atlases (only the atlases the tiles describe: from the local `data/tex-look`, or from gs://`$TWIN_GCS_BUCKET`/skraafoto/tex-look when that is set, cached in `~/.cache/cph-twin/tex-look`; ADC token over REST, never the gcloud CLI) into a directory: about 740 files, 1 GB. `--core-block` / `--detail-block` (default 2) and `--groups single` trade requests for bytes, `--chunk` sizes the atlas chunks.
 2. Upload the directory to any static host (packs immutable, manifest.json no-cache, ideally with Range). For R2: `python3 tools/hosting/upload_packs.py --dir .context/packs/<v>` (wrangler with `XDG_CONFIG_HOME=~/.config/wrangler-personal`, the personal account; packs first, the manifest last, packs the bucket already holds are skipped). `tools/hosting/serve_range.py` serves a pack directory locally with Range (`--no-range` to test the fallback), and `tools/hosting/measure_visit.py` counts the requests and bytes of a scripted visit against any data base.
 
-**Pages build.** `.github/workflows/pages.yml` publishes only index.html, css and js and rewrites `BUILD_DATA_BASE` to the repository variable `CPH_DATA_URL` (default: the r2.dev URL above). The r2.dev endpoint is rate limited and not CDN-cached; for launch traffic put a custom domain on the bucket and set `CPH_DATA_URL` to it.
+**Pages build.** `.github/workflows/pages.yml` publishes only index.html, css and js and rewrites `BUILD_DATA_BASE` to the repository variable `DATA_URL`; it does not deploy until that variable is set. The r2.dev endpoint is rate limited and not CDN-cached, so put a custom domain on the bucket and use that as `DATA_URL`.
 
-**Bucket setup** (done, personal account, wrangler with `XDG_CONFIG_HOME=~/.config/wrangler-personal`): `wrangler r2 bucket create cph-twin-data`, `wrangler r2 bucket dev-url enable cph-twin-data`, `wrangler r2 bucket cors set cph-twin-data --file tools/hosting/cors.json` (GET/HEAD from https://martincollignon.github.io and localhost:8000/8080/3000/5173). The old unpacked layout on the previous account (`.../v3`, `tools/hosting/upload_r2.py` through the ingest Worker) still works with `?data=` but is no longer the default.
+**Bucket setup** (phase 7, wrangler with `XDG_CONFIG_HOME=~/.config/wrangler-personal`): `wrangler r2 bucket create $R2_BUCKET`, `wrangler r2 bucket cors set $R2_BUCKET --file tools/hosting/cors.json` (edit its allowed origins to your Pages domain first), then a custom domain on the bucket.
 
 ## Detail overrides
 
-Hand-guided or semi-automatic building reconstructions can take the place of generated buildings in the live twin. Nyhavn is the first: the five photo-traced fronts and roofs of Nyhavn 9–17, with their openings, roof windows and chimneys (`tools/nyhavn`, PR #15). The other 92 Roofer-fitted Nyhavn buildings convert too (`--select all`), but they are not published: there, the generated building with the same Roofer roof and the same Skråfoto source is at least as good. The format (`cph-detail/1`: per-tile layer, compact GLBs, parametric openings, cornices, dormers and chimneys), the mapping to GeoDanmark ids, the engine rules and the licences are in [docs/detail-overrides.md](docs/detail-overrides.md). The near ring draws the overrides. Mid and far keep the generated building with its measured tones. `?overrides=0` switches them off.
+Hand-guided or semi-automatic building reconstructions can take the place of generated buildings in the live twin; for Aalborg, detailed landmark models (Utzon Center, Budolfi) go in this way (phase 2b). Upstream's Nyhavn set and its builder were removed in phase 1. The format (`cph-detail/1`: per-tile layer, compact GLBs, parametric openings, cornices, dormers and chimneys), the mapping to GeoDanmark ids, the engine rules and the licences are in [docs/detail-overrides.md](docs/detail-overrides.md). The near ring draws the overrides. Mid and far keep the generated building with its measured tones. `?overrides=0` switches them off.
 
 ```sh
-python3 tools/overrides/nyhavn.py                 # PR #15's model-v2 + detail-v3 -> ~/.local/share/cph-twin/overrides/nyhavn
-python3 tools/overrides/publish.py install        # into the local unpacked ./data (uninstall to remove)
+python3 tools/overrides/publish.py install        # a set under ~/.local/share/cph-twin/overrides into the local unpacked ./data (uninstall to remove)
 python3 tools/hosting/build_packs.py --offline    # packs every set under ~/.local/share/cph-twin/overrides (--no-overrides to skip)
-uv run --with playwright --with pillow python tools/shoot-overrides.py --data <base>   # Nyhavn before / after, fps, memory
+uv run --with playwright --with pillow python tools/shoot-overrides.py --data <base>   # before / after, fps, memory
 ```
 
 ## Licence and attributions
 
 The project code is available under the [MIT License](LICENSE).
 
-Based on [Slop New York](https://github.com/mrdoob/slop-newyork/) by mrdoob (MIT): the renderer, post-processing, controls, cameras, audio, traffic and pedestrian engine come from that project.
+Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon (MIT), which is based on [Slop New York](https://github.com/mrdoob/slop-newyork/) by mrdoob (MIT): the renderer, post-processing, controls, cameras, audio, traffic and pedestrian engine come from those projects.
 
-The data bundle `data/cph-geodata.json` is a derived database and carries the licences of its sources:
+The Aalborg data is built in phases 2–6; its sources and licences are listed here as they arrive. Until then the repository holds upstream's Copenhagen district data as test fixtures (`tests/fixtures/cph/`), a derived database that carries the licences of its sources:
 
 - © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), available under the Open Database License (ODbL). The OSM-derived parts of the bundle, and anything derived from them, stay under the ODbL (attribution, share-alike).
 - Indeholder data fra Klimadatastyrelsen / GeoDanmark (Bygning), BBR og Københavns Kommune (kbhkort, CC BY 4.0 / Open Data DK licens).
 - Facade photos use Skråfoto 2023 and 2025 from Styrelsen for Dataforsyning og Infrastruktur (retrieved October 2026); the processed atlases are derived from those photos. [Terms for free geographic data](https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf).
-- Nyhavn detail models (`overrides/nyhavn`, docs/detail-overrides.md): roofs and walls fitted with Roofer to DHM Punktsky 2019, and roof and facade photos from Skråfoto 2025 (Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur). Footprints are GeoDanmark Bygning. The openings, roof windows, chimneys and colours of Nyhavn 9–17 are traced from [a 2022 photo by Jenny Andersson / News Øresund](https://commons.wikimedia.org/wiki/File:Nyhavn_9-17_(Copenhagen)_01.jpg) (CC BY 2.0). Dimensions were measured on [a 2018 photo by Liberaler Humanist](https://commons.wikimedia.org/wiki/File:Nyhavn_9,11,13,15_and_17_with_boats,_K%C3%B8benhavn.jpg) (CC BY-SA 3.0), used as a reference only: none of its pixels are published.
-- Københavns Kommune open data: trae_basis, cykelsti, cykelstativ, trafiksignal_oversigt, fortovsmatrikel, parkregister, and for `data/cph-surfaces.json` dp_belaegninger, afmaerkning_total, blaa_cykelfelt (plus OSM squares, ODbL).
+- Københavns Kommune open data: trae_basis, cykelsti, cykelstativ, trafiksignal_oversigt, fortovsmatrikel, parkregister, and for `cph-surfaces.json` dp_belaegninger, afmaerkning_total, blaa_cykelfelt (plus OSM squares, ODbL).
 
 The map and facade sources are credited in the loading screen and their data files. Third-party data and dependencies retain their respective licences.
-
-## Building reconstruction skill
-
-`.claude/skills/building-case-to-3d/` (also `.agents/skills/` for Codex) rebuilds a single building as LoD3 from its Filarkiv/byggesag drawings, reconciled against 2025 Skråfoto. Subagents: `drawing-archivist`, `skraafoto-registrar`, `twin-validator` (`.claude/agents/`, `.codex/agents/`). Output heroes (e.g. Nørre Søgade 37) are referenced by building ID in `data/cph-geodata.json` `heroes[]` and linked with `tools/link-heroes.sh`. The script reads the model build from `CPH_HERO_DIR` (default: `~/.local/share/building-case-3d/noerre-soegade-37/build`). Drawings and models stay outside git. Hero models are derived from third-party building-case drawings and are not published: the Pages build (an http(s) `BUILD_DATA_BASE`) never requests them and extrudes the footprint instead; a local checkout loads them (`?heroes=0` / `?heroes=1` override, `js/data-config.js` `heroesEnabled`).
