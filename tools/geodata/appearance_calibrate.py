@@ -15,7 +15,8 @@ The photogrammetric tones (`tone`, appearance/2) have three problems when they a
      building: same material, different light); buildings without sunlit walls take the median offset of buildings within
      NEIGHBOUR_R metres that have both (same street side by proximity), else a global transfer fitted on all such
      buildings (L' = a + b L, chroma-plane shift);
-  2. chroma is restored (CHROMA_GAIN, soft-capped);
+  2. chroma is restored (CHROMA_GAIN, soft-capped), except blue to purple hues (COOL_HUES: the skylight cast), which are damped
+     unless a sunlit wall is clearly blue;
   3. BBR `mursten` walls with a pinkish hue become red-brown brick (darker) or yellow brick (lighter);
   4. lightness is compressed above L_SHOULDER and floored, and the colour is clipped to the sRGB gamut by reducing chroma.
 `cal` records the route: own | neighbours | global | none (sunlit / unchanged), `cal_brick` marks rule 3.
@@ -40,6 +41,12 @@ L_MAX = 0.84
 L_MIN = 0.28
 OFFSET_L_RANGE = (-0.05, 0.25)
 OFFSET_AB_MAX = 0.06
+# Blue to purple (OKLab hue 200-320 deg) is the skylight cast of shadow views, not a facade colour: its chroma is damped instead of
+# restored, so the cast never turns into a blue wall (Aalborg: 7 % of walls, the whitewashed Budolfi among them). Only a sunlit wall
+# that is clearly blue in the photo (a painted facade) keeps its measured chroma.
+COOL_HUES = (200.0, 320.0)
+COOL_GAIN = 0.5
+COOL_KEEP_C = 0.06
 
 _M1 = np.array([[0.4122214708, 0.5363325363, 0.0514459929], [0.2119034982, 0.6806995451, 0.1073969566], [0.0883024619, 0.2817188376, 0.6299787005]])
 _M2 = np.array([[0.2104542553, 0.7936177850, -0.0040720468], [1.9779984951, -2.4285922050, 0.4505937099], [0.0259040371, 0.7827717662, -0.8086757660]])
@@ -105,10 +112,12 @@ def brick_rule(lab):
     return from_lch(min(L, 0.56), float(np.clip(max(C * 1.8, 0.07), 0.07, 0.11)), 42.0 + 0.3 * (h - 42.0)), True
 
 
-def finish(lab, mursten=False):
+def finish(lab, mursten=False, sunlit=False):
     """Steps 2-4 of the module docstring on an OKLab colour; returns (sRGB, brick_flag)."""
     L, C, h = lch(lab)
     gain = CHROMA_GAIN
+    if COOL_HUES[0] <= h <= COOL_HUES[1]:
+        gain = 1.0 if sunlit and C >= COOL_KEEP_C else COOL_GAIN
     C2 = C * gain
     if C2 > CHROMA_SOFT_MAX:  # soft cap: do not push already vivid walls further
         C2 = CHROMA_SOFT_MAX + (C2 - CHROMA_SOFT_MAX) * 0.3
@@ -207,7 +216,7 @@ def calibrate(geo: dict, offsets: dict | None = None, transfer: tuple | None = N
                     else:
                         lab = np.array([alpha + beta * lab[0], lab[1] + dab[0], lab[2] + dab[1]])
                         route = "global"
-            rgb, brick = finish(lab, mursten)
+            rgb, brick = finish(lab, mursten, bool(w.get("sunlit")))
             w["tone_cal"] = [round(float(x), 3) for x in rgb]
             w["cal"] = route
             if brick:

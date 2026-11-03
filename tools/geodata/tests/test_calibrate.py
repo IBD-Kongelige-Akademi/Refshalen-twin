@@ -81,6 +81,18 @@ def test_finish_keeps_lightness_in_the_plausible_range_and_in_gamut():
         assert np.all(out >= 0) and np.all(out <= 1)
 
 
+def test_a_skylight_cast_is_damped_not_restored_but_a_painted_blue_wall_stays():
+    # Budolfi: whitewashed, the shadow view leaves a faint blue cast that the chroma restore used to turn into a blue wall
+    cast = srgb_to_oklab([0.55, 0.661, 0.774])
+    assert lch(srgb_to_oklab(finish(cast)[0]))[1] < lch(cast)[1], "the cast loses chroma"
+    painted = srgb_to_oklab([0.25, 0.42, 0.70])
+    _, C_sun, h_sun = lch(srgb_to_oklab(finish(painted, sunlit=True)[0]))
+    _, C_shadow, _ = lch(srgb_to_oklab(finish(painted, sunlit=False)[0]))
+    assert C_sun > 0.09 and C_sun > 1.5 * C_shadow and 200 <= h_sun <= 320, "a sunlit, clearly blue facade stays blue (the soft cap applies)"
+    warm = srgb_to_oklab([0.80, 0.74, 0.66])
+    assert lch(srgb_to_oklab(finish(warm)[0]))[1] > lch(warm)[1], "warm hues are still restored"
+
+
 def test_inferred_walls_follow_their_building_and_stats_shape():
     b = building("a", [wall(0, [0.85, 0.80, 0.70], True), {"edge": 1, "ring": 0, "tone": [0.5, 0.5, 0.5], "conf": "inferred"}], material="mursten")
     geo = {"buildings": [b], "appearance": {}}
