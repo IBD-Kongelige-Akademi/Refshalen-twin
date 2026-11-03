@@ -49,7 +49,7 @@ def compile_buildings(kk_bygning: dict, rasters=None, dhm_mod=None):
     """Returns (buildings, stats)."""
     bb = box(*frame.area_local())
     out = []
-    stats = {"input_features": 0, "dsm": 0, "kk_eave": 0, "storey_default": 0, "no_bbr": 0}
+    stats = {"input_features": 0, "dsm": 0, "storey_default": 0, "no_bbr": 0}
     for f in kk_bygning["features"]:
         p = f["properties"]
         fot = p.get("fot_id")
@@ -104,11 +104,6 @@ def _building(bid, fot, p, ring, holes, part_utm, rasters, dhm_mod, stats):
         ground_src, ground_conf = "dtm:median", "measured"
         h_conf, h_src = "measured", "dsm:p60-p95"
         stats["dsm"] += 1
-    elif (p.get("tagrendehoejde_estimat") or 0) >= 2.0:  # <2 m is a placeholder, not a roof height
-        eave_h = float(p["tagrendehoejde_estimat"])
-        ridge_h = eave_h
-        h_conf, h_src = "observed", "kk:bygning:tagrendehoejde_estimat"
-        stats["kk_eave"] += 1
     elif storeys:
         eave_h = storeys * 3.0
         ridge_h = eave_h

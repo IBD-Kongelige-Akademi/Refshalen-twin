@@ -1,17 +1,19 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["shapely>=2", "requests", "pyproj"]
+# dependencies = ["shapely>=2", "requests", "pyproj", "geopandas", "pyogrio"]
 # ///
-"""Citywide boundary and 500 m tile list for Københavns + Frederiksberg Kommune.
+"""Boundary and 500 m tile list for Aalborg Kommune (0851).
+
+    uv run tools/geodata/city_tiles.py [--area district|kommune] [--refresh]
 
 Outputs (EPSG:25832):
-  data/city/boundary.geojson  kommune 0101, 0147, and their union (simplified to ~5 m)
-  data/city/tiles.json        500 m tiles intersecting the boundary
+  data/city/boundary.geojson  kommune 0851 and the union (simplified to ~5 m)
+  data/city/tiles.json        500 m tiles intersecting the boundary: `--area district` (default) keeps only the district's
+                              16 tiles (frame.DISTRICT_UTM_BBOX), `--area kommune` all of them (phase 8)
 
 Inputs (cached under data/raw/city/, refetched with --refresh):
-  dagi_kommuner.json   DAGI kommuneinddeling_current (Datafordeler WFS, needs
-                       DATAFORDELER_USERNAME / DATAFORDELER_PASSWORD)
+  dg_dagi_kommuneinddeling_0851.json  DAGI kommuneinddeling (datagrundlag.dk, no account)
   osm_coastline.json   OSM natural=coastline  (ODbL), land/sea split
   osm_water.json       OSM natural=water      (ODbL), lakes/canals/ponds
 
@@ -27,6 +29,7 @@ import json
 import math
 import os
 import sys
+import time
 from pathlib import Path
 
 import requests
@@ -36,58 +39,59 @@ from shapely.ops import polygonize, unary_union
 from shapely.prepared import prep
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import envsecret  # noqa: E402
+import datagrundlag as DG  # noqa: E402
+import frame  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw" / "city"
 OUT = ROOT / "data" / "city"
 TILE = 500
 SIMPLIFY_M = 5.0
-UA = "cph-twin-geodata/0.1 (open-data compiler)"
-DAGI_WFS = "https://wfs.datafordeler.dk/DAGI/DAGI_WFS/1.0.0/WFS"
-OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"]
-OSM_BBOX = "55.58,12.43,55.74,12.74"  # S,W,N,E covering both kommuner with margin
-KOMMUNER = {"0101": "København", "0147": "Frederiksberg"}
+UA = "aalborg-twin-geodata/0.1 (open-data compiler)"
+OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
+            "https://overpass.private.coffee/api/interpreter"]
+KOMMUNER = {"0851": "Aalborg"}
 _to_utm = Transformer.from_crs(4326, 25832, always_xy=True)
+_to_wgs = Transformer.from_crs(25832, 4326, always_xy=True)
 
 
 def log(*a):
     print(*a, file=sys.stderr)
 
 
+def osm_bbox(utm_bbox, margin: float = 500.0) -> str:
+    """Overpass "S,W,N,E" around a UTM bbox, grown by `margin` metres."""
+    e0, n0, e1, n1 = utm_bbox
+    lon0, lat0 = _to_wgs.transform(e0 - margin, n0 - margin)
+    lon1, lat1 = _to_wgs.transform(e1 + margin, n1 + margin)
+    return f"{min(lat0, lat1):.5f},{min(lon0, lon1):.5f},{max(lat0, lat1):.5f},{max(lon0, lon1):.5f}"
+
+
 def overpass(query: str) -> dict:
-    last = None
-    for url in OVERPASS:
-        try:
-            r = requests.post(url, data={"data": query}, headers={"User-Agent": UA}, timeout=240)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:  # noqa: BLE001
-            last = e
-    raise RuntimeError(f"overpass failed: {last}")
+    errors = []
+    for attempt in range(2):
+        for url in OVERPASS:
+            try:
+                r = requests.post(url, data={"data": query}, headers={"User-Agent": UA}, timeout=240)
+                r.raise_for_status()
+                return r.json()
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{url.split('/')[2]}: {e}"[:160])
+        time.sleep(30)
+    raise RuntimeError(f"overpass failed: {errors}")
 
 
 def load_dagi(refresh: bool) -> dict:
-    p = RAW / "dagi_kommuner.json"
-    if p.exists() and not refresh:
-        return json.loads(p.read_text())
-    user, pw = envsecret.require("DATAFORDELER_USERNAME"), envsecret.require("DATAFORDELER_PASSWORD")
-    r = requests.get(DAGI_WFS, params={
-        "username": user, "password": pw, "service": "WFS", "version": "2.0.0", "request": "GetFeature",
-        "typeNames": "dagi_v001:kommuneinddeling_current", "outputFormat": "application/json",
-        "cql_filter": "kommunekode IN ('" + "','".join(KOMMUNER) + "')",
-    }, headers={"User-Agent": UA}, timeout=300)
-    r.raise_for_status()
-    RAW.mkdir(parents=True, exist_ok=True)
-    p.write_text(r.text)
-    return r.json()
+    codes = ", ".join(f"'{k}'" for k in KOMMUNER)
+    return DG.fetch_features("dagi", "kommuneinddeling", where=f"kommunekode IN ({codes})", columns=["kommunekode", "navn"],
+                             force=refresh, suffix="_" + "_".join(KOMMUNER))
 
 
-def load_osm(name: str, query: str, refresh: bool) -> dict:
+def load_osm(name: str, query: str, refresh: bool, bbox: str) -> dict:
     p = RAW / f"osm_{name}.json"
     if p.exists() and not refresh:
         return json.loads(p.read_text())
-    d = overpass(f"[out:json][timeout:180][bbox:{OSM_BBOX}];{query}out geom;")
+    d = overpass(f"[out:json][timeout:180][bbox:{bbox}];{query}out geom;")
     RAW.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(d))
     return d
@@ -151,12 +155,12 @@ def build_boundary(refresh: bool):
     feats = [{"type": "Feature", "properties": {"kommunekode": k, "navn": KOMMUNER[k], "kind": "kommune",
                                                   "area_km2": round(by[k].area / 1e6, 3)}, "geometry": mapping(simp[k])}
              for k in KOMMUNER]
-    feats.append({"type": "Feature", "properties": {"kind": "union", "navn": "København + Frederiksberg",
+    feats.append({"type": "Feature", "properties": {"kind": "union", "navn": " + ".join(KOMMUNER.values()),
                                                     "area_km2": round(union.area / 1e6, 3)}, "geometry": mapping(simp_union)})
     OUT.mkdir(parents=True, exist_ok=True)
     fc = {"type": "FeatureCollection",
           "crs": {"type": "name", "properties": {"name": "urn:ogc:def:crs:EPSG::25832"}},
-          "source": "DAGI kommuneinddeling_current via Datafordeler WFS (SDFI), simplified to 5 m",
+          "source": f"DAGI kommuneinddeling (Klimadatastyrelsen) via {dagi.get('source', 'datagrundlag.dk')}, simplified to 5 m",
           "features": feats}
     (OUT / "boundary.geojson").write_text(json.dumps(fc, ensure_ascii=False, separators=(",", ":")))
     return by, union
@@ -165,14 +169,20 @@ def build_boundary(refresh: bool):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--refresh", action="store_true", help="refetch DAGI and OSM inputs")
+    ap.add_argument("--area", choices=("district", "kommune"), default="district",
+                    help="tiles of the district bbox only (default) or of the whole kommune")
     a = ap.parse_args()
 
     by, union = build_boundary(a.refresh)
-    coast = load_osm("coastline", '(way["natural"="coastline"];);', a.refresh)
-    water = load_osm("water", '(way["natural"="water"];relation["natural"="water"];);', a.refresh)
-    land, dry = land_polygons(union, coast, water)
-    log(f"[city] boundary {union.area/1e6:.1f} km2, land {land.area/1e6:.1f} km2, land minus inland water {dry.area/1e6:.1f} km2")
+    area = box(*frame.DISTRICT_UTM_BBOX) if a.area == "district" else union
+    obox = osm_bbox(area.bounds if a.area == "district" else union.bounds)
+    coast = load_osm("coastline", '(way["natural"="coastline"];);', a.refresh, obox)
+    water = load_osm("water", '(way["natural"="water"];relation["natural"="water"];);', a.refresh, obox)
+    clip = union.intersection(area)
+    land, dry = land_polygons(clip, coast, water)
+    log(f"[city] {a.area}: {clip.area/1e6:.1f} km2 in the boundary, land {land.area/1e6:.1f} km2, land minus inland water {dry.area/1e6:.1f} km2")
 
+    union = clip
     pu, pd = prep(union), prep(dry)
     pk = {k: prep(g) for k, g in by.items()}
     x0, y0, x1, y1 = union.bounds
@@ -195,7 +205,7 @@ def main():
     tiles.sort(key=lambda t: (t["bounds"][0], t["bounds"][1]))
     n_land = sum(1 for t in tiles if t["land_frac"] > 0)
     n_mostly = sum(1 for t in tiles if t["land_frac"] >= 0.5)
-    out = {"crs": "EPSG:25832", "tile_size": TILE, "count": len(tiles), "count_land": n_land,
+    out = {"crs": "EPSG:25832", "tile_size": TILE, "area": a.area, "count": len(tiles), "count_land": n_land,
            "count_land_ge_50pct": n_mostly, "tiles": tiles}
     (OUT / "tiles.json").write_text(json.dumps(out, separators=(",", ":")))
     both = sum(1 for t in tiles if len(t["kommune"]) > 1)

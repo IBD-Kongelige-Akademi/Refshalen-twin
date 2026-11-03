@@ -1,9 +1,10 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["requests", "shapely>=2", "pyproj", "numpy", "rasterio", "scipy", "pillow", "laspy[lazrs]", "pyshp"]
+# dependencies = ["requests", "shapely>=2", "pyproj", "numpy", "rasterio", "scipy", "pillow", "laspy[lazrs]", "pyshp",
+#                 "geopandas", "pyogrio", "duckdb"]
 # ///
-"""Citywide compiler (milestone C1/C5 of docs/citywide-plan.md): Koebenhavns + Frederiksberg Kommune -> 500 m tiles.
+"""Citywide compiler (milestone C1/C5 of docs/citywide-plan.md): Aalborg Kommune (the tiles of data/city/tiles.json) -> 500 m tiles.
 
     uv run tools/geodata/build_city.py [--stage STAGE ...] [--workers 4] [--cells 6176_723 ...] [--force STAGE]
 
@@ -18,9 +19,9 @@ data/raw/city/ (citywide, one file per source layer; shared by all cells) and da
 plus the DHM rasters, deleted when the cell is finished). Nothing under data/raw or data/tiles is committed.
 
 Stages, in order (default: all that exist):
-    fetch       citywide sparse layers once: KK WFS (paged, deduped by id, checked against resultType=hits), Overpass,
-                GeoDanmark Bygning + BBR (Datafordeler) for Frederiksberg and for gaps in the KK layer
-    buildings0  merge the building sources into one footprint list and slice it per 1 km cell (+50 m margin)
+    fetch       citywide sparse layers once: GeoDanmark (bygning, vejkant, vejmidte, soe, kyst, havn, bassin, trae) and BBR
+                bygning of the kommune from datagrundlag.dk (no account; datagrundlag.py), Overpass
+    buildings0  GeoDanmark footprints joined to BBR (bbruuid = id_lokalid), sliced per 1 km cell (+50 m margin)
     geo         roads (one pass for the whole city, so the road graph is connected), roadGraph, cycle tracks, sidewalks,
                 water, parks, signals, trees, racks, benches, lights -> tile layer `roads`; lakes.json
     cells       per 1 km cell (parallel): DHM DSM/DTM via WCS -> building heights, terrain grid -> tile layers
@@ -50,6 +51,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import city_sources as S  # noqa: E402
+import datagrundlag as DG  # noqa: E402
 import envsecret  # noqa: E402
 import frame  # noqa: E402
 import tile_split as T  # noqa: E402
@@ -71,6 +73,14 @@ TERRAIN_CELL = 2.0
 GEO_VERSION = "cph-geodata/1"
 CITY_BBOX_MARGIN = 100.0
 
+KOMMUNE = "0851"  # Aalborg
+SCOPE = "Aalborg Kommune, the tiles of data/city/tiles.json (build_city.py)"
+ATTRIBUTION = [
+    "Indeholder data fra Klimadatastyrelsen / GeoDanmark (Bygning, Vejkant, Vejmidte, Sø, Kyst, Havn, Bassin, Træ), BBR, DAGI og DHM "
+    "(vilkår for frie geografiske data, CC BY 4.0), via datagrundlag.dk.",
+    "© OpenStreetMap contributors (ODbL)",
+]
+DG_LAYERS = ["bygning", "vejkant", "vejmidte", "soe", "kyst", "havn", "bassin", "trae"]  # GeoDanmark tables fetched for the tiles
 KK_BASE = ["bygning", "bygning_kk", "Kommunevej", "trafikhastigheder", "ensrettede_gader", "cykelsti", "trafiksignal_oversigt",
            "fortovsmatrikel", "parkregister", "park_groent_omr_oversigtskort", "vejkant"]
 KK_POINTS = ["cykelstativ", "baenke_borde_puma", "dp_byinventar_l", "trae_basis", "automatisk_detekterede_traeer_kk_beta"]
@@ -232,12 +242,22 @@ def stage_fetch2(a, tiles) -> None:
     mark_done("fetch2")
 
 
-def stage_fetch(a, tiles, groups=("base", "points")) -> None:
-    ensure_secrets("DATAFORDELER_USERNAME", "DATAFORDELER_PASSWORD", "DATAFORDELER_GRAPHQL_API_KEY")
+def osm_bbox(utm_bbox) -> str:
+    """Overpass "S,W,N,E" of a UTM bbox."""
+    from pyproj import Transformer
+
+    tr = Transformer.from_crs(25832, 4326, always_xy=True)
+    (lon0, lat0), (lon1, lat1) = tr.transform(utm_bbox[0], utm_bbox[1]), tr.transform(utm_bbox[2], utm_bbox[3])
+    return f"{min(lat0, lat1):.5f},{min(lon0, lon1):.5f},{max(lat0, lat1):.5f},{max(lon0, lon1):.5f}"
+
+
+def stage_fetch(a, tiles) -> None:
+    """datagrundlag.dk layers for the tiles' bbox (+ margin) and BBR of the kommune (`fetch-dg`), then Overpass (`fetch-osm`).
+    The two parts are marked separately: buildings and terrain need only the first."""
     from concurrent.futures import ThreadPoolExecutor
 
     bbox = city_bbox_utm(tiles)
-    layers = (KK_BASE if "base" in groups else []) + (KK_POINTS if "points" in groups else [])
+    S.OSM_BBOX = osm_bbox(bbox)
     errors = {}
 
     def run(label, fn):
@@ -247,24 +267,21 @@ def stage_fetch(a, tiles, groups=("base", "points")) -> None:
             errors[label] = str(e)[:200]
             log(f"[fetch] {label} FAILED: {e}")
 
-    def kk_all():
-        for layer in layers:
-            run(f"kk:{layer}", lambda layer=layer: S.fetch_kk(layer, bbox, force=a.force_fetch))
-
-    def osm_all():
+    if a.force_stage("fetch") or not is_done("fetch-dg"):
+        with ThreadPoolExecutor(4) as ex:
+            fs = [ex.submit(run, f"dg:{t}", lambda t=t: DG.fetch_features("geodanmark", t, bbox=bbox, force=a.force_fetch)) for t in DG_LAYERS]
+            fs.append(ex.submit(run, f"dg:bbr:{KOMMUNE}", lambda: DG.fetch_bbr_bygning(KOMMUNE, force=a.force_fetch)))
+            for f in fs:
+                f.result()
+        if errors:
+            raise SystemExit(f"fetch incomplete: {errors}")
+        mark_done("fetch-dg", snapshots=DG.snapshots())
+    if a.force_stage("fetch") or not is_done("fetch-osm"):
         for key, body in OSM_QUERIES.items():
             run(f"osm:{key}", lambda key=key, body=body: S.fetch_overpass(key, body, force=a.force_fetch))
-
-    with ThreadPoolExecutor(4) as ex:
-        fs = [ex.submit(kk_all), ex.submit(osm_all),
-              ex.submit(run, "geodk:bygning", lambda: S.fetch_geodk_bygning(bbox)),
-              ex.submit(run, "bbr:0147", lambda: S.fetch_bbr("0147")),
-              ex.submit(run, "bbr:0101", lambda: S.fetch_bbr("0101"))]
-        for f in fs:
-            f.result()
-    if errors:
-        raise SystemExit(f"fetch incomplete: {errors}")
-    mark_done("fetch-" + "-".join(groups))
+        if errors:
+            raise SystemExit(f"fetch incomplete (Overpass; datagrundlag.dk is done, rerun to retry): {errors}")
+        mark_done("fetch-osm", bbox=S.OSM_BBOX)
 
 
 # --------------------------------------------------------------------------------------- buildings: merge + slice
@@ -289,62 +306,42 @@ def _geom_bounds(geom) -> tuple[float, float, float, float]:
 
 
 def merge_building_features(tiles: dict) -> tuple[list, dict]:
-    """One footprint list in the KK `bygning` property schema (buildings.compile_buildings reads it):
-    KK bygning, + KK bygning_kk supplement, + GeoDanmark Bygning (GEODKV) for every footprint KK does not have
-    (all of Frederiksberg), with BBR attributes from the Datafordeler BBR GraphQL service."""
-    import buildings as B
-
-    kk = _load_json(RAW_CITY / "kk_bygning.json")
-    kk2 = _load_json(RAW_CITY / "kk_bygning_kk.json") if (RAW_CITY / "kk_bygning_kk.json").exists() else None
-    feats = list(kk["features"])
-    extra = B.supplement_from_bygning_kk(kk, kk2)
-    feats += extra
-    have = {f["properties"].get("fot_id") for f in feats}
-    stats = {"kk_bygning": len(kk["features"]), "kk_bygning_kk_extra": len(extra)}
-    # code -> text tables learnt from the KK layer itself (it carries both)
-    roof, wall = {}, {}
-    for f in kk["features"]:
-        p = f["properties"]
-        if p.get("tagdaekningsmaterialekode") is not None and p.get("tagdaekningsmateriale"):
-            roof[str(p["tagdaekningsmaterialekode"])] = p["tagdaekningsmateriale"]
-        if p.get("ydervaeggensmaterialekode") is not None and p.get("ydervaeggensmateriale"):
-            wall[str(p["ydervaeggensmaterialekode"])] = p["ydervaeggensmateriale"]
-    stats["roof_codes"], stats["wall_codes"] = roof, wall
-    bbr = {}
-    for k in ("0147", "0101"):
-        p = RAW_CITY / f"bbr_{k}.json"
-        if p.exists():
-            bbr.update(_load_json(p))
-    gd = _load_json(RAW_CITY / "geodk_bygning.json")["features"] if (RAW_CITY / "geodk_bygning.json").exists() else []
-    added = outside = no_bbr = 0
+    """One footprint list in the property schema buildings.compile_buildings reads (fot_id, bygningid, antaletager, ...):
+    every GeoDanmark Bygning footprint whose bbox centre lies in a tile, joined to BBR bygning by bbruuid = id_lokalid for
+    use (byg021), year (byg026), wall and roof material (byg032 / byg033, as text: datagrundlag.WALL_TEXT / ROOF_TEXT)
+    and storeys (byg054). Both come from datagrundlag.dk (stage fetch)."""
+    gd = _load_json(DG.cache_path("geodanmark", "bygning"))["features"]
+    bbr = _load_json(DG.cache_path("bbr", "bygning", f"_{KOMMUNE}"))
+    feats = []
+    outside = no_bbr = 0
+    status = Counter()
     for f in gd:
         p = f["properties"]
-        fot = p.get("fot_id")
-        if fot in have or fot is None:
+        fot = p.get("id_lokalid")
+        if fot is None or f.get("geometry") is None:
             continue
         x0, y0, x1, y1 = _geom_bounds(f["geometry"])
         if frame.tile_of_point((x0 + x1) / 2, (y0 + y1) / 2) not in tiles:
-            outside += 1  # a neighbouring kommune beyond the tiles
+            outside += 1  # beyond the tiles (the fetch bbox has a margin)
             continue
-        b = bbr.get(p.get("bbruuid") or "")
+        uuid = (p.get("bbruuid") or "").lower()
+        b = bbr.get(uuid)
         if b is None:
             no_bbr += 1
-        use = b.get("byg021BygningensAnvendelse") if b else None
-        props = {"fot_id": fot, "bygningid": p.get("bbruuid") if b else None, "bygningstype": p.get("bygningstype"),
-                 "bygningensanvendelsekode": int(use) if use and str(use).isdigit() else None,
-                 "opfoerelselsaar": b.get("byg026Opfoerelsesaar") if b else None,
-                 "ydervaeggensmateriale": wall.get(str(b.get("byg032YdervaeggensMateriale"))) if b else None,
-                 "tagdaekningsmateriale": roof.get(str(b.get("byg033Tagdaekningsmateriale"))) if b else None,
-                 "antaletager": b.get("byg054AntalEtager") if b else None}
+        else:
+            status[b["status"]] += 1
+        props = {"fot_id": fot, "bygningid": uuid if b else None, "bygningstype": p.get("bygningstype"),
+                 "bygningensanvendelsekode": b["use"] if b else None, "opfoerelselsaar": b["year"] if b else None,
+                 "ydervaeggensmateriale": b["wall"] if b else None, "tagdaekningsmateriale": b["roof"] if b else None,
+                 "antaletager": b["storeys"] if b else None}
         feats.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
-        added += 1
-    stats.update({"geodanmark_added": added, "geodanmark_added_without_bbr": no_bbr, "geodanmark_total": len(gd), "geodanmark_outside_tiles": outside,
-                  "bbr_records": len(bbr)})
+    stats = {"geodanmark_in_tiles": len(feats), "geodanmark_without_bbr": no_bbr, "geodanmark_total": len(gd),
+             "geodanmark_outside_tiles": outside, "bbr_records": len(bbr), "bbr_status": dict(status)}
     return feats, stats
 
 
 def stage_buildings0(a, tiles, cells) -> None:
-    """Slice the merged footprint list per cell (+ margin) into data/raw/cells/<cell>/kk_bygning.json."""
+    """Slice the merged footprint list per cell (+ margin) into data/raw/cells/<cell>/bygning.json."""
     if is_done("buildings0") and not a.force_stage("buildings0"):
         return
     t0 = time.time()
@@ -362,7 +359,7 @@ def stage_buildings0(a, tiles, cells) -> None:
                 if c in per_cell:
                     per_cell[c].append(f)
     for c, fs in per_cell.items():
-        S.atomic_write(RAW_CELLS / c / "kk_bygning.json", dump({"type": "FeatureCollection", "features": fs}))
+        S.atomic_write(RAW_CELLS / c / "bygning.json", dump({"type": "FeatureCollection", "features": fs}))
     # facade tones measured from oblique photos (appearance.py) exist for the district only: keep them for those ids
     dist = DATA / "cph-geodata.json"
     if dist.exists():
@@ -627,7 +624,7 @@ def cell_job(cell: str, tids: list[str], force: bool = False) -> dict:
         import dhm
 
         rasters, dtm = dhm_cell(work, core, os.environ["GSEARCH_TOKEN"])
-        feats = _load_json(work / "kk_bygning.json")
+        feats = _load_json(work / "bygning.json")
         blds, stats = B.compile_buildings(feats, rasters, dhm)
         for b in blds:
             b.pop("preset", None)
@@ -690,7 +687,7 @@ def stage_cells(a, tiles, cells) -> None:
     log(f"[cells] {len(todo)} of {len(cells)} cells to do, {a.workers} workers, {free_gb():.1f} GB free")
     if not todo:
         return
-    if any(not (RAW_CELLS / c / "kk_bygning.json").exists() for c in todo):  # slices are deleted when the city is done (20 s to rebuild)
+    if any(not (RAW_CELLS / c / "bygning.json").exists() for c in todo):  # slices are deleted when the city is done (20 s to rebuild)
         a2 = argparse.Namespace(**vars(a))
         a2.force_stage = lambda s: s == "buildings0"
         stage_buildings0(a2, tiles, cells)
@@ -755,23 +752,18 @@ def stage_index(a, tiles, cells) -> None:
     gm = _load_json(WORK / "geo_meta.json") if (WORK / "geo_meta.json").exists() else None
     # geodata block: what is not tile-owned
     g = dict(meta.get("geodata", {}))
+    g.update({"version": GEO_VERSION, "frame": {"epsg": 25832, "vertical": "DVR90", "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": bbox},
+              "attribution": ATTRIBUTION})
+    m = dict(g.get("meta", {}))
+    m["scope"] = SCOPE
+    m["snapshots"] = DG.snapshots()
     if gm:
-        g.update({"version": GEO_VERSION, "generated": gm["generated"], "points_keys": gm["points_keys"],
-                  "frame": {"epsg": 25832, "vertical": "DVR90", "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": bbox}})
-        g["attribution"] = [
-            "Indeholder data fra Klimadatastyrelsen / GeoDanmark (Bygning), BBR og Københavns Kommune (kbhkort, CC BY 4.0 / Open Data DK licens).",
-            "Indeholder data fra Styrelsen for Dataforsyning og Infrastruktur, Skråfoto 2023 and 2025 (retrieved October 2026).",
-            "© OpenStreetMap contributors (ODbL)",
-            "Københavns Kommune open data: trae_basis, cykelsti, cykelstativ, trafiksignal_oversigt, fortovsmatrikel, parkregister",
-            "Frederiksberg Kommune: GeoDanmark Bygning, BBR og DHM (SDFI); øvrigt fra OSM",
-        ]
-        m = dict(g.get("meta", {}))
-        m.update({"road_stats": gm["road_stats"], "roads_dropped_outside_tiles": gm["roads_dropped_outside_tiles"],
-                  "scope": "Københavns + Frederiksberg Kommune (build_city.py)"})
-        b0 = read_done("buildings0")
-        if b0:
-            m["building_sources"] = {k: v for k, v in b0.items() if k not in ("done", "roof_codes", "wall_codes")}
-        g["meta"] = m
+        g.update({"generated": gm["generated"], "points_keys": gm["points_keys"]})
+        m.update({"road_stats": gm["road_stats"], "roads_dropped_outside_tiles": gm["roads_dropped_outside_tiles"]})
+    b0 = read_done("buildings0")
+    if b0:
+        m["building_sources"] = {k: v for k, v in b0.items() if k not in ("done", "roof_codes", "wall_codes")}
+    g["meta"] = m
     # heroes are referenced by building id only (the engine reads data/heroes/<id>, tools/link-heroes.sh): no local model paths in public data
     if g.get("heroes"):
         g["heroes"] = [{k: v for k, v in h.items() if k not in ("glb", "frame")} for h in g["heroes"]]
@@ -837,8 +829,7 @@ def main(argv=None):
         t0 = time.time()
         check_disk()
         if s == "fetch":
-            if not (is_done("fetch-base-points") and not a.force_stage("fetch")):
-                stage_fetch(a, tiles)
+            stage_fetch(a, tiles)
         elif s == "fetch2":
             stage_fetch2(a, tiles)
         elif s == "buildings0":

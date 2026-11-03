@@ -22,23 +22,22 @@ def mb(n: float) -> str:
 
 
 def building_coverage(tiles: dict) -> dict:
-    """Share of GeoDanmark Bygning footprints (Datafordeler GEODKV, centroid inside the DAGI boundary) that are in the tiles."""
-    from shapely.geometry import shape
+    """Share of GeoDanmark Bygning footprints (datagrundlag.dk; centroid inside the DAGI boundary and inside a tile) that
+    are in the tiles' building layers."""
+    from shapely.geometry import box, shape
+    from shapely.ops import unary_union
     from shapely.prepared import prep
 
-    gd_path = BC.RAW_CITY / "geodk_bygning.json"
+    gd_path = BC.DG.cache_path("geodanmark", "bygning")
     if not gd_path.exists():
         return {}
     bnd = json.loads((BC.CITY_DIR / "boundary.geojson").read_text())
     union = next(f for f in bnd["features"] if f["properties"].get("kind") == "union")
-    pu = prep(shape(union["geometry"]))
-    from shapely.geometry import Point
+    area = shape(union["geometry"]).intersection(unary_union([box(*t["bounds"]) for t in tiles.values()]))
+    pu = prep(area)
 
     have, heights, n_tot = set(), Counter(), 0
-    kommune = {}
-    for k in ("0101", "0147"):
-        f = next(f for f in bnd["features"] if f["properties"].get("kommunekode") == k)
-        kommune[k] = prep(shape(f["geometry"]))
+    kommune = {f["properties"]["kommunekode"]: prep(shape(f["geometry"])) for f in bnd["features"] if f["properties"].get("kommunekode")}
     for tid in tiles:
         p = BC.TILES_DIR / tid / "buildings.json"
         if not p.exists():
@@ -49,8 +48,6 @@ def building_coverage(tiles: dict) -> dict:
             src = b.get("src", [])
             if "dsm:p60-p95" in src:
                 heights["dhm_dsm_measured"] += 1
-            elif "kk:bygning:tagrendehoejde_estimat" in src:
-                heights["kk_eave_estimate"] += 1
             elif "default:storeys*3.0" in src:
                 heights["storeys_x_3m"] += 1
             else:
@@ -64,7 +61,7 @@ def building_coverage(tiles: dict) -> dict:
             continue
         k = next((k for k, pk in kommune.items() if pk.contains(c)), "other")
         inside[k] += 1
-        if str(f["properties"]["fot_id"]) not in have:
+        if str(f["properties"]["id_lokalid"]) not in have:
             miss[k] += 1
     return {"compiled": n_tot, "geodanmark_inside": sum(inside.values()), "missing": sum(miss.values()),
             "by_kommune": {k: {"geodanmark": inside[k], "missing": miss[k]} for k in inside}, "heights": dict(heights)}
@@ -130,9 +127,18 @@ def write_report(tiles: dict, cells: dict) -> None:
     idx = BC.scan_tiles(tiles)
     L = []
     w = L.append
-    w("# Citywide data coverage (Københavns + Frederiksberg Kommune)\n")
+    w("# Data coverage (Aalborg Kommune)\n")
     w(f"Generated {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())} by `tools/geodata/build_city.py` (stage `report`). "
       f"{len(tiles)} tiles of 500 m in {len(cells)} one-km cells (`data/city/tiles.json`).\n")
+    snaps = BC.DG.snapshots()
+    if snaps:
+        w("## Source snapshots (datagrundlag.dk)\n")
+        w("| dataset | snapshot | count |")
+        w("|---|---|---:|")
+        for k, v in sorted(snaps.items()):
+            n = v.get("features", v.get("records", ""))
+            w(f"| {k} | {v['snapshot_date']} | {n:,} |" if isinstance(n, int) else f"| {k} | {v['snapshot_date']} | {n} |")
+        w("")
     w("## Layers\n")
     w("| layer | tiles done | of | features (by list) | bytes |")
     w("|---|---:|---:|---|---:|")
@@ -148,7 +154,7 @@ def write_report(tiles: dict, cells: dict) -> None:
     if bc:
         w("## Buildings\n")
         pct = 100.0 * (1 - bc["missing"] / max(1, bc["geodanmark_inside"]))
-        w(f"- GeoDanmark Bygning footprints (Datafordeler GEODKV `bygning_current`) with the centroid inside the DAGI boundary: "
+        w(f"- GeoDanmark Bygning footprints (datagrundlag.dk `geodanmark.bygning`) with the centroid inside the DAGI boundary and the tiles: "
           f"**{bc['geodanmark_inside']:,}**; of them in the tiles: **{bc['geodanmark_inside'] - bc['missing']:,} ({pct:.2f} %)**; "
           f"missing {bc['missing']:,} (target >= 98 %).")
         for k, v in bc["by_kommune"].items():
@@ -156,15 +162,17 @@ def write_report(tiles: dict, cells: dict) -> None:
         w(f"- Buildings compiled (parts of multipolygons count separately): {bc['compiled']:,}.")
         w("- Height source (eave and ridge):")
         tot = max(1, sum(bc["heights"].values()))
-        names = {"dhm_dsm_measured": "DHM DSM p60/p95 over DTM ground (measured)", "kk_eave_estimate": "KK `tagrendehoejde_estimat` (observed)",
+        names = {"dhm_dsm_measured": "DHM DSM p60/p95 over DTM ground (measured)",
                  "storeys_x_3m": "BBR storeys x 3.0 m (inferred)", "default_outbuilding": "default 3.2 m outbuilding (inferred)"}
         for k, v in sorted(bc["heights"].items(), key=lambda kv: -kv[1]):
             w(f"  - {names.get(k, k)}: {v:,} ({100 * v / tot:.1f} %)")
+        dsm = 100 * bc["heights"].get("dhm_dsm_measured", 0) / tot
+        w(f"  - measured share {dsm:.1f} % (target >= 90 %)")
         b0 = BC.read_done("buildings0")
         if b0:
-            w(f"- Footprint sources: KK `bygning` {b0.get('kk_bygning', 0):,}, KK `bygning_kk` extra {b0.get('kk_bygning_kk_extra', 0):,}, "
-              f"GeoDanmark Bygning added where KK has none (all of Frederiksberg, plus gaps) {b0.get('geodanmark_added', 0):,} "
-              f"({b0.get('geodanmark_added_without_bbr', 0):,} of them without a BBR record).")
+            w(f"- Footprint source: GeoDanmark Bygning {b0.get('geodanmark_in_tiles', 0):,} in the tiles, joined to BBR bygning "
+              f"(bbruuid = id_lokalid, {b0.get('bbr_records', 0):,} BBR records of kommune {BC.KOMMUNE}); "
+              f"{b0.get('geodanmark_without_bbr', 0):,} footprints have no BBR record. BBR status of the matches: {b0.get('bbr_status', {})}.")
         w("")
     rg = BC.CITY_DIR / "roadgraph.json"
     if rg.exists():
