@@ -71,9 +71,9 @@ def test_entry_records_snap_distance_wall_and_conf():
 
 def test_normalise_converts_to_local_and_drops_non_gaeldende():
     raw = {"id_lokalId": "u", "status": "3", "husnummertekst": "37A", "geoDanmarkBygning": 1064715171,
-           "adgangTilBygning": "bbr", "adgangspunkt": {"position": "POINT(723934.02 6176501.87)", "oprindelse_nøjagtighedsklasse": "A"},
-           "vejpunkt": {"position": "POINT(723900 6176500)"}, "navngivenVej": {"vejnavn": "Nørre Søgade"}}
+           "adgangTilBygning": "bbr", "adgangspunkt": {"position": "POINT(556034.02 6323101.87)", "oprindelse_nøjagtighedsklasse": "A"},
+           "vejpunkt": {"position": "POINT(556000 6323100)"}, "navngivenVej": {"vejnavn": "Gammeltorv"}}
     n = normalise(raw)
     assert (round(n["x"], 2), round(n["z"], 2)) == (34.02, -1.87) and n["road"] == [0.0, 0.0]
-    assert n["gdk"] == "1064715171" and n["street"] == "Nørre Søgade" and n["acc"] == "A"
+    assert n["gdk"] == "1064715171" and n["street"] == "Gammeltorv" and n["acc"] == "A"
     assert normalise({**raw, "status": "4"}) is None

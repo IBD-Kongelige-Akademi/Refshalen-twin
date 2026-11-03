@@ -256,15 +256,18 @@ test('tiled height field reads the grid of the tile a point lies in', () => {
   const a = tileOfLocal(-100, -100);
   terrain.addTile(chunkPayload(a));
   const f = createTiledHeightField(terrain, tileOfLocal);
-  const g = createHeightGrid({ bbox: [-420, -520, 120, 20], cell: 0.5 });
-  g.polygon([-50, -50, 50, -50, 50, 0, -50, 0], 0.2);
+  // a point and a polygon well inside tile a, wherever the frame origin puts its edges
+  const [bx0, bz0, bx1, bz1] = tileBoundsLocal(a);
+  const px = bx0 + 250, pz = bz0 + 250;
+  const g = createHeightGrid({ bbox: [bx0 - 20, bz0 - 20, bx1 + 20, bz1 + 20], cell: 0.5 });
+  g.polygon([px - 50, pz - 30, px + 50, pz - 30, px + 50, pz + 20, px - 50, pz + 20], 0.2);
   f.addTile(a, g);
-  assert.ok(Math.abs(f.offsetAt(0, -20) - 0.2) < 1e-3);
-  assert.ok(Math.abs(f.heightAt(0, -20) - (field(0, -20) + 0.2)) < 0.03);
-  assert.equal(f.offsetAt(300, 300), 0);
+  assert.ok(Math.abs(f.offsetAt(px, pz) - 0.2) < 1e-3);
+  assert.ok(Math.abs(f.heightAt(px, pz) - (field(px, pz) + 0.2)) < 0.03);
+  assert.equal(f.offsetAt(bx1 + 300, bz1 + 300), 0);
   assert.equal(f.tileCount, 1);
   f.removeTile(a);
-  assert.equal(f.offsetAt(0, -20), 0);
+  assert.equal(f.offsetAt(px, pz), 0);
 });
 
 test('tiled lawn mask answers per tile; a removed tile has no lawn', () => {

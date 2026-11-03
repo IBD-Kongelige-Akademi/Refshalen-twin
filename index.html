@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Copenhagen Twin</title>
+  <title>Aalborg Twin</title>
   <link rel="icon" href="data:," />
-  <meta name="description" content="Copenhagen Twin: a walkable, drivable and bikeable real-time 3D twin of Søerne and inner Nørrebro, built with three.js WebGPURenderer and TSL. Real building footprints and heights, streets, signals, traffic and cyclists." />
+  <meta name="description" content="Aalborg Twin: a walkable, drivable and bikeable real-time 3D twin of the old town and harbour front on the Limfjord, built with three.js WebGPURenderer and TSL. Real building footprints and heights, streets, signals, traffic and cyclists." />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <!-- Intentional immutable three.js source pin: keep core, TSL, and addons on the same verified commit. -->
   <script type="importmap">
@@ -173,15 +173,15 @@
   <div id="loading-overlay" role="status" aria-live="polite">
     <div class="loader">
       <span class="brand-mark loader-bullet" aria-hidden="true">CPH</span>
-      <div class="loader-title">Copenhagen Twin</div>
+      <div class="loader-title">Aalborg Twin</div>
       <div class="loader-track is-indeterminate" aria-hidden="true"><span id="loading-progress" class="loader-fill"></span></div>
       <div id="loading-status">Initializing WebGPURenderer &amp; TSL Shaders...</div>
-      <div class="loader-credit">Based on Slop New York by mrdoob (MIT) · Facade imagery: Skråfoto 2023 and 2025 from Styrelsen for Dataforsyning og Infrastruktur (retrieved October 2026) · Map data © OpenStreetMap contributors (ODbL), GeoDanmark, BBR and Københavns Kommune open data · Nyhavn detail models: DHM Punktsky 2019 roofs (Roofer) and Skråfoto 2025 (Klimadatastyrelsen / SDFI); Nyhavn 9–17 fronts traced from photos by Jenny Andersson / News Øresund (CC BY 2.0) and Liberaler Humanist (CC BY-SA 3.0, measurement reference)</div>
+      <div class="loader-credit">Based on Slop New York by mrdoob (MIT), via copenhagen-twin by Martin Collignon (MIT) · Map data © OpenStreetMap contributors (ODbL), GeoDanmark, BBR and DHM (Klimadatastyrelsen / SDFI)</div>
     </div>
   </div>
 
   <!-- 3D WebGPU Viewport Container -->
-  <main id="canvas-container" aria-label="3D interactive Copenhagen Twin viewport"></main>
+  <main id="canvas-container" aria-label="3D interactive Aalborg Twin viewport"></main>
 
   <!-- Top-Left: Brand & Renderer Telemetry -->
   <header class="hud hud-top-left">
@@ -189,8 +189,8 @@
       <span class="brand-mark" aria-hidden="true">CPH</span>
       <div class="brand-titles">
         <div class="brand-heading">
-          <h1>Copenhagen Twin</h1>
-          <a class="repo-link" href="https://github.com/mrdoob/slop-newyork/" target="_blank" rel="noopener noreferrer" title="Based on Slop New York by mrdoob (MIT). Facade imagery: Skråfoto 2023 and 2025 from Styrelsen for Dataforsyning og Infrastruktur (retrieved October 2026). Data: GeoDanmark (Bygning), BBR, Københavns Kommune open data and © OpenStreetMap contributors (ODbL). Nyhavn detail models: roofs and walls fitted to DHM Punktsky 2019 with Roofer, roof and facade photos Skråfoto 2025 (Klimadatastyrelsen / SDFI); Nyhavn 9–17 openings, roof windows and chimneys traced from photos by Jenny Andersson / News Øresund (CC BY 2.0) and Liberaler Humanist (CC BY-SA 3.0, measurements only, no pixels)." aria-label="Based on Slop New York by mrdoob (MIT); credits and data attributions (opens in a new tab)">Credits <span aria-hidden="true">↗</span></a>
+          <h1>Aalborg Twin</h1>
+          <a class="repo-link" href="https://github.com/mrdoob/slop-newyork/" target="_blank" rel="noopener noreferrer" title="Based on Slop New York by mrdoob (MIT), via copenhagen-twin by Martin Collignon (MIT). Data: GeoDanmark (Bygning), BBR, DHM (Klimadatastyrelsen / SDFI) and © OpenStreetMap contributors (ODbL)." aria-label="Based on Slop New York by mrdoob (MIT); credits and data attributions (opens in a new tab)">Credits <span aria-hidden="true">↗</span></a>
         </div>
         <div class="brand-subtitle">three.js · WebGPU · TSL · <span id="hud-fps" class="fps-ok">60</span> fps</div>
       </div>
@@ -231,20 +231,13 @@
   <!-- Teleport Destinations (native popover: light-dismiss & Esc) -->
   <div id="teleport-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" aria-label="Teleport the active player">
     <div class="pop-title">Teleport to</div>
-    <button id="tp-ns37" class="pop-item tp-btn" data-teleport="ns37" type="button"><span class="pop-name">Nørre Søgade 37</span><span class="pop-sub">Søerne · start</span></button>
-    <button id="tp-dlb" class="pop-item tp-btn" data-teleport="dlb" type="button"><span class="pop-name">Dronning Louises Bro</span><span class="pop-sub">Søerne · Sankt Jørgens Sø</span></button>
-    <button id="tp-peblinge" class="pop-item tp-btn" data-teleport="peblinge" type="button"><span class="pop-name">Peblinge Sø</span><span class="pop-sub">Peblinge Dossering</span></button>
-    <button id="tp-nbro" class="pop-item tp-btn" data-teleport="nbro" type="button"><span class="pop-name">Nørrebrogade</span><span class="pop-sub">Nørrebro · cycle street</span></button>
-    <button id="tp-blaag" class="pop-item tp-btn" data-teleport="blaag" type="button"><span class="pop-name">Blågårds Plads</span><span class="pop-sub">Nørrebro · square</span></button>
+    <button id="tp-torv" class="pop-item tp-btn" data-teleport="torv" type="button"><span class="pop-name">Gammel Torv</span><span class="pop-sub">Old town · start</span></button>
+    <button id="tp-budolfi" class="pop-item tp-btn" data-teleport="budolfi" type="button"><span class="pop-name">Budolfi Domkirke</span><span class="pop-sub">Old town · the cathedral</span></button>
+    <button id="tp-jomfru" class="pop-item tp-btn" data-teleport="jomfru" type="button"><span class="pop-name">Jomfru Ane Gade</span><span class="pop-sub">Old town · nightlife street</span></button>
+    <button id="tp-aalborghus" class="pop-item tp-btn" data-teleport="aalborghus" type="button"><span class="pop-name">Aalborghus</span><span class="pop-sub">Harbour front · the castle</span></button>
+    <button id="tp-limfjord" class="pop-item tp-btn" data-teleport="limfjord" type="button"><span class="pop-name">Limfjordsbroen</span><span class="pop-sub">Harbour front · the bridge</span></button>
+    <button id="tp-utzon" class="pop-item tp-btn" data-teleport="utzon" type="button"><span class="pop-name">Utzon Center</span><span class="pop-sub">Harbour front · Limfjord</span></button>
     <div id="tp-city-title" class="pop-title" hidden>Citywide</div>
-    <button id="tp-rhus" class="pop-item tp-btn" data-teleport="rhus" type="button" hidden><span class="pop-name">Rådhuspladsen</span><span class="pop-sub">Indre By · town hall square</span></button>
-    <button id="tp-nyhavn" class="pop-item tp-btn" data-teleport="nyhavn" type="button" hidden><span class="pop-name">Nyhavn</span><span class="pop-sub">Indre By · the canal</span></button>
-    <button id="tp-slot" class="pop-item tp-btn" data-teleport="slot" type="button" hidden><span class="pop-name">Christiansborg</span><span class="pop-sub">Slotsholmen</span></button>
-    <button id="tp-brygge" class="pop-item tp-btn" data-teleport="brygge" type="button" hidden><span class="pop-name">Islands Brygge</span><span class="pop-sub">Amager · the harbour front</span></button>
-    <button id="tp-vesterbro" class="pop-item tp-btn" data-teleport="vesterbro" type="button" hidden><span class="pop-name">Istedgade</span><span class="pop-sub">Vesterbro</span></button>
-    <button id="tp-frbrhus" class="pop-item tp-btn" data-teleport="frbrhus" type="button" hidden><span class="pop-name">Frederiksberg Rådhus</span><span class="pop-sub">Frederiksberg · Smallegade</span></button>
-    <button id="tp-frballe" class="pop-item tp-btn" data-teleport="frballe" type="button" hidden><span class="pop-name">Frederiksberg Allé</span><span class="pop-sub">Frederiksberg · the avenue</span></button>
-    <button id="tp-trianglen" class="pop-item tp-btn" data-teleport="trianglen" type="button" hidden><span class="pop-name">Trianglen</span><span class="pop-sub">Østerbro</span></button>
   </div>
 
   <!-- Bottom-Left: Street-Name Sign -->
@@ -332,18 +325,19 @@
     </div>
   </section>
 
-  <!-- All Cameras: 3 Follow Cameras + 5 Copenhagen Vantage Cameras + Auto-Director Drone -->
+  <!-- All Cameras: 3 Follow Cameras + 6 Aalborg Vantage Cameras + Auto-Director Drone -->
   <div id="camera-popover" class="popover" popover data-side="above" data-anchor="hud-cluster" data-align="hud-cluster" aria-label="Multiple Camera Angles">
     <div class="pop-title">Follow</div>
     <button id="cam-chase" class="pop-item cam-btn active" data-camera="chase" type="button"><span class="pop-name">3rd-Person Chase</span></button>
     <button id="cam-action" class="pop-item cam-btn" data-camera="action" type="button"><span class="pop-name">Low-Angle Action</span><kbd>6</kbd></button>
     <button id="cam-pov" class="pop-item cam-btn" data-camera="pov" type="button"><span class="pop-name">First-Person / Cockpit</span><kbd>7</kbd></button>
     <div class="pop-title">Scenic</div>
-    <button id="cam-dlb" class="pop-item cam-btn" data-camera="dlb" type="button"><span class="pop-name">Dronning Louises Bro</span><kbd>8</kbd></button>
-    <button id="cam-ns37" class="pop-item cam-btn" data-camera="ns37" type="button"><span class="pop-name">Nørre Søgade 37</span><kbd>9</kbd></button>
-    <button id="cam-peblinge" class="pop-item cam-btn" data-camera="peblinge" type="button"><span class="pop-name">Peblinge Sø</span><kbd>0</kbd></button>
-    <button id="cam-nbro" class="pop-item cam-btn" data-camera="nbro" type="button"><span class="pop-name">Nørrebrogade</span></button>
-    <button id="cam-blaag" class="pop-item cam-btn" data-camera="blaag" type="button"><span class="pop-name">Blågårds Plads</span></button>
+    <button id="cam-limfjord" class="pop-item cam-btn" data-camera="limfjord" type="button"><span class="pop-name">Limfjordsbroen</span><kbd>8</kbd></button>
+    <button id="cam-torv" class="pop-item cam-btn" data-camera="torv" type="button"><span class="pop-name">Gammel Torv</span><kbd>9</kbd></button>
+    <button id="cam-utzon" class="pop-item cam-btn" data-camera="utzon" type="button"><span class="pop-name">Utzon Center</span><kbd>0</kbd></button>
+    <button id="cam-budolfi" class="pop-item cam-btn" data-camera="budolfi" type="button"><span class="pop-name">Budolfi Domkirke</span></button>
+    <button id="cam-jomfru" class="pop-item cam-btn" data-camera="jomfru" type="button"><span class="pop-name">Jomfru Ane Gade</span></button>
+    <button id="cam-aalborghus" class="pop-item cam-btn" data-camera="aalborghus" type="button"><span class="pop-name">Aalborghus</span></button>
     <button id="cam-drone" class="pop-item cam-btn" data-camera="drone" type="button"><span class="pop-name">Auto-Director Aerial</span></button>
   </div>
 

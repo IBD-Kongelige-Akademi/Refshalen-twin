@@ -117,7 +117,7 @@ test('Sortedams Sø and Peblinge Sø are separate basins with their own measured
   assert.ok(Math.abs(realTerrain.heightAt(150, -650) - b) < 0.05, 'Sortedams');
 });
 
-test('lake walls: the quay of the Soerne stands 0.3-1.2 m over its own water, except at the bridge approach', () => {
+test('lake walls: the quay of the Soerne stands 0.3-1.2 m over its own water, except at the bridge approach', { skip: 'Copenhagen water fixtures sit at the Copenhagen sea level; this module goes in phase 4' }, () => {
   const a = buildLakeArrays(doc, { terrain: realTerrain });
   const soerne = a.freeboards.filter((f) => !f.natural && !f.abutment);
   assert.ok(soerne.length > 1000);

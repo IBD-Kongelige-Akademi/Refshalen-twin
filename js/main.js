@@ -20,7 +20,7 @@ import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.j
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
-// Boots the Copenhagen twin (js/world.js builds the city from data/cph-geodata.json).
+// Boots the Aalborg twin (js/world.js builds the city from the tile index, or data/cph-geodata.json without one).
 
 async function initApp() {
   const query = new URLSearchParams(location.search);
@@ -579,13 +579,13 @@ async function initApp() {
         selectCamera('pov', true);
         break;
       case 'Digit8':
-        selectCamera('dlb', true);
+        selectCamera('limfjord', true);
         break;
       case 'Digit9':
-        selectCamera('ns37', true);
+        selectCamera('torv', true);
         break;
       case 'Digit0':
-        selectCamera('peblinge', true);
+        selectCamera('utzon', true);
         break;
       case 'KeyV':
         cycleCamera(e.shiftKey ? -1 : 1);

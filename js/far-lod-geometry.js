@@ -8,6 +8,7 @@
 // Positions of a tile are relative to its north-west corner (x = east, z = south); the layer places the mesh there.
 
 import earcut from './earcut.js';
+import { SEA_LEVEL_LOCAL } from './tile-grid.js';
 
 export const FAR_GRID = 16;
 const HEAD = 4 + (FAR_GRID + 1) * (FAR_GRID + 1) * 2 + (FAR_GRID * FAR_GRID) / 8;
@@ -133,7 +134,7 @@ export const FAR_COLORS = Object.freeze({ water: [58, 96, 118], park: [92, 118, 
  * The ground of one tile on its 16 x 16 grid: positions relative to the tile's north-west corner, colour by what the cell is.
  * Heights at the sea (within 0.12 m of `sea`) are water, whatever the bits say.
  */
-export function farGroundArrays(buf, off, bounds, sea = -6.84, colors = FAR_COLORS) {
+export function farGroundArrays(buf, off, bounds, sea = SEA_LEVEL_LOCAL, colors = FAR_COLORS) {
   const n = FAR_GRID + 1;
   const h = farHeights(buf, off);
   const { parksAt } = readFarHeader(buf, off);

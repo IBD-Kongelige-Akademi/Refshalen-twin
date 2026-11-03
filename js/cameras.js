@@ -3,28 +3,30 @@ import { TELEPORT_LOCATIONS } from './city-config.js';
 
 // js/cameras.js
 // Multi-camera system supporting Third-Person Chase (with mouse/touch orbit + zoom),
-// Low-Angle Action Cam, POV/Cockpit Cam, 5 Copenhagen vantage cameras, and Auto-Director Drone.
+// Low-Angle Action Cam, POV/Cockpit Cam, 6 Aalborg vantage cameras, and Auto-Director Drone.
 
 const CAMERA_PRESETS = [
   { id: 'chase',       name: '3rd-Person Chase',         short: 'Chase',       category: 'follow', fov: 56 },
   { id: 'action',      name: 'Low-Angle Action',         short: 'Action',      category: 'follow', fov: 60 },
   { id: 'pov',         name: 'First-Person / Cockpit',   short: 'POV / Dash',  category: 'follow', fov: 68 },
-  { id: 'dlb',         name: 'Dronning Louises Bro',     short: 'Louises Bro', category: 'scenic', fov: 52 },
-  { id: 'ns37',        name: 'Nørre Søgade 37',          short: 'NS37',        category: 'scenic', fov: 56 },
-  { id: 'peblinge',    name: 'Peblinge Sø',              short: 'Peblinge',    category: 'scenic', fov: 50 },
-  { id: 'nbro',        name: 'Nørrebrogade',             short: 'Nørrebro',    category: 'scenic', fov: 54 },
-  { id: 'blaag',       name: 'Blågårds Plads',           short: 'Blågård',     category: 'scenic', fov: 56 },
+  { id: 'limfjord',    name: 'Limfjordsbroen',           short: 'Limfjord',    category: 'scenic', fov: 52 },
+  { id: 'torv',        name: 'Gammel Torv',              short: 'Torv',        category: 'scenic', fov: 56 },
+  { id: 'utzon',       name: 'Utzon Center',             short: 'Utzon',       category: 'scenic', fov: 50 },
+  { id: 'budolfi',     name: 'Budolfi Domkirke',         short: 'Budolfi',     category: 'scenic', fov: 54 },
+  { id: 'jomfru',      name: 'Jomfru Ane Gade',          short: 'Jomfru Ane',  category: 'scenic', fov: 56 },
+  { id: 'aalborghus',  name: 'Aalborghus',               short: 'Aalborghus',  category: 'scenic', fov: 54 },
   { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
 ];
 
 // Scenic vantage points: stand `back` metres behind and `up` metres above the teleport location (looking along its
 // heading), or at a fixed `pos`, and look at the point `ahead` metres in front of it, `lookY` metres up.
 const SCENIC_VIEWS = {
-  dlb: { back: 26, up: 7, ahead: 60, lookY: 6, sway: 3 },
-  ns37: { pos: [-7.2, 5.5, -7.5], look: [18.2, 9, 4.3], sway: 1.2 },
-  peblinge: { back: 30, up: 9, ahead: 70, lookY: 4, sway: 3.5 },
-  nbro: { back: 22, up: 6, ahead: 60, lookY: 7, sway: 2.5 },
-  blaag: { back: 24, up: 8, ahead: 50, lookY: 8, sway: 2 }
+  limfjord: { back: 26, up: 7, ahead: 60, lookY: 6, sway: 3 },
+  torv: { back: 18, up: 5.5, ahead: 40, lookY: 8, sway: 1.2 },
+  utzon: { back: 30, up: 9, ahead: 70, lookY: 4, sway: 3.5 },
+  budolfi: { back: 22, up: 6, ahead: 50, lookY: 12, sway: 2.5 },
+  jomfru: { back: 20, up: 5, ahead: 45, lookY: 6, sway: 2 },
+  aalborghus: { back: 24, up: 8, ahead: 50, lookY: 8, sway: 2 }
 };
 
 class CameraSystem {
@@ -277,11 +279,12 @@ class CameraSystem {
         break;
       }
 
-      case 'dlb':
-      case 'ns37':
-      case 'peblinge':
-      case 'nbro':
-      case 'blaag': {
+      case 'limfjord':
+      case 'torv':
+      case 'utzon':
+      case 'budolfi':
+      case 'jomfru':
+      case 'aalborghus': {
         const view = SCENIC_VIEWS[this.activePresetId];
         const loc = TELEPORT_LOCATIONS[this.activePresetId];
         const sway = Math.sin(elapsed * 0.24) * view.sway;
@@ -300,16 +303,16 @@ class CameraSystem {
       }
 
       case 'drone': {
-        // Slow orbit above the district (Søerne, Nørrebro, Peblinge Sø)
+        // Slow orbit above the old town and the harbour front (Budolfi, Aalborghus, Limfjordsbroen)
         const angle = elapsed * 0.07 + 0.65;
         const radius = 380.0 + Math.sin(elapsed * 0.23) * 90.0;
         const alt = 230.0 + Math.cos(elapsed * 0.19) * 60.0;
         desiredPos.set(
-          Math.cos(angle) * radius - 60.0,
+          Math.cos(angle) * radius + 20.0,
           alt,
-          Math.sin(angle) * radius - 300.0
+          Math.sin(angle) * radius - 220.0
         );
-        desiredLook.set(-60.0, 10.0, -300.0);
+        desiredLook.set(20.0, 10.0, -220.0);
         break;
       }
     }

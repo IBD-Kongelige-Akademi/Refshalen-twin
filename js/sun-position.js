@@ -2,9 +2,9 @@
 // Azimuth is degrees clockwise from true north; scene vectors use x=east, y=up, z=south.
 
 const COPENHAGEN_TIME_ZONE = 'Europe/Copenhagen';
-const DEFAULT_LATITUDE = 55.684;
-const DEFAULT_LONGITUDE = 12.564;
-const GRID_CONVERGENCE_DEGREES = 2.9;
+const DEFAULT_LATITUDE = 57.048; // Aalborg, Gammel Torv
+const DEFAULT_LONGITUDE = 9.919;
+const GRID_CONVERGENCE_DEGREES = 0.77; // UTM 32N grid north vs true north at Aalborg: (9.919 - 9) * sin(57.048)
 const DEG = Math.PI / 180;
 
 const copenhagenFormatter = new Intl.DateTimeFormat('en-GB', {

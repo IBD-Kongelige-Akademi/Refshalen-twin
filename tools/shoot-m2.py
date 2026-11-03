@@ -747,7 +747,7 @@ try:
             page.screenshot(path=f'{args.out}/hud-teleport-menu.png')
             page.keyboard.press('Escape'); page.wait_for_timeout(300)
             # teleport to Dronning Louises Bro, then to Nørrebrogade and capture the chase view with traffic around
-            for key, shot in (('dlb', 'teleport-dronning-louises-bro'), ('nbro', 'teleport-norrebrogade'), ('blaag', 'teleport-blagards-plads')):
+            for key, shot in (('limfjord', 'teleport-limfjordsbroen'), ('jomfru', 'teleport-jomfru-ane-gade'), ('utzon', 'teleport-utzon-center')):
                 page.click('#btn-teleport'); page.wait_for_timeout(300)
                 page.click(f'#tp-{key}'); page.wait_for_timeout(5000)
                 page.screenshot(path=f'{args.out}/{shot}.png')
@@ -770,7 +770,7 @@ try:
             for key in ('1', '3', '4', '2'):
                 page.keyboard.press(key); page.wait_for_timeout(1200)
             check('mode label after 2', page.text_content('#hud-active-mode') == 'Car')
-            for key, shot in (('8', 'camera-dronning-louises-bro'), ('9', 'camera-ns37'), ('0', 'camera-peblinge')):
+            for key, shot in (('8', 'camera-limfjordsbroen'), ('9', 'camera-gammel-torv'), ('0', 'camera-utzon-center')):
                 page.keyboard.press(key); page.wait_for_timeout(2500)
                 page.screenshot(path=f'{args.out}/{shot}.png')
                 check(f'camera {key}', page.text_content('#hud-active-camera') != '3rd-Person Chase', page.text_content('#hud-active-camera'))

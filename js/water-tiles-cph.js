@@ -1,5 +1,6 @@
 import { Arrays, wallAlong, surfaceArrays, WATER, KIND, BANK_BATTER, BEACH_BATTER } from './lakes-cph.js';
 import { chamfer } from './ground-field-cph.js';
+import { SEA_LEVEL_LOCAL } from './tile-grid.js';
 
 // js/water-tiles-cph.js
 // Pure (no three.js) geometry and rasters of the streamed city's generic water (milestone C4). The `water` layer of a tile
@@ -12,7 +13,7 @@ import { chamfer } from './ground-field-cph.js';
 // The quay / bank geometry is the district's (js/lakes-cph.js wallAlong): granite wall with a coping, or a grassed bank with a 1 : 1.6 batter.
 
 export const POND_LIFT = 0.02;
-export const SEA_LEVEL = -6.84; // 0 m DVR90 in the local frame
+export const SEA_LEVEL = SEA_LEVEL_LOCAL; // 0 m DVR90 in the local frame (js/tile-grid.js)
 /** 1 for water at the sea level (harbour, canals, the sound), 0 for lakes and ponds: the water shader's `waterTint`. */
 export const seaTint = (level, kind) => (kind === 'sea' || Math.abs(level - SEA_LEVEL) < 0.05 ? 1 : 0);
 

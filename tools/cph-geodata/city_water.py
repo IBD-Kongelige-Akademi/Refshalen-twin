@@ -20,7 +20,7 @@ tile_streets.py. It never edits what build_city.py / city_layers2.py write; it r
 
 Sources (water): GeoDanmark `soe` + `bassin` polygons, OSM natural=water (data/raw/city/osm_water.json), the sea from the OSM coastline
 (land on the left of a way; polygonised against the OSM request bbox, so harbour basins and Oeresund come out as water).
-Level of a body: the median of the compiled terrain (DTM) over it, 0 m DVR90 (the sea, -6.84 local) when it lies within 0.25 m of that.
+Level of a body: the median of the compiled terrain (DTM) over it, 0 m DVR90 (the sea, -origin height local) when it lies within 0.25 m of that.
 Shores: every boundary of the water union is a shore wall. Water at the sea level (the harbour, Sydhavn, Nordhavn, the canals) is quayed
 (`q`: granite wall + coping) by default, as the real harbour is, except where OSM says the coast is natural: `s` (sand beach) near
 natural=beach / sand / shingle, `b` (grassed bank) near wetland / bare rock / forest / meadow / nature reserve land that no building, pavement
@@ -58,7 +58,7 @@ ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw" / "city"
 RAW_WATER = RAW / "water"
 VERSION = "cph-water/1"
-SEA = -6.84  # DVR90 0 m in the local frame (origin height 6.84)
+SEA = -frame.ORIGIN[2]  # DVR90 0 m in the local frame
 SEA_SNAP_M = 0.6  # a body whose terrain median is this close to the sea is at the sea (the DTM over harbour basins wobbles by a few dm)
 POND_MAX_M2 = 1500.0  # smaller water is a fountain / pool: flat water, no walls, no ground cut (lakes.py POND_MAX_M2)
 MIN_WATER_M2 = 20.0

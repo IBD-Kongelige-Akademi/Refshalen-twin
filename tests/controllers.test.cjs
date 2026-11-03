@@ -36,7 +36,7 @@ function keyboardHarness(overrides = {}, moduleImports = {}) {
   const window = eventTarget();
   const document = { ...eventTarget(), hidden: false };
   const config = {
-    TELEPORT_LOCATIONS: { ns37: { z: 0 } },
+    TELEPORT_LOCATIONS: { torv: { z: 0 } },
     isTypingInField: (event) => ['INPUT', 'SELECT'].includes(event.target?.tagName),
     ...overrides
   };

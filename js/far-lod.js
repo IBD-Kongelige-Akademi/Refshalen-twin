@@ -2,6 +2,7 @@ import * as THREE from 'three/webgpu';
 import { attribute } from 'three/tsl';
 import { farTileArrays, farGroundArrays, farWaterArrays, FAR_COLORS } from './far-lod-geometry.js';
 import { disposeTree } from './dispose-tree.js';
+import { SEA_LEVEL_LOCAL } from './tile-grid.js';
 
 // js/far-lod.js
 // The far ring (docs/citywide-plan.md, C5): everything beyond the tiles the streamer keeps resident. One compact citywide layer
@@ -51,7 +52,7 @@ export function createFarLayer(scene, { header, buffer, bounds, isResident = () 
   const group = new THREE.Group();
   group.name = 'CopenhagenFar';
   scene.add(group);
-  const sea = header.sea ?? -6.84;
+  const sea = header.sea ?? SEA_LEVEL_LOCAL;
   const buildingMaterial = farMaterial('far-buildings');
   const groundMaterial = farMaterial('far-ground', { roughness: 1 });
   const tiles = new Map(); // id -> { ground, buildings, distance }

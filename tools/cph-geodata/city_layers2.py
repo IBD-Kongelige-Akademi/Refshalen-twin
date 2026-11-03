@@ -34,7 +34,7 @@ def cell_priority(cells: dict) -> list[str]:
         e0, n0, e1, n1 = BC.cell_bbox_utm(c)
         cx, cy = (e0 + e1) / 2, (n0 + n1) / 2
         inner = INNER[0] <= cx <= INNER[2] and INNER[1] <= cy <= INNER[3]
-        return (0 if inner else 1, math.hypot(cx - 724000, cy - 6176500), c)
+        return (0 if inner else 1, math.hypot(cx - frame.ORIGIN[0], cy - frame.ORIGIN[1]), c)
 
     return sorted(cells, key=key)
 

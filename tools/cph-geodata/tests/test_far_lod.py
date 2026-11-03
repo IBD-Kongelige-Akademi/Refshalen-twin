@@ -52,7 +52,7 @@ def test_top_height_and_tones():
 
 
 def test_height_grid_bilinear_and_sea_default():
-    tid = "1447_12353"
+    tid = "1112_12646"
     bounds = frame.tile_bounds_local(tid)
     w = 250
     chunk = {"x0": bounds[0], "z0": bounds[1], "w": w, "h": w, "cell": 2.0,
@@ -63,7 +63,7 @@ def test_height_grid_bilinear_and_sea_default():
 
 
 def test_tile_block_layout_decodes(tmp_path):
-    tid = "1447_12353"
+    tid = "1112_12646"
     bounds = frame.tile_bounds_local(tid)
     xmin, zmin = bounds[0], bounds[1]
     tdir = tmp_path / tid
@@ -95,10 +95,10 @@ def test_water_levels_follow_the_shore(tmp_path):
     ring = [0, 0, 400, 0, 400, 300, 0, 300]
     (tmp_path / "lakes.json").write_text(json.dumps({"lakes": [{"id": "lake:1", "name": "A", "ring": ring}, {"id": "lake:2", "name": "Sea", "ring": [5000, 5000, 6000, 5000, 6000, 6000, 5000, 6000]}], "ponds": []}))
     tid = frame.tile_of_local(200, 150)
-    h_shore = np.full((17, 17), 0.4, dtype=np.float32)
+    h_shore = np.full((17, 17), F.SEA + 5.4, dtype=np.float32)  # well above the sea
     h_sea = np.full((17, 17), F.SEA + 0.5, dtype=np.float32)
     heights = {tid: h_shore, frame.tile_of_local(5500, 5500): h_sea}
     out = F.water_polygons(tmp_path, heights)
     by = {w["id"]: w for w in out}
-    assert abs(by["lake:1"]["level"] - 0.4) < 1e-6  # an inland lake sits at its shore
+    assert abs(by["lake:1"]["level"] - (F.SEA + 5.4)) < 1e-5  # an inland lake sits at its shore
     assert by["lake:2"]["level"] == F.SEA  # near the sea: the sea

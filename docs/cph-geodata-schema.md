@@ -5,8 +5,8 @@
 - **Units:** metres.
 - **CRS:** source EPSG:25832, vertical DVR90.
 - **Local frame:** `x = E - origin[0]` (east), `z = -(N - origin[1])` (south positive, three.js-friendly), `y` up = DVR90 − origin[2].
-- **Origin:** `[723900.0, 6176500.0, 6.84]`, near Nørre Søgade 37.
-- **District bbox (local):** x ∈ [−750, 750], z ∈ [−750, 750].
+- **Origin:** `[556000.0, 6323100.0, h]`, by Gammel Torv in Aalborg; the DVR90 height `h` is read from the DTM at the origin in phase 2 (0.0 until then).
+- **District bbox (local):** x ∈ [−1000, 1000], z ∈ [−900, 1100] (E 555000–557000, N 6322000–6324000).
 - **Format:** polygons and polylines are flat `[x0, z0, x1, z1, …]` arrays, rounded to 0.01 m. Rings are counter-clockwise when seen from above (in x/−z), with no closing duplicate.
 
 ## Provenance
@@ -24,7 +24,7 @@ Field-level overrides go in `conf_fields: {field: conf}`. Nothing may be invente
 {
   "version": "cph-geodata/1",
   "generated": "ISO time",
-  "frame": {"epsg": 25832, "vertical": "DVR90", "origin": [723900.0, 6176500.0, 6.84], "axes": "x=east, z=south, y=up", "bbox": [-750, -750, 750, 750]},
+  "frame": {"epsg": 25832, "vertical": "DVR90", "origin": [556000.0, 6323100.0, 0.0], "axes": "x=east, z=south, y=up", "bbox": [-1000, -900, 1000, 1100]},
   "attribution": ["Indeholder data fra Klimadatastyrelsen …", "Indeholder data fra Styrelsen for Dataforsyning og Infrastruktur, Skråfoto 2023 and 2025 (retrieved October 2026)", "© OpenStreetMap contributors (ODbL)", "…"],
   "buildings": [Building],
   "roads": [Road],
@@ -248,7 +248,7 @@ can select another writable scratch path.
 
 Generated from the layer files above, gitignored (about 40 MB); the engine reads `data/tiles/index.json` when it exists and the monolithic `data/cph-*.json` otherwise (`?debug=notiles` forces the monolithic path). Regenerate with `uv run tools/cph-geodata/tile_split.py`.
 
-- Grid: fixed 500 m in EPSG:25832, id `<floor(E/500)>_<floor(N/500)>` (`frame.py`, `js/tile-grid.js`); four tiles fill one 1 km DHM / LoD2 cell. The district touches 4 x 4 tiles (`1446_12351` .. `1449_12354`).
+- Grid: fixed 500 m in EPSG:25832, id `<floor(E/500)>_<floor(N/500)>` (`frame.py`, `js/tile-grid.js`); four tiles fill one 1 km DHM / LoD2 cell. The district touches 4 x 4 tiles (`1110_12644` .. `1113_12647`).
 - `data/tiles/index.json`: `{version, tileSize, frame, city: {meta, roadgraph, streets, lakes}, tiles: {id: {utm, local, layers: {name: bytes}, counts, bytes}}}`.
 - `data/tiles/<id>/<layer>.json`, each `{tile, ord, ...lists}`: `buildings` (geodata buildings), `roads` (roads, cycleTracks, sidewalks, water, parks, `points.<kind>`), `surfaces` (surfaces, markings), `furniture` (the cph-furniture lists), `vegetation` (surfaces, canopy), `entrances` (entrances, stairwells), `groundfloor` (venues), `terrain` (`chunk`: int16 cm cells owned by the tile, base64, plus per-building ground levels), `lod2` (+ `lod2.bin`: that tile's roofer records, offsets relative to the tile file).
 - Ownership is by centroid (bbox centre of a ring or polyline, x/z of a point); nothing is split, so an item may stick out of its tile. Terrain is owned by cell centre. Entrances, stairwells, per-building terrain levels and LoD2 records follow their building.

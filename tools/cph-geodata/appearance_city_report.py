@@ -146,7 +146,7 @@ def coverage() -> str:
             if len(b.get("ring", [])) < 6:
                 continue
             cx, cz = C.centroid(b)
-            e, n = cx + 723900.0, 6176500.0 - cz
+            e, n = cx + A.ORIGIN[0], A.ORIGIN[1] - cz
             name = next((k for k, g in kom.items() if g.contains(Point(e, n))), "outside DAGI boundary")
             r = row(name)
             area = abs(ring_area(b["ring"]))

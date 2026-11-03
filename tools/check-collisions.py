@@ -58,7 +58,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--spots", default="", help="comma-separated spot names for --survey (default: the city or the district set)")
     parser.add_argument("--ticks", type=int, default=600, help="--survey: measured fixed-dt ticks per spot (default 600 = 10 s)")
     parser.add_argument("--warm", type=int, default=600, help="--survey: warm-up ticks per spot after streaming (default 600)")
-    parser.add_argument("--city-spots", default="rhus,stroget,vesterbro,frballe,nyhavn",
+    parser.add_argument("--city-spots", default="",
                         help="city cases (streamed citywide index only): walk/cycle/drive into walls, poles and parked cars at these spots; '' skips")
     parser.add_argument("--cpu-only", action="store_true", help="--survey: only the collision CPU windows (for A/B rounds)")
     parser.add_argument("--perf-rounds", type=int, default=1, help="--survey: CPU windows per spot (alternate builds between runs for A/B)")
@@ -72,23 +72,16 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-# --survey spots (local frame; heading: forward is (sin h, cos h)). The city ones are js/city-teleports.js plus Stroget (Vimmelskaftet);
+# --survey spots (local frame; heading: forward is (sin h, cos h)). The city ones are js/city-teleports.js (empty until phase 4);
 # the district ones are js/city-config.js TELEPORT_LOCATIONS.
-CITY_SPOTS = {
-    "rhus": (437.9, 723.6, -2.42),
-    "stroget": (827.0, 400.0, 1.99),
-    "nyhavn": (1881.4, 217.6, 2.76),
-    "frballe": (-1305.4, 1024.2, -1.69),
-    "vesterbro": (-281.4, 1414.0, -1.02),
-    "trianglen": (879.5, -2142.6, 0.11),
-    "brygge": (859.3, 1964.1, -0.59),
-}
+CITY_SPOTS = {}
 DISTRICT_SPOTS = {
-    "ns37": (0.0, 0.0, 3.14159),
-    "dlb": (97.0, -476.7, -2.12),
-    "peblinge": (-76.8, -320.0, -0.45),
-    "nbro": (-147.3, -620.1, -2.1),
-    "blaag": (-314.6, -448.0, 1.04),
+    "torv": (-77.0, -73.0, 3.14159),
+    "budolfi": (-234.0, -49.0, 3.14159),
+    "jomfru": (-157.0, -161.0, 3.14159),
+    "aalborghus": (-25.0, -263.0, 3.14159),
+    "limfjord": (52.0, -398.0, 3.14159),
+    "utzon": (266.0, -345.0, 3.14159),
 }
 PROBE_JS = pathlib.Path(__file__).resolve().with_name("collision-probe.js")
 COLLISION_FILES = ("city-collisions.js", "static-colliders.js", "collision-shapes.js")

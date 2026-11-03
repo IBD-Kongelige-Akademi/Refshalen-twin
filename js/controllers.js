@@ -41,7 +41,7 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 // 4. Helicopter (Sightseeing Twin-Turbine Chopper)
 
 // Spawn at Nørre Søgade 37 (the frame origin); the vehicles are staggered around it
-const SPAWN_Z = TELEPORT_LOCATIONS.ns37.z;
+const SPAWN_Z = TELEPORT_LOCATIONS.torv.z;
 const groundCollider = { type: 'ground' };
 
 const CAR_DRIVE = {

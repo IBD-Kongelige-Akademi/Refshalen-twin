@@ -41,7 +41,8 @@ from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw"
-ORIGIN = (723900.0, 6176500.0, 6.84)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frame import ORIGIN  # noqa: E402
 
 VEHICULAR = {"primary", "secondary", "residential", "service"}
 LANE_W = 3.0  # the traffic simulation's lane pitch

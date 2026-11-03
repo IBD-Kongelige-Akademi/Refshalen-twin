@@ -98,7 +98,7 @@ def all_cells(idx: dict | None = None) -> dict[str, list[str]]:
 
 def cell_bbox_local(cell: str) -> tuple[float, float, float, float]:
     cx, cy = map(int, cell.split("_"))
-    x0, z1 = A.ORIGIN[0] * 0 + cx * 1000 - 723900.0, -(cy * 1000 - 6176500.0)
+    x0, z1 = cx * 1000 - A.ORIGIN[0], -(cy * 1000 - A.ORIGIN[1])
     return x0, z1 - 1000.0, x0 + 1000.0, z1  # (x0, zmin, x1, zmax)
 
 

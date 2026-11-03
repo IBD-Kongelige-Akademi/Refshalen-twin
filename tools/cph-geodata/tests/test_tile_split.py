@@ -10,21 +10,21 @@ DATA = Path(__file__).resolve().parents[3] / "data"
 
 
 def test_ownership_by_centroid_and_tile_edges():
-    # local x=0,z=0 is E 723900, N 6176500 -> tile 1447_12353; x=100 is E 724000 -> the next tile east
-    assert T.owner_of_point({"x": 0, "z": 0}) == "1447_12353"
-    assert T.owner_of_point({"x": 99.99, "z": -0.01}) == "1447_12353"
-    assert T.owner_of_point({"x": 100.0, "z": -0.01}) == "1448_12353"
+    # local x=0,z=0 is E 556000, N 6323100 -> tile 1112_12646; x=500 is E 556500 -> the next tile east
+    assert T.owner_of_point({"x": 0, "z": 0}) == "1112_12646"
+    assert T.owner_of_point({"x": 499.99, "z": -0.01}) == "1112_12646"
+    assert T.owner_of_point({"x": 500.0, "z": -0.01}) == "1113_12646"
     # a building sticking out of its tile belongs to the tile of its bbox centre
-    ring = [90, -10, 130, -10, 130, -30, 90, -30]  # centre x = 110
-    assert T.owner_of_ring({"ring": ring}) == "1448_12353"
-    assert T.owner_of_line({"pts": [-10, -10, 10, -30]}) == "1447_12353"
+    ring = [490, -10, 530, -10, 530, -30, 490, -30]  # centre x = 510
+    assert T.owner_of_ring({"ring": ring}) == "1113_12646"
+    assert T.owner_of_line({"pts": [10, -10, 30, -30]}) == "1112_12646"
 
 
 def _mini(tmp_path):
     b = lambda i, x, z: {"id": f"gdk:{i}", "ring": [x, z, x + 10, z, x + 10, z - 10, x, z - 10]}  # noqa: E731
-    geo = {"version": "cph-geodata/1", "frame": {}, "buildings": [b(1, 150, 0), b(2, 0, 0), b(3, 200, 0)],
+    geo = {"version": "cph-geodata/1", "frame": {}, "buildings": [b(1, 550, 0), b(2, 10, 0), b(3, 600, 0)],
            "roads": [{"id": "r", "pts": [0, 0, 5, 5]}], "roadGraph": {"nodes": [], "links": []}, "cycleTracks": [], "sidewalks": [],
-           "water": [], "parks": [], "points": {"signals": [], "trees": [{"x": 150, "z": 0}], "bikeRacks": [], "benches": [], "lights": []},
+           "water": [], "parks": [], "points": {"signals": [], "trees": [{"x": 550, "z": 0}], "bikeRacks": [], "benches": [], "lights": []},
            "heroes": [], "meta": {}}
     (tmp_path / "cph-geodata.json").write_text(json.dumps(geo))
     return geo
@@ -34,7 +34,7 @@ def test_split_keeps_every_item_once_and_orders(tmp_path):
     geo = _mini(tmp_path)
     tiles, meta, rg, extra, bins = T.split_all(tmp_path)
     owners = {tid: [b["id"] for b in L["buildings"]["buildings"]] for tid, L in tiles.layers.items() if "buildings" in L}
-    assert owners == {"1448_12353": ["gdk:1", "gdk:3"], "1447_12353": ["gdk:2"]}
+    assert owners == {"1113_12646": ["gdk:1", "gdk:3"], "1112_12646": ["gdk:2"]}
     out, city = tmp_path / "tiles", tmp_path / "city"
     T.write_all(tiles, meta, rg, extra, bins, out, city, tmp_path)
     again = T.assemble(out, city)

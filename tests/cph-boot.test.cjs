@@ -56,26 +56,27 @@ test('there is no ?city switch and no NYC strings in the shipped sources', () =>
   }
 });
 
-test('the Copenhagen frame matches docs/cph-geodata-schema.md', async () => {
+test('the Aalborg frame matches docs/cph-geodata-schema.md', async () => {
   const { CPH_FRAME, toLocal, toEtrs, ISLAND_BOUNDS, TELEPORT_LOCATIONS } = await import('../js/city-config.js');
-  assert.deepEqual([...CPH_FRAME.origin], [723900.0, 6176500.0, 6.84]);
+  const [e0, n0, h0] = CPH_FRAME.origin;
+  assert.deepEqual([e0, n0], [556000.0, 6323100.0]);
   assert.equal(CPH_FRAME.epsg, 25832);
-  assert.deepEqual([...CPH_FRAME.bbox], [-750, -750, 750, 750]);
+  assert.deepEqual([...CPH_FRAME.bbox], [-1000, -900, 1000, 1100]);
   assert.match(CPH_FRAME.axes, /x=east, z=south/);
-  const p = toLocal(723900 + 100, 6176500 + 40, 6.84 + 3);
+  const p = toLocal(e0 + 100, n0 + 40, h0 + 3);
   assert.deepEqual([p.x, p.y, p.z], [100, 3, -40], 'north is -z');
   const back = toEtrs(p.x, p.z, p.y);
-  assert.ok(Math.abs(back.e - 724000) < 1e-9 && Math.abs(back.n - 6176540) < 1e-9 && Math.abs(back.h - 9.84) < 1e-9);
-  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-750, -750, 750, 750]);
-  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['ns37', 'dlb', 'peblinge', 'nbro', 'blaag']);
+  assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
+  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -900, 1000, 1100]);
+  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['torv', 'budolfi', 'jomfru', 'aalborghus', 'limfjord', 'utzon']);
 });
 
-test('the city config is the Copenhagen one', async () => {
+test('the city config is the Aalborg one', async () => {
   const config = await import('../js/city-config.js');
-  assert.equal(config.ISLAND_BOUNDS.maxX, 750);
+  assert.equal(config.ISLAND_BOUNDS.maxX, 1000);
   assert.equal(config.isTypingInField({ target: { tagName: 'INPUT' } }), true);
   assert.equal(config.isTypingInField({ target: { tagName: 'DIV' } }), false);
-  assert.equal(config.TELEPORT_LOCATIONS.ns37.x, 0, 'start at Nørre Søgade 37, the frame origin');
+  assert.equal(config.TELEPORT_LOCATIONS.torv.name, 'Gammel Torv', 'start at Gammel Torv, by the frame origin');
 });
 
 test('geodata is optional: absent data boots the empty plane, present data is exposed', async () => {

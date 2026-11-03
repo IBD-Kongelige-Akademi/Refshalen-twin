@@ -1,11 +1,14 @@
 // js/tile-grid.js
 // The fixed 500 m tile grid in EPSG:25832: the JS mirror of tools/cph-geodata/frame.py (keep the two in step).
-// Tile id "<e500>_<n500>" = floor(E / 500), floor(N / 500); four tiles fill one 1 km DHM / LoD2 cell (6176_723).
+// Tile id "<e500>_<n500>" = floor(E / 500), floor(N / 500); four tiles fill one 1 km DHM / LoD2 cell (6323_555).
 // Local frame: x = E - origin.E, z = -(N - origin.N). A tile's local bounds are [xmin, zmin, xmax, zmax].
 
 export const TILE_SIZE = 500;
-export const ORIGIN_E = 723900;
-export const ORIGIN_N = 6176500;
+export const ORIGIN_E = 556000; // Aalborg, by Gammel Torv
+export const ORIGIN_N = 6323100;
+export const ORIGIN_H = 0.0; // DVR90 height of the origin: a placeholder until phase 2 reads it from the DTM
+/** 0 m DVR90 (the sea) in the local frame. */
+export const SEA_LEVEL_LOCAL = -ORIGIN_H;
 
 export const tileId = (ie, in_) => `${ie}_${in_}`;
 

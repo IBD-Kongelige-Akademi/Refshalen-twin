@@ -7,8 +7,8 @@
 For a grid of ground points over the bbox and each direction (north/south/east/west/nadir),
 pick the image in which the point lands closest to the image centre. Then read, per selected
 image, one full-resolution window covering every point it serves, from 0 m up to `--zmax`.
-Output: data/raw/skraafoto<year>/<view_id>.jpg + cameras.json (same record format as the
-building-case-to-3d skill: view_id, pers (verbatim pers:*), crop, image_size, direction, file).
+Output: data/raw/skraafoto<year>/<view_id>.jpg + cameras.json (the record format of skraafoto.py:
+view_id, pers (verbatim pers:*), crop, image_size, direction, file).
 
 Needs the Skråfoto token (header auth). It is read from --env-file and never printed.
 Everything downstream (photogrammetric colour/texture sampling) runs offline from this cache.
@@ -25,11 +25,9 @@ from urllib.parse import urlencode
 
 import numpy as np
 
-SKILL = Path(__file__).resolve().parents[2] / ".claude/skills/building-case-to-3d/scripts"
-sys.path.insert(0, str(SKILL))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import skraafoto as S  # noqa: E402
-
-ORIGIN = (723900.0, 6176500.0, 6.84)
+from frame import ORIGIN  # noqa: E402
 
 
 def search(token: str, collection: str, bbox_ll: tuple[float, float, float, float]) -> list[dict]:

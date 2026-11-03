@@ -11,7 +11,7 @@ Sources (Københavns Kommune open WFS, CC BY 4.0 / Open Data DK licens, no auth)
   OSM place=square / highway=pedestrian areas (ODbL): squares and pedestrian streets KK's register does not cover
 There is no kerb-stone layer in the KK WFS (vejkant is the GeoDanmark road edge), so kerbs are geometry in the viewer.
 
-Same local frame as cph-geodata.json (x = E - 723900, z = -(N - 6176500), bbox +-750 m). Raw responses are cached
+Same local frame as cph-geodata.json (frame.py: x = E - origin E, z = -(N - origin N), the district bbox). Raw responses are cached
 under data/raw/. This is a separate file so it never touches data/cph-geodata.json.
 
     uv run tools/cph-geodata/surfaces.py [--refresh]

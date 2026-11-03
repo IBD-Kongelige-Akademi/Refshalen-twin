@@ -1,16 +1,19 @@
 // js/city-config.js
-// Copenhagen spatial configuration: the local frame, the playable bounds and the teleport presets the engine core
-// (controllers, cameras, materials, gamepad) relies on. The frame follows docs/cph-geodata-schema.md.
+// Aalborg spatial configuration: the local frame, the playable bounds and the teleport presets the engine core
+// (controllers, cameras, materials, gamepad) relies on. The frame follows docs/cph-geodata-schema.md and mirrors
+// tools/cph-geodata/frame.py (keep the two in step).
 //
 // Local frame: 1 unit = 1 m, x = east, z = south (north = -z), y up. Source CRS EPSG:25832, vertical DVR90.
 //   x = E - origin[0];  z = -(N - origin[1]);  y = DVR90 - origin[2]
 
+import { ORIGIN_E, ORIGIN_N, ORIGIN_H } from './tile-grid.js';
+
 export const CPH_FRAME = Object.freeze({
   epsg: 25832,
   vertical: 'DVR90',
-  origin: Object.freeze([723900.0, 6176500.0, 6.84]), // near Norre Sogade 37
+  origin: Object.freeze([ORIGIN_E, ORIGIN_N, ORIGIN_H]), // by Gammel Torv (js/tile-grid.js)
   axes: 'x=east, z=south, y=up',
-  bbox: Object.freeze([-750, -750, 750, 750]) // [minX, minZ, maxX, maxZ]
+  bbox: Object.freeze([-1000, -900, 1000, 1100]) // [minX, minZ, maxX, maxZ]: E 555000-557000, N 6322000-6324000
 });
 
 const [BX0, BZ0, BX1, BZ1] = CPH_FRAME.bbox;
@@ -57,15 +60,16 @@ export function setCityBounds(bbox, { frame = null } = {}) {
 /** The current playable / loaded extent as [minX, minZ, maxX, maxZ]. */
 export const getCityBounds = () => [ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ];
 
-// Teleport presets (local frame; positions and headings taken from the roadGraph centrelines of the named streets,
-// heading = direction of travel along the street: forward is (sin h, cos h)). The scenic cameras (cameras.js) frame
-// the same places.
+// Teleport presets (local frame; forward is (sin h, cos h), so heading PI faces north towards the Limfjord). Positions are
+// converted from approximate map positions: snap them to the road graph centrelines once phase 2 has built the streets.
+// The scenic cameras (cameras.js) frame the same places.
 const TELEPORT_LOCATIONS = {
-  ns37: { name: 'Nørre Søgade 37', sub: 'Søerne · start', x: 0, z: 0, heading: Math.PI },
-  dlb: { name: 'Dronning Louises Bro', sub: 'Søerne · Sankt Jørgens Sø', x: 97, z: -476.7, heading: -2.12 },
-  peblinge: { name: 'Peblinge Sø', sub: 'Peblinge Dossering', x: -76.8, z: -320, heading: -0.45 },
-  nbro: { name: 'Nørrebrogade', sub: 'Nørrebro · cycle street', x: -147.3, z: -620.1, heading: -2.1 },
-  blaag: { name: 'Blågårds Plads', sub: 'Nørrebro · square', x: -314.6, z: -448, heading: 1.04 }
+  torv: { name: 'Gammel Torv', sub: 'Old town · start', x: -77, z: -73, heading: Math.PI },
+  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -234, z: -49, heading: Math.PI },
+  jomfru: { name: 'Jomfru Ane Gade', sub: 'Old town · nightlife street', x: -157, z: -161, heading: Math.PI },
+  aalborghus: { name: 'Aalborghus', sub: 'Harbour front · the castle', x: -25, z: -263, heading: Math.PI },
+  limfjord: { name: 'Limfjordsbroen', sub: 'Harbour front · the bridge', x: 52, z: -398, heading: Math.PI },
+  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 266, z: -345, heading: Math.PI }
 };
 
 function isTypingInField(event) {

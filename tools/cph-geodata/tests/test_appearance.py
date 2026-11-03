@@ -84,13 +84,14 @@ def test_visibility_front_box_occludes_back_box():
 
 
 def test_dsm_marks_tree_in_front_of_wall_as_occluded():
-    # 100 m x 100 m DSM, 1 m cells, ground 7 m DVR90; wall at x = 60 facing west; tree at x 40..48
-    arr = np.full((100, 100), 7.0, np.float32)
+    # 100 m x 100 m DSM, 1 m cells, ground 0.16 m above the origin height; wall at x = 60 facing west; tree at x 40..48
+    g = A.ORIGIN[2] + 0.16  # DVR90
+    arr = np.full((100, 100), g, np.float32)
     x0 = -50.0
     z_top = -50.0
     for r in range(45, 56):
         for c in range(90, 98):  # x = c + x0 -> 40..47
-            arr[r, c] = 7.0 + 15.0
+            arr[r, c] = g + 15.0
     dsm = A.DSM(arr, x0, z_top, 1.0)
     cam_c = np.array([-45.0, 40.0, 0.0])  # camera west of the wall, high
     pts = np.array([[60.0, 3.0, 0.0],    # behind the tree, low: ray passes through the blob
@@ -252,16 +253,16 @@ def test_brick_prior_only_touches_ambiguous_shadow_walls():
 def test_pitched_roof_flag_and_dsm_sampling():
     b = ccw_box("p", 0, 0, 20, -10, 10)
     sc = A.build_scene([b])
-    arr = np.full((60, 60), 6.84, np.float32)  # ground at local y 0
+    arr = np.full((60, 60), A.ORIGIN[2], np.float32)  # ground at local y 0
     for r in range(19, 32):  # rows cover z -10..0 (+margin)
         for c in range(20, 40):
-            arr[r, c] = 6.84 + 10 + (3.0 - abs(c - 30) * 0.3)  # ridge 3 m above the eave
+            arr[r, c] = A.ORIGIN[2] + 10 + (3.0 - abs(c - 30) * 0.3)  # ridge 3 m above the eave
     dsm = A.DSM(arr, -20.0, -30.0, 1.0)
     pts, rise = A.pitched_roofs(sc, [b], dsm)
     assert rise[0] > 1.5 and sc.roof_of[0] in pts
     P = pts[sc.roof_of[0]]
     assert len(P) >= 6 and (P[:, 1] >= 10 - 1e-6).all()  # lifted to / above the eave plane
-    flat_arr = np.full((60, 60), 16.84, np.float32)
+    flat_arr = np.full((60, 60), A.ORIGIN[2] + 10, np.float32)
     _, rise2 = A.pitched_roofs(sc, [b], A.DSM(flat_arr, -20.0, -30.0, 1.0))
     assert rise2[0] < 1.5
 

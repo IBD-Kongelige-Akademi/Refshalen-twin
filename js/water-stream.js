@@ -3,7 +3,7 @@ import { uniform, NodeUpdateType } from 'three/tsl';
 import { createWaterMaterial, createLakeWallMaterial, patchPlanarReflector, toGeometry } from './water-cph.js';
 import { applyGroundWindow } from './ground-shader-cph.js';
 import { buildTileWaterArrays, shoreWindow, groundWindow, windowOrigin } from './water-tiles-cph.js';
-import { tileBoundsLocal } from './tile-grid.js';
+import { tileBoundsLocal, SEA_LEVEL_LOCAL } from './tile-grid.js';
 import { disposeTree } from './dispose-tree.js';
 import { sidePlanes, boxVisible } from './reflect-gate.js';
 
@@ -56,7 +56,7 @@ export function createWaterLayer(scene, { header, groundMaterial, lakeRings = []
   const wallsRoot = new THREE.Group();
   wallsRoot.name = 'stream-water-walls';
   group.add(wallsRoot);
-  const sea = header?.sea ?? -6.84;
+  const sea = header?.sea ?? SEA_LEVEL_LOCAL;
   const reflect = reflectOptions();
 
   // window rasters

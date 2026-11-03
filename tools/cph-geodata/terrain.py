@@ -29,7 +29,8 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / "data" / "raw"
-ORIGIN = (723900.0, 6176500.0, 6.84)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frame import ORIGIN  # noqa: E402
 CELL = 2.0
 MESH_CELL = 4.0  # ground mesh cell (m); the lake cut pieces refer to this grid over [-MESH_HALF, MESH_HALF]
 MESH_HALF = 750.0

@@ -13,6 +13,7 @@ import argparse
 from collections import Counter
 import json
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -27,7 +28,8 @@ from shapely.ops import unary_union
 
 ROOT = Path(__file__).resolve().parents[2]
 RAW = ROOT / 'data/raw'
-ORIGIN = (723900, 6176500)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frame import ORIGIN  # noqa: E402
 LIDAR = 'dhm:punktsky:class5'
 CIR = 'geodanmark:orto_foraar_cir:2025-04-27'
 METHOD = 'ortho-cir/1'

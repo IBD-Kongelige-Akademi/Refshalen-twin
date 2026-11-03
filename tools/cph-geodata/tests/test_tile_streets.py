@@ -35,7 +35,7 @@ def test_graph_fixes_are_renumbered_by_position_for_another_graph():
 
 
 def test_ownership_by_bbox_centre():
-    assert TS.owner([0, 0, 10, -10]) == "1447_12353"
+    assert TS.owner([0, 0, 10, -10]) == "1112_12646"
     assert TS.owner([]) is None
     x0, z0, x1, z1 = TS.doc_extent({"roads": {"a": {"p": [0, 0, 10, 5]}}, "extraRoads": [{"p": [-5, 1]}], "sidewalks": [{"ring": [3, 9, 4, 12]}], "cycleTracks": [{"pts": [2, -7]}]})
     assert (x0, z0, x1, z1) == (-5, -7, 10, 12)
@@ -44,18 +44,18 @@ def test_ownership_by_bbox_centre():
 def test_buckets_and_manifest(tmp_path):
     tiles = tmp_path / "tiles"
     city = tmp_path / "city"
-    for t in ("1447_12353", "1448_12353"):
+    for t in ("1112_12646", "1113_12646"):
         (tiles / t).mkdir(parents=True)
-    (tiles / "1447_12353" / "roads.json").write_text(json.dumps({"roads": [{"id": "osm:way/1"}]}))
-    (tiles / "1448_12353" / "roads.json").write_text(json.dumps({"roads": [{"id": "osm:way/2"}]}))
-    (tiles / "1447_12353" / "buildings.json").write_text(json.dumps({"buildings": [{"id": "gdk:9"}]}))
+    (tiles / "1112_12646" / "roads.json").write_text(json.dumps({"roads": [{"id": "osm:way/1"}]}))
+    (tiles / "1113_12646" / "roads.json").write_text(json.dumps({"roads": [{"id": "osm:way/2"}]}))
+    (tiles / "1112_12646" / "buildings.json").write_text(json.dumps({"buildings": [{"id": "gdk:9"}]}))
     city.mkdir()
     streets = {
         "version": "cph-streets/1",
-        "roads": {"osm:way/1": {"p": [0, 0, 50, 0], "hw": 3}, "osm:way/2": {"p": [120, 0, 160, 0], "hw": 3}},
-        "extraRoads": [{"id": "osm:way/2#1", "base": "osm:way/2", "p": [130, 0, 140, 0], "hw": 3}],
+        "roads": {"osm:way/1": {"p": [0, 0, 50, 0], "hw": 3}, "osm:way/2": {"p": [520, 0, 560, 0], "hw": 3}},
+        "extraRoads": [{"id": "osm:way/2#1", "base": "osm:way/2", "p": [530, 0, 540, 0], "hw": 3}],
         "graph": {"nodes": [], "widths": [], "dropLinks": []},
-        "sidewalks": [{"id": "s1", "ring": [10, -2, 20, -2, 20, -4, 10, -4]}, {"id": "s2", "ring": [130, -2, 140, -2, 140, -4, 130, -4]}],
+        "sidewalks": [{"id": "s1", "ring": [10, -2, 20, -2, 20, -4, 10, -4]}, {"id": "s2", "ring": [530, -2, 540, -2, 540, -4, 530, -4]}],
         "cycleTracks": [{"id": "c1", "pts": [5, -5, 15, -5]}],
         "buildings": {"drop": [{"id": "gdk:9", "reason": "x"}], "clip": []},
         "surfaceCuts": [],
@@ -69,13 +69,13 @@ def test_buckets_and_manifest(tmp_path):
         assert TS.main() == 0
     finally:
         sys.argv = argv
-    a = json.loads((tiles / "1447_12353" / "streets.json").read_text())
-    b = json.loads((tiles / "1448_12353" / "streets.json").read_text())
+    a = json.loads((tiles / "1112_12646" / "streets.json").read_text())
+    b = json.loads((tiles / "1113_12646" / "streets.json").read_text())
     assert list(a["roads"]) == ["osm:way/1"] and list(b["roads"]) == ["osm:way/2"]
     assert [e["id"] for e in b["extraRoads"]] == ["osm:way/2#1"]  # an extra piece goes with its base road's tile
     assert [s["id"] for s in a["sidewalks"]] == ["s1"] and [s["id"] for s in b["sidewalks"]] == ["s2"]
     assert [c["id"] for c in a["cycleTracks"]] == ["c1"]
     assert a["buildings"]["drop"][0]["id"] == "gdk:9"
     post = json.loads((city / "post.json").read_text())
-    assert post["streets"]["graph"] == "streets-graph.json" and set(post["streets"]["tiles"]) == {"1447_12353", "1448_12353"}
-    assert math.isfinite(post["streets"]["tiles"]["1447_12353"])
+    assert post["streets"]["graph"] == "streets-graph.json" and set(post["streets"]["tiles"]) == {"1112_12646", "1113_12646"}
+    assert math.isfinite(post["streets"]["tiles"]["1112_12646"])

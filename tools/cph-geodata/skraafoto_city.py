@@ -25,7 +25,6 @@ from urllib.parse import urlencode
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-sys.path.insert(0, str(HERE.parents[1] / ".claude/skills/building-case-to-3d/scripts"))
 sys.path.insert(0, str(HERE))
 import skraafoto as S  # noqa: E402
 from frame import ORIGIN  # noqa: E402

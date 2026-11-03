@@ -99,7 +99,7 @@ def main():
                       __twin.freeCam = null;
                       document.querySelector(`[data-mode="${mode === 'cargobike' ? 'cyclist' : 'car'}"]`).click();
                       if (mode === 'cargobike') document.querySelector('[data-bike-type="cargobike"]').click();
-                      document.querySelector('[data-teleport="ns37"]').click();
+                      document.querySelector('[data-teleport="torv"]').click();
                     }''', 'cargobike' if scene == 'cargo' else 'car')
                 elif scene in ('lake', 'aerial'):
                     page.evaluate('''name => {

@@ -24,7 +24,7 @@ Method
   5. Write `buildings[].observed` back into the geodata (additive) plus a QA report and
      contact sheet.
 
-Frame: local x = E - 723900, z = -(N - 6176500), y = DVR90 - 6.84 (see schema doc).
+Frame: local x = E - origin E, z = -(N - origin N), y = DVR90 - origin height (frame.py, see schema doc).
 """
 from __future__ import annotations
 
@@ -41,9 +41,9 @@ import numpy as np
 from PIL import Image
 
 import polytri
+from frame import ORIGIN
 
-ORIGIN = (723900.0, 6176500.0, 6.84)
-LAT, LON = 55.686, 12.563  # district centre, for the sun position
+LAT, LON = 57.048, 9.919  # district centre (Aalborg), for the sun position
 
 SHADOW_AMBIENT = 0.55  # sky share of irradiance on a surface (a in E = a + (1-a) cos); soft so shaded walls stay photo-like
 E_REF_COS = 0.8  # reference sun incidence the reported tone is normalised to

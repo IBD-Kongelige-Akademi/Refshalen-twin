@@ -4,14 +4,18 @@ Everything that needs the origin, the district bbox or a tile id imports it from
 fetch.py, lakes.py, ortho.py, roads.py, points.py ...). The JS mirror is js/tile-grid.js; keep the two in step.
 
 Tile grid: a fixed 500 m grid in EPSG:25832. Tile id "<e500>_<n500>" = (floor(E / 500), floor(N / 500)), so four
-tiles fill one 1 km DHM / LoD2 cell (e.g. LoD2 cell 6176_723 = tiles 1446_12352, 1447_12352, 1446_12353, 1447_12353).
+tiles fill one 1 km DHM / LoD2 cell (e.g. LoD2 cell 6323_555 = tiles 1110_12646, 1111_12646, 1110_12647, 1111_12647).
+
+Aalborg: origin in the old town by Gammel Torv; the district is the 2 x 2 km box E 555000-557000, N 6322000-6324000
+(16 tiles 1110_12644 .. 1113_12647, LoD2 cells 6322_555, 6322_556, 6323_555, 6323_556).
 """
 from __future__ import annotations
 
 import math
 
-ORIGIN = (723900.0, 6176500.0, 6.84)  # E, N (EPSG:25832), DVR90 height
-LOCAL_BBOX = (-750.0, -750.0, 750.0, 750.0)  # xmin, zmin, xmax, zmax
+# DVR90 height of the origin: a placeholder until phase 2 reads it from the DTM at the origin (keep js/city-config.js in step)
+ORIGIN = (556000.0, 6323100.0, 0.0)  # E, N (EPSG:25832), DVR90 height
+LOCAL_BBOX = (-1000.0, -900.0, 1000.0, 1100.0)  # xmin, zmin, xmax, zmax
 
 TILE_SIZE = 500.0  # metres
 FETCH_MARGIN = 60.0  # metres beyond an area so edge geometry is complete
@@ -125,7 +129,7 @@ def tiles_for_bbox(bbox, margin: float = 0.0) -> list[str]:
 
 
 def lod2_cell_of_tile(tid: str) -> str:
-    """The 1 km DHM / LoD2 cell '<N km>_<E km>' (e.g. 6176_723) that holds a tile."""
+    """The 1 km DHM / LoD2 cell '<N km>_<E km>' (e.g. 6323_555) that holds a tile."""
     ie, in_ = parse_tile_id(tid)
     return f"{in_ // 2}_{ie // 2}"
 
@@ -138,7 +142,7 @@ def add_area_args(ap) -> None:
     g.add_argument("--bbox", nargs=4, type=float, metavar=("MINE", "MINN", "MAXE", "MAXN"), default=None,
                    help="area in EPSG:25832 metres")
     g.add_argument("--tile", action="append", default=None, metavar="E500_N500",
-                   help="a 500 m tile id like 1447_12353 (repeatable; the area is their union)")
+                   help="a 500 m tile id like 1111_12646 (repeatable; the area is their union)")
 
 
 _AREA_UTM = DISTRICT_UTM_BBOX

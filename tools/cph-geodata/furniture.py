@@ -5,7 +5,7 @@
 """Street-furniture compiler for the Copenhagen twin -> data/cph-furniture.json (M4).
 
 A separate file: it never touches data/cph-geodata.json (it reads roads and buildings from it for orientation).
-Same local frame (x = E - 723900, z = -(N - 6176500), bbox +-750 m). Raw downloads are cached in data/raw/.
+Same local frame (frame.py: x = E - origin E, z = -(N - origin N), the district bbox). Raw downloads are cached in data/raw/.
 
 Sources
   Trees      k101:automatisk_detekterede_traeer_kk_beta (height, crown area) + ..._kroner_kk_beta (crown polygons)

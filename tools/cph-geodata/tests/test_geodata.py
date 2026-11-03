@@ -7,29 +7,29 @@ import roadgraph
 
 
 def test_origin_maps_to_zero():
-    assert frame.to_local(723900.0, 6176500.0) == (0.0, -0.0)
-    assert frame.to_local_y(6.84) == 0.0
+    assert frame.to_local(556000.0, 6323100.0) == (0.0, -0.0)
+    assert frame.to_local_y(frame.ORIGIN[2]) == 0.0
 
 
 def test_axes_east_positive_x_south_positive_z():
-    x, z = frame.to_local(723900.0 + 100, 6176500.0 - 50)  # 100 m east, 50 m south
+    x, z = frame.to_local(556000.0 + 100, 6323100.0 - 50)  # 100 m east, 50 m south
     assert (x, z) == (100.0, 50.0)
-    assert frame.to_utm(100.0, 50.0) == (724000.0, 6176450.0)
+    assert frame.to_utm(100.0, 50.0) == (556100.0, 6323050.0)
 
 
 def test_roundtrip():
-    e, n = 723412.34, 6176987.65
+    e, n = 555412.34, 6323587.65
     assert frame.to_utm(*frame.to_local(e, n)) == (e, n)
 
 
 def test_bbox_corners_match_district():
-    assert frame.to_local(723150, 6177250) == (-750.0, -750.0)
-    assert frame.to_local(724650, 6175750) == (750.0, 750.0)
+    assert frame.to_local(555000, 6324000) == (-1000.0, -900.0)
+    assert frame.to_local(557000, 6322000) == (1000.0, 1100.0)
 
 
 def test_ccw_in_map_plane_from_cw_input():
     # UTM square listed clockwise (E,N): (0,0)->(0,10)->(10,10)->(10,0)
-    base = (723900.0, 6176500.0)
+    base = (556000.0, 6323100.0)
     cw = [(base[0], base[1]), (base[0], base[1] + 10), (base[0] + 10, base[1] + 10), (base[0] + 10, base[1]), (base[0], base[1])]
     ring = frame.ring_to_local(cw)
     assert len(ring) == 4  # closing duplicate dropped
@@ -38,7 +38,7 @@ def test_ccw_in_map_plane_from_cw_input():
 
 
 def test_ccw_input_untouched():
-    base = (723900.0, 6176500.0)
+    base = (556000.0, 6323100.0)
     ccw = [(base[0], base[1]), (base[0] + 10, base[1]), (base[0] + 10, base[1] + 10), (base[0], base[1] + 10)]
     local = [frame.to_local(*p) for p in ccw]
     assert frame.ring_to_local(ccw) == local

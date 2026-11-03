@@ -46,11 +46,11 @@ from shapely.geometry import MultiPolygon, Polygon
 from shapely.ops import unary_union
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from frame import tile_bounds_local  # noqa: E402
+from frame import ORIGIN, tile_bounds_local  # noqa: E402
 
 GRID = 16
 VERSION = "cph-far/1"
-SEA = -6.84  # DVR90 0 m in the local frame (origin height 6.84)
+SEA = -ORIGIN[2]  # DVR90 0 m in the local frame
 
 ROOF_COLOURS = {  # js/building-geometry.js ROOF_COLOURS (sRGB)
     "tagpap": (0.2, 0.2, 0.22), "tagpap med lille hældning": (0.2, 0.2, 0.22), "tagpap med stor hældning": (0.24, 0.23, 0.24),
@@ -279,8 +279,8 @@ def water_polygons(city_dir: Path, heights: dict[str, np.ndarray], tol: float = 
     out = []
 
     def sample(x, z):
-        ie = math.floor((x + 723900.0) / 500.0)
-        in_ = math.floor((6176500.0 - z) / 500.0)
+        ie = math.floor((x + ORIGIN[0]) / 500.0)
+        in_ = math.floor((ORIGIN[1] - z) / 500.0)
         h = heights.get(f"{ie}_{in_}")
         if h is None:
             return None
