@@ -7,14 +7,14 @@ Phase 1 of the Aalborg plan: Copenhagen removed, Aalborg frame set. The viewer b
 | | Value | Where |
 |---|---|---|
 | Origin | E 556000, N 6323100 (EPSG:25832) | `tools/geodata/frame.py` `ORIGIN`, `js/tile-grid.js` `ORIGIN_E/N` |
-| Origin height | 0.0, a placeholder: phase 2 reads it from the DTM | `frame.py` `ORIGIN[2]`, `js/tile-grid.js` `ORIGIN_H` |
+| Origin height | 3.85 m DVR90, the median DHM terrain within 10 m of the origin (set in phase 2) | `frame.py` `ORIGIN[2]`, `js/tile-grid.js` `ORIGIN_H` |
 | District | E 555000–557000, N 6322000–6324000; local x −1000…1000, z −900…1100 | `frame.py` `LOCAL_BBOX`, `js/city-config.js` `CPH_FRAME.bbox` |
 | Tiles | 1110_12644 … 1113_12647 (16) | from the bbox |
 | Sun | 57.048 N, 9.919 E; grid convergence 0.77° | `js/sun-position.js`, `tools/geodata/appearance.py` |
 
-Everything else imports these values: `terrain.py`, `streets.py`, `appearance.py`, `tree_canopy.py`, `skraafoto_prefetch.py`, `far_lod.py`, `city_water.py`, `ortho.py` and `vegetation_cir.py` in Python, and `city-config.js` plus the water and far-LoD modules in JS. The sea level follows the origin height (`SEA = -ORIGIN[2]`, `SEA_LEVEL_LOCAL`). When phase 2 sets the height, change `frame.py` and `js/tile-grid.js` and nothing else.
+Everything else imports these values: `terrain.py`, `streets.py`, `appearance.py`, `tree_canopy.py`, `skraafoto_prefetch.py`, `far_lod.py`, `city_water.py`, `ortho.py` and `vegetation_cir.py` in Python, and `city-config.js` plus the water and far-LoD modules in JS. The sea level follows the origin height (`SEA = -ORIGIN[2]`, `SEA_LEVEL_LOCAL`). To change it, edit `frame.py` and `js/tile-grid.js` and nothing else, then rerun `build_city.py --stage cells --force cells`.
 
-Teleports (`js/city-config.js`, `index.html`, `js/cameras.js`, `tools/check-collisions.py`) are converted from approximate map positions, and all face north. Snap them to the road graph and set headings in phase 2.
+Teleports (`js/city-config.js`, `index.html`, `js/cameras.js`, `tools/check-collisions.py`) are converted from approximate map positions, and all face north. Snap them to the road graph and set headings once phase 3 has built it.
 
 ## Tests
 

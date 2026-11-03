@@ -71,7 +71,7 @@ async function initApp() {
   markInit('lighting');
 
   if (loadingStatus) {
-    loadingStatus.textContent = 'Constructing Copenhagen...';
+    loadingStatus.textContent = 'Constructing Aalborg...';
   }
 
   // 3. Build the city from the Copenhagen geodata

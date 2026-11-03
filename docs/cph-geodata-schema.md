@@ -5,7 +5,7 @@
 - **Units:** metres.
 - **CRS:** source EPSG:25832, vertical DVR90.
 - **Local frame:** `x = E - origin[0]` (east), `z = -(N - origin[1])` (south positive, three.js-friendly), `y` up = DVR90 − origin[2].
-- **Origin:** `[556000.0, 6323100.0, h]`, by Gammel Torv in Aalborg; the DVR90 height `h` is read from the DTM at the origin in phase 2 (0.0 until then).
+- **Origin:** `[556000.0, 6323100.0, 3.85]`, by Gammel Torv in Aalborg; the DVR90 height is the median DHM terrain within 10 m of the origin.
 - **District bbox (local):** x ∈ [−1000, 1000], z ∈ [−900, 1100] (E 555000–557000, N 6322000–6324000).
 - **Format:** polygons and polylines are flat `[x0, z0, x1, z1, …]` arrays, rounded to 0.01 m. Rings are counter-clockwise when seen from above (in x/−z), with no closing duplicate.
 
@@ -24,7 +24,7 @@ Field-level overrides go in `conf_fields: {field: conf}`. Nothing may be invente
 {
   "version": "cph-geodata/1",
   "generated": "ISO time",
-  "frame": {"epsg": 25832, "vertical": "DVR90", "origin": [556000.0, 6323100.0, 0.0], "axes": "x=east, z=south, y=up", "bbox": [-1000, -900, 1000, 1100]},
+  "frame": {"epsg": 25832, "vertical": "DVR90", "origin": [556000.0, 6323100.0, 3.85], "axes": "x=east, z=south, y=up", "bbox": [-1000, -900, 1000, 1100]},
   "attribution": ["Indeholder data fra Klimadatastyrelsen …", "Indeholder data fra Styrelsen for Dataforsyning og Infrastruktur, Skråfoto 2023 and 2025 (retrieved October 2026)", "© OpenStreetMap contributors (ODbL)", "…"],
   "buildings": [Building],
   "roads": [Road],

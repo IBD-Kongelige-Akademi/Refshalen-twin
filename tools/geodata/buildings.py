@@ -9,6 +9,7 @@ import presets
 FLAT_ROOFS = ("tagpap med lille", "built-up", "asfalt", "tagpap", "beton", "glas")
 PITCHED_ROOFS = ("tegl", "tagsten", "betontagsten", "fibercement", "skifer", "tagpap med stor", "stråtag", "metal", "zink")
 DEFAULT_H = 3.2  # outbuilding eave height when no source exists
+SMALL_MIN_EAVE = 1.5  # metres: below this, a small footprint's DSM sample is taken to be the ground beside it
 
 
 def roof_kind(mat: str | None) -> str:
@@ -97,13 +98,19 @@ def _building(bid, fot, p, ring, holes, part_utm, rasters, dhm_mod, stats):
     hs = None
     if rasters is not None:
         hs = dhm_mod.building_heights(rasters, part_utm)
+    # a small footprint is sampled closer to its edge (dhm.INSETS); an eave under SMALL_MIN_EAVE there is the ground around it
+    edge_biased = bool(hs) and hs.get("inset", 1.0) < 1.0 and hs["eave"] - hs["ground"] < SMALL_MIN_EAVE
     if hs:
         ground = frame.to_local_y(hs["ground"])
+        ground_src, ground_conf = "dtm:median", "measured"
+    if hs and not edge_biased:
         eave_h = hs["eave"] - hs["ground"]
         ridge_h = hs["ridge"] - hs["ground"]
-        ground_src, ground_conf = "dtm:median", "measured"
         h_conf, h_src = "measured", "dsm:p60-p95"
         stats["dsm"] += 1
+        if hs.get("inset", 1.0) < 1.0:
+            src.append(f"dsm:inset-{hs['inset']:g}m")
+            stats["dsm_small_inset"] = stats.get("dsm_small_inset", 0) + 1
     elif storeys:
         eave_h = storeys * 3.0
         ridge_h = eave_h
@@ -112,6 +119,9 @@ def _building(bid, fot, p, ring, holes, part_utm, rasters, dhm_mod, stats):
         eave_h = DEFAULT_H
         ridge_h = eave_h
         h_src = "default:outbuilding-height"
+    if edge_biased:
+        src.append("dsm:edge-biased")
+        stats["dsm_edge_biased"] = stats.get("dsm_edge_biased", 0) + 1
     src.append(h_src)
     src.append(ground_src)
     n_storeys = storeys

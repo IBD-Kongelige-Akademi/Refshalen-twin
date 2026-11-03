@@ -6,7 +6,7 @@
 export const TILE_SIZE = 500;
 export const ORIGIN_E = 556000; // Aalborg, by Gammel Torv
 export const ORIGIN_N = 6323100;
-export const ORIGIN_H = 0.0; // DVR90 height of the origin: a placeholder until phase 2 reads it from the DTM
+export const ORIGIN_H = 3.85; // DVR90 height of the origin: the median DHM terrain within 10 m of it
 /** 0 m DVR90 (the sea) in the local frame. */
 export const SEA_LEVEL_LOCAL = -ORIGIN_H;
 

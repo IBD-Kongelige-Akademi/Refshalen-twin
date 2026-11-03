@@ -64,7 +64,7 @@ test('the Aalborg frame matches docs/cph-geodata-schema.md', async () => {
   assert.deepEqual([...CPH_FRAME.bbox], [-1000, -900, 1000, 1100]);
   assert.match(CPH_FRAME.axes, /x=east, z=south/);
   const p = toLocal(e0 + 100, n0 + 40, h0 + 3);
-  assert.deepEqual([p.x, p.y, p.z], [100, 3, -40], 'north is -z');
+  assert.ok([p.x - 100, p.y - 3, p.z + 40].every((d) => Math.abs(d) < 1e-9), 'north is -z');
   const back = toEtrs(p.x, p.z, p.y);
   assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
   assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -900, 1000, 1100]);

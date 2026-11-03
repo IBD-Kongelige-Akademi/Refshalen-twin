@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import math
 
-# DVR90 height of the origin: a placeholder until phase 2 reads it from the DTM at the origin (keep js/city-config.js in step)
-ORIGIN = (556000.0, 6323100.0, 0.0)  # E, N (EPSG:25832), DVR90 height
+# DVR90 height of the origin: the median DHM terrain within 10 m of it (phase 2); keep js/tile-grid.js in step
+ORIGIN = (556000.0, 6323100.0, 3.85)  # E, N (EPSG:25832), DVR90 height
 LOCAL_BBOX = (-1000.0, -900.0, 1000.0, 1100.0)  # xmin, zmin, xmax, zmax
 
 TILE_SIZE = 500.0  # metres

@@ -90,18 +90,28 @@ def load_rasters(token: str):
     return out
 
 
+INSETS = (1.0, 0.5, 0.25, 0.0)  # metres the footprint is shrunk by before the DSM is sampled; smaller only when needed
+
+
 def building_heights(rasters, poly_utm):
-    """-> dict(ground, eave, ridge) in DVR90 or None. Eave = 60th percentile of the
-    DSM inside the footprint shrunk by 1 m, ridge = 95th percentile, ground = DTM
-    median under the footprint plus a 1.5 m ring."""
-    inner = poly_utm.buffer(-1.0)
-    if inner.is_empty:
-        inner = poly_utm
-    dsm = rasters["dsm"].values(inner)
+    """-> dict(ground, eave, ridge, inset) in DVR90 or None. Eave = 60th percentile of the
+    DSM inside the footprint shrunk by `inset` (1 m, or less for small footprints that would
+    otherwise hold fewer than 4 pixel centres), ridge = 95th percentile, ground = DTM median
+    under the footprint plus a 1.5 m ring."""
+    dsm = np.array([])
+    inset = None
+    for inset in INSETS:
+        inner = poly_utm.buffer(-inset) if inset else poly_utm
+        if inner.is_empty:
+            continue
+        dsm = rasters["dsm"].values(inner)
+        if dsm.size >= 4:
+            break
     ring = poly_utm.buffer(1.5).difference(poly_utm)
     dtm = rasters["dtm"].values(ring if not ring.is_empty else poly_utm)
     if dtm.size == 0:
         dtm = rasters["dtm"].values(poly_utm)
     if dsm.size < 4 or dtm.size == 0:
         return None
-    return {"ground": float(np.median(dtm)), "eave": float(np.percentile(dsm, 60)), "ridge": float(np.percentile(dsm, 95))}
+    return {"ground": float(np.median(dtm)), "eave": float(np.percentile(dsm, 60)), "ridge": float(np.percentile(dsm, 95)),
+            "inset": inset}

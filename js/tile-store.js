@@ -194,6 +194,8 @@ export function createTileLod2(meta, fetchBin) {
 
 // ------------------------------------------------------------------------------------------------------------ store
 
+const EMPTY_ROAD_GRAPH = () => ({ nodes: [], links: [], names: [], classes: [] });
+
 /** The unpacked layout: one file per layer under the tile directory (data/tiles), the city files beside it. */
 export function createFileSource(baseUrl, fetchImpl = globalThis.fetch) {
   // remote data sits under a version prefix and is served with long cache headers: let the browser cache it
@@ -274,8 +276,9 @@ async function createStore(index, source) {
     cityPromise ||= (async () => {
       // with a per-tile street layout the whole-city streets.json is not read at all (it is only meaningful for the tiles it covers)
       const tiled = !!post?.streets;
+      // a build without the roads stage (buildings and terrain only) has no road graph: an empty one keeps traffic idle
       const [meta, roadGraph, streets, streetsGraph, lakes, water] = await Promise.all([
-        json(index.city.meta), json(index.city.roadgraph),
+        json(index.city.meta), index.city.roadgraph ? json(index.city.roadgraph) : EMPTY_ROAD_GRAPH(),
         !tiled && index.city.streets ? json(index.city.streets).catch(() => null) : null,
         tiled && post.streets.graph ? json(`${cityDir}/${post.streets.graph}`).catch(() => null) : null,
         index.city.lakes ? json(index.city.lakes).catch(() => null) : null,
