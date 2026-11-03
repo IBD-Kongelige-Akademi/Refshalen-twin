@@ -14,6 +14,9 @@ LOCK = threading.Lock()
 
 
 class Handler(SimpleHTTPRequestHandler):
+    # keep-alive: with HTTP/1.0 every module and tile request is a new connection, and on Windows a page load's ~100 parallel module
+    # requests overflow the listen backlog (SYNs left unanswered, thousands of sockets in TIME_WAIT) until the page stalls
+    protocol_version = 'HTTP/1.1'
     range_ok = True
     log_path = None
     cors = False
@@ -52,6 +55,7 @@ class Handler(SimpleHTTPRequestHandler):
             if start >= size or start > end:
                 self.send_response(416)
                 self.send_header('Content-Range', f'bytes */{size}')
+                self.send_header('Content-Length', '0')
                 self.end_headers()
                 self._log(416, 0, rng)
                 return
@@ -81,6 +85,7 @@ def main():
     ap.add_argument('--cors', action='store_true')
     a = ap.parse_args()
     Handler.range_ok, Handler.log_path, Handler.cors = not a.no_range, a.log, a.cors
+    ThreadingHTTPServer.request_queue_size = 128  # socketserver's default listen backlog is 5
     srv = ThreadingHTTPServer((a.bind, a.port), functools.partial(Handler, directory=os.path.abspath(a.dir)))
     srv.daemon_threads = True
     print(f'serving {os.path.abspath(a.dir)} on http://{a.bind}:{srv.server_port} (range {"on" if Handler.range_ok else "off"})', flush=True)

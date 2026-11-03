@@ -38,8 +38,24 @@ Texture budget: `tests/texture-memory-budget-city.test.mjs` replays the facade l
 Observed brick walls come out near-neutral and light (median sRGB 0.81 grey), so the citywide brick reference falls back to its
 default; `tone_cal` (appearance_calibrate.py) restores chroma as upstream does for Copenhagen. Worth checking on screenshots.
 
-Open: street-level screenshots (`tools/shoot-windows.py` or the browser pane) were not taken in this phase; the local Python
-server timed out loading the page.
+## Screenshots (midday, 21 June; `docs/phase5/`)
+
+| Place | What it shows |
+|---|---|
+| `jomfru-ane-gade.jpg` | photo atlases on the near facades (133 resident at this spot), entrances and shopfronts at street level |
+| `gammel-torv.jpg` | the square's slab paving, photo tones on the surrounding walls |
+| `aalborghus.jpg` | measured lawn around the castle; its yellow and white walls come out right |
+| `budolfi.jpg` | **a defect**: the cathedral's shadow-side walls draw blue (see below) |
+| `utzon.jpg` | grass slopes on the harbour front, photo tones on the old-town houses |
+
+**Blue walls.** `appearance_calibrate` turns shadow views' faint skylight cast into strong blue: 2,081 of 29,310 walls (7 %)
+are blue after `tone_cal` against 981 before, also on sunlit walls (route `none`), so the chroma restore (`CHROMA_GAIN`) amplifies
+the cast. Budolfi (whitewashed) is the visible case. A tuning fix for Aalborg's light is open.
+
+Viewing locally: `.claude/launch.json` now serves with `tools/hosting/serve_range.py` on port 8010, which keeps connections
+alive (HTTP/1.1) and has a 128-deep listen backlog. Python's `http.server` closed every connection and had a backlog of 5; on this
+Windows machine that left thousands of loopback sockets in TIME_WAIT that never expired and made the page stall on port 8000.
+Open the viewer at `http://127.0.0.1:8010/`: `localhost` tries IPv6 first, and the server only listens on IPv4.
 
 ## Source changes for Aalborg
 
