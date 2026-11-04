@@ -1429,7 +1429,7 @@ class ThirdPersonControllerManager {
       this.scene.add(group);
       return { group, spec, state: material.userData.busState, wheels, spin: 0, x: 0, z: 0 };
     });
-    const bellowsMat = new THREE.MeshStandardNodeMaterial({ color: 0x3a3d41, roughness: 0.86, metalness: 0.02, side: THREE.DoubleSide });
+    const bellowsMat = new THREE.MeshStandardNodeMaterial({ color: 0x9a9fa3, roughness: 0.62, metalness: 0.25, side: THREE.DoubleSide });
     const bellows = [createBusBellows(bellowsMat), createBusBellows(bellowsMat)];
     for (const b of bellows) this.scene.add(b.mesh);
 

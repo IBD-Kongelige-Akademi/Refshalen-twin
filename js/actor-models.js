@@ -1377,8 +1377,9 @@ const BUS_LONG_SPEC = {
 
 // The Plusbus: a Solaris Urbino 24 electric (24.7 m, three modules on two bellows; js/articulated-bus.js has the layout and the
 // kinematics). One spec per module, each centred on its own origin: the front module has the MetroStyle cab, the rear one the tail
-// lamps; the joint faces are flat. Doors (curb side, double leaf) and axles are module-local z. The livery is inferred from photos
-// (white, a dark glazing band, a teal skirt stripe; docs/aalborg-phase4c.md), roofs carry battery pods along all three modules.
+// lamps; the joint faces are flat. Doors (curb side, double leaf) and axles are module-local z. The livery follows a photo of the
+// Aalborg Plusbus: a white lower body, a yellow stripe under the black window band, a light-blue roof line, roof and roof pods (battery
+// pods along all three modules); silver bellows.
 const URBINO_FLAT = { halfWidth: [0.05, 1.2, 2], edge: [0.05, 2.9, 2], crown: [0.05, 0.005, 2], sill: [0.03, 0.38, 2], shoulder: [0.05, 1.0, 2] };
 const urbinoModule = (name, length, extra) => {
   const h = length / 2;
@@ -1387,7 +1388,7 @@ const urbinoModule = (name, length, extra) => {
     halfWidth: [[h, 1.275], [-h, 1.275]],
     edge: [[h, 3.0], [-h, 3.0]],
     nose: URBINO_FLAT, tail: URBINO_FLAT, cab: false, tailFace: false, rake: 0,
-    livery: { base: 0xeef1f0, accent: 0x00908a, accentBand: [0.44, 0.66] },
+    livery: { base: 0xefede6, accent: 0xf2cc12, accentBand: [1.03, 1.19], roof: 0x8fd0e6, roofY: 2.72, skirt: false },
     route: 'PLUS',
     ...extra
   };
@@ -1730,7 +1731,10 @@ function createLoftedBusMaterial(s = BUS_SPEC, { player = false } = {}) {
   const paint = L
     ? mix(color(L.base), color(L.accent), step(L.accentBand[0], p.y).mul(step(p.y, L.accentBand[1])).mul(side))
     : mix(color(0xf7c600), color(0xc91d2b), corner);
-  const livery = mix(mix(paint, color(0x14191d), glazingBand), color(0x1c2026), skirt).mul(shadeY);
+  // a coloured roof: everything above roofY, and the roof's top surfaces
+  const roofPaint = L?.roof ? max(smoothstep(L.roofY - 0.012, L.roofY + 0.012, p.y), smoothstep(0.65, 0.95, n.y).mul(step(2.0, p.y))) : float(0);
+  const lower = L?.skirt === false ? float(0) : skirt;
+  const livery = mix(mix(mix(paint, color(0x14191d), glazingBand), color(L?.roof ?? 0), roofPaint), color(0x1c2026), lower).mul(shadeY);
 
   // Lamps: twin round headlamps & amber turn signals in black pods; red tail / brake light columns, amber turn &
   // white reverse lamps at the rear corners; plates
@@ -1762,7 +1766,7 @@ function createLoftedBusMaterial(s = BUS_SPEC, { player = false } = {}) {
   const interior = mix(mix(color(0x3d3934), color(0x15161a), smoothstep(0.42, 1.1, p.y)), color(0xc9a227), pole);
   body = mix(body, interior, doorway);
 
-  const col = mix(mix(mix(body, color(0x1b1f24), isTrim), color(0xc9ced3), isPod), color(0x424549), isBellows);
+  const col = mix(mix(mix(body, color(0x1b1f24), isTrim), color(L?.roof ?? 0xc9ced3), isPod), color(0x424549), isBellows);
 
   const mat = new THREE.MeshStandardNodeMaterial();
   mat.colorNode = mix(col, color(0x000000), isSign);

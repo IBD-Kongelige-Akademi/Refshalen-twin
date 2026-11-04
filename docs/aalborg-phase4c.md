@@ -22,8 +22,13 @@ body per module from the city-bus loft:
 - A per-module door list.
 - A ribbed bellows sleeve (`createBusBellows`) bent between the two faces every frame.
 
-**The livery is not published.** The one used (white, a dark glazing band, a teal skirt stripe, a `+ PLUSBUS · CENTRUM` sign) is an
-inferred stand-in and still an open question. No line number is shown.
+**The livery** follows a photo of an Aalborg Plusbus:
+
+- a white lower body with a yellow stripe under the black window band;
+- a light-blue roof line, roof and roof pods;
+- silver bellows.
+
+The destination sign reads `+ PLUSBUS · CENTRUM`; no line number is shown. Shot: `docs/phase4c/plusbus-livery.jpg`.
 
 ## Driving
 
@@ -67,7 +72,7 @@ inferred stand-in and still an open question. No line number is shown.
   - The run along the car route to Jomfru Ane Gade (via Bispensgade) was cut short and is still to do.
 - The doors opened on all three modules at a stop. The chase camera kept every corner of the bus inside the frame (|NDC| ≤ 0.8)
   while driving straight and in a full turn.
-- Screenshots are still to take: the doorway shading was reworked after the first shot.
+- The livery shot is `docs/phase4c/plusbus-livery.jpg`. A shot of the open doors is still to take.
 
 ## Not done
 
