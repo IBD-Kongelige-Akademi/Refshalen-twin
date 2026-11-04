@@ -28,6 +28,7 @@ Map data © OpenStreetMap contributors (ODbL); DHM © Klimadatastyrelsen (CC BY 
 """
 from __future__ import annotations
 
+import base64
 import glob
 import json
 import math
@@ -48,6 +49,10 @@ import frame  # noqa: E402
 ROOT = Path(__file__).resolve().parents[2]
 RAW_OSM = ROOT / "data" / "raw" / "city" / "osm_api"
 VEG = ROOT / "data" / "raw" / "veg"
+TERRAIN_ORIG = ROOT / "data" / "city" / "work" / "terrain_orig"  # each tile's terrain layer as the compiler wrote it
+UNDER_REACH_M = 2.5  # the ground beside a deck is sampled this far out from its edge
+SINK_M = 1.0  # the ground under a bridge over water lies this far under the water level
+UNDER_MIN_DROP_M = 0.3  # a terrain cell under a deck is lowered when the ground beside it lies this much lower
 VERSION = "aalborg-structures/1"
 DECK_STEP_M = 2.0
 RING_STEP_M = 3.0
@@ -87,6 +92,15 @@ class Heights:
         import rasterio
 
         self.dtm = CW.Dtm(tiles_dir, meta["terrain"])
+        # the terrain as the compiler made it: a rerun reads the tiles' originals (write_terrain keeps them), not its own edits
+        for bp in sorted(TERRAIN_ORIG.glob("*.json")):
+            c = (read_json(bp) or {}).get("chunk")
+            if c:
+                a = np.frombuffer(base64.b64decode(c["data"]), dtype="<i2").reshape(c["h"], c["w"]).astype(np.float32) / 100.0
+                i0 = round((c["x0"] - self.dtm.x0) / self.dtm.cell)
+                j0 = round((c["z0"] - self.dtm.z0) / self.dtm.cell)
+                self.dtm.grid[j0:j0 + c["h"], i0:i0 + c["w"]] = a
+        self.orig = self.dtm.grid.copy()
         # the water the water build made (city_water.py): under a bridge over it the ground is the water, not the terrain (the compiled
         # terrain carries the fjord bridges' decks across the water)
         self.water, self.levels = [], []
@@ -213,6 +227,131 @@ def ring_with_ground(coords, H):
     return [round(v, 2) for p in pts for v in p], [round(float(v), 2) for v in g]
 
 
+def terrain_under_decks(decks, H) -> int:
+    """The compiled terrain carries many bridges (a ridge across the fjord, a mound over the railway): under every deck the terrain is
+    set to the ground beside the bridge, what the deck spans. A cell's ground is interpolated between the two points UNDER_REACH_M
+    outside the deck's edge across the nearest carried way (the water level where that point is over water); a cell is only lowered.
+    Works on H.dtm.grid in place (H.orig is the terrain as compiled); returns the number of cells lowered."""
+    grid, orig = H.dtm.grid, H.orig
+    x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
+
+    def beside(x, z):
+        """Ground at (x, z) in the original terrain; over water the bed, SINK_M under the water level (the ground cut under a bridge
+        over water must not show through the water surface)."""
+        i = int(math.floor((x - x0) / cell))
+        j = int(math.floor((z - z0) / cell))
+        g = float(orig[j, i]) if 0 <= j < orig.shape[0] and 0 <= i < orig.shape[1] else float("nan")
+        if H.wtree is not None:
+            for k in H.wtree.query(shapely.points(x, z), predicate="within"):
+                bed = H.levels[k] - SINK_M
+                g = min(g, bed) if math.isfinite(g) else bed
+        return g
+
+    changed = 0
+    for d in decks:
+        g = d["_g"]
+        segs = []
+        for a in d["axes"]:
+            p = a["pts"]
+            for m in range(4, len(p), 4):
+                segs.append((p[m - 4], p[m - 3], p[m], p[m + 1]))
+        if not segs:
+            continue
+        edge = g.boundary
+        bx0, bz0, bx1, bz1 = g.bounds
+        i0, i1 = int(math.floor((bx0 - x0) / cell)), int(math.ceil((bx1 - x0) / cell))
+        j0, j1 = int(math.floor((bz0 - z0) / cell)), int(math.ceil((bz1 - z0) / cell))
+        for j in range(max(0, j0), min(grid.shape[0], j1 + 1)):
+            for i in range(max(0, i0), min(grid.shape[1], i1 + 1)):
+                cx, cz = x0 + (i + 0.5) * cell, z0 + (j + 0.5) * cell
+                if not shapely.contains_xy(g, cx, cz):
+                    continue
+                # the nearest carried way: across it is what the deck spans
+                best, tx, tz = float("inf"), 1.0, 0.0
+                for ax, az, bx, bz in segs:
+                    dx, dz = bx - ax, bz - az
+                    l2 = dx * dx + dz * dz or 1e-9
+                    s = max(0.0, min(1.0, ((cx - ax) * dx + (cz - az) * dz) / l2))
+                    dd = (ax + dx * s - cx) ** 2 + (az + dz * s - cz) ** 2
+                    if dd < best:
+                        l = math.sqrt(l2)
+                        best, tx, tz = dd, dx / l, dz / l
+                nx, nz = -tz, tx
+                samples = []
+                for sgn in (1.0, -1.0):
+                    ray = LineString([(cx, cz), (cx + sgn * nx * 80.0, cz + sgn * nz * 80.0)])
+                    hit = ray.intersection(edge)
+                    pts = [hit] if hit.geom_type == "Point" else [q for q in getattr(hit, "geoms", []) if q.geom_type == "Point"]
+                    if not pts:
+                        continue
+                    dist = min(math.hypot(q.x - cx, q.y - cz) for q in pts) + UNDER_REACH_M
+                    h = beside(cx + sgn * nx * dist, cz + sgn * nz * dist)
+                    if math.isfinite(h):
+                        samples.append((dist, h))
+                if not samples:
+                    continue
+                if len(samples) == 2:
+                    (d1, h1), (d2, h2) = samples
+                    under = (h1 * d2 + h2 * d1) / (d1 + d2)
+                else:
+                    under = samples[0][1]
+                if math.isfinite(orig[j, i]) and orig[j, i] - under > UNDER_MIN_DROP_M:
+                    grid[j, i] = under
+                    changed += 1
+    return changed
+
+
+def regrounded(d, H):
+    """The deck's ground (ringG, holesG, the axes' ground y) and clearance from the terrain as it now is under it."""
+    def again(ring, before):
+        # off the compiled terrain (a deck running out of the district) the earlier ground stands
+        g = H.ground(np.array(ring[0::2]), np.array(ring[1::2]))
+        return [round(float(v), 2) if np.isfinite(v) else b for v, b in zip(g, before)]
+
+    d["ringG"] = again(d["ring"], d["ringG"])
+    d["holesG"] = [again(h, hg) for h, hg in zip(d["holes"], d["holesG"])]
+    clear = 0.0
+    for a in d["axes"]:
+        p = a["pts"]
+        gs = H.ground(np.array(p[0::4]), np.array(p[1::4]))
+        for k, gv in enumerate(gs):
+            if np.isfinite(gv):
+                p[4 * k + 3] = round(float(gv), 2)
+            clear = max(clear, p[4 * k + 2] - p[4 * k + 3])
+    d["clear"] = round(clear, 2)
+
+
+def write_terrain(tiles_dir: Path, H, ids) -> int:
+    """Each tile's terrain chunk from H.dtm.grid; the compiler's original goes to TERRAIN_ORIG once. A tile where no cell changed gets its
+    original back. Returns the number of tiles written with lowered cells."""
+    TERRAIN_ORIG.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for tid in ids:
+        path = tiles_dir / tid / "terrain.json"
+        backup = TERRAIN_ORIG / f"{tid}.json"
+        doc = read_json(backup) if backup.exists() else read_json(path)
+        c = (doc or {}).get("chunk")
+        if not c:
+            continue
+        i0 = round((c["x0"] - H.dtm.x0) / H.dtm.cell)
+        j0 = round((c["z0"] - H.dtm.z0) / H.dtm.cell)
+        new = H.dtm.grid[j0:j0 + c["h"], i0:i0 + c["w"]]
+        old = H.orig[j0:j0 + c["h"], i0:i0 + c["w"]]
+        if np.allclose(np.nan_to_num(new), np.nan_to_num(old)):
+            if backup.exists():  # no deck over this tile any more: the original back
+                path.write_text(backup.read_text(encoding="utf-8"), encoding="utf-8")
+                backup.unlink()
+            continue
+        if not backup.exists():
+            backup.write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        cm = np.round(np.nan_to_num(new, nan=0.0) * 100).astype("<i2")
+        out = dict(doc)
+        out["chunk"] = {**c, "data": base64.b64encode(cm.tobytes()).decode("ascii")}
+        path.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+        n += 1
+    return n
+
+
 def build(tiles_dir: Path, city_dir: Path) -> dict:
     from pyproj import Transformer
 
@@ -293,7 +432,11 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
             holes_g.append(hg)
         decks.append({"id": f"deck:{len(decks)}", "name": names[0] if names else "", "kind": kind, "ring": ext, "ringG": ext_g, "holes": holes,
                       "holesG": holes_g, "axes": axes, "clear": round(clear, 2), "_g": g})
-    log(f"decks: {len(decks)} structures, {sum(d['_g'].area for d in decks) / 1e4:.2f} ha; {sum(1 for d in decks if d['clear'] > 2.5)} stand over 2.5 m")
+    changed = terrain_under_decks(decks, H)
+    for d in decks:
+        regrounded(d, H)
+    log(f"decks: {len(decks)} structures, {sum(d['_g'].area for d in decks) / 1e4:.2f} ha; {sum(1 for d in decks if d['clear'] > 2.5)} stand over 2.5 m; "
+        f"terrain lowered under them in {changed} cells")
 
     # ---- rails
     rails = []
@@ -338,7 +481,8 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
         if ds or rs:
             out[tid] = {"tile": tid, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
                         "rails": [{k: v for k, v in r.items() if k != "_g"} for r in sorted(rs, key=lambda r: r["id"])]}
-    return {"tiles": out, "stats": {"decks": len(decks), "deck_ha": round(sum(d["_g"].area for d in decks) / 1e4, 2),
+    terrain_tiles = write_terrain(tiles_dir, H, ids)
+    return {"terrain_tiles": terrain_tiles, "tiles": out, "stats": {"decks": len(decks), "deck_ha": round(sum(d["_g"].area for d in decks) / 1e4, 2),
                                     "high_decks": sum(1 for d in decks if d["clear"] > 2.5), "rails": len(rails),
                                     "rail_km": round(sum(r["_g"].length for r in rails) / 1000, 2), "tiles": len(out)}}
 
@@ -355,6 +499,7 @@ def update_manifest(city_dir: Path, key: str, value) -> None:
 def main() -> int:
     tiles_dir, city_dir = ROOT / "data" / "tiles", ROOT / "data" / "city"
     res = build(tiles_dir, city_dir)
+    log(f"terrain: {res['terrain_tiles']} tiles with the ground cut under their decks")
     sizes = {}
     for tid, lay in res["tiles"].items():
         text = json.dumps(lay, separators=(",", ":"), ensure_ascii=False)

@@ -180,9 +180,11 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
                 if len(poly.get("ring", [])) >= 6:
                     solid.append(Polygon(utm_ring(poly["ring"])).buffer(0))
     # and the bridge decks (city_structures.py): the DSM over a deck is the deck, not a crown
+    deck_polys = []
     for sp in sorted(BC.TILES_DIR.glob("*/structures.json")):
         for deck in (json.loads(sp.read_text(encoding="utf-8")).get("decks") or []):
             if len(deck.get("ring", [])) >= 6:
+                deck_polys.append(Polygon([(deck["ring"][i], deck["ring"][i + 1]) for i in range(0, len(deck["ring"]), 2)]).buffer(0))
                 solid.append(Polygon(utm_ring(deck["ring"])).buffer(0.5))
     blocked = geometry_mask([g for g in solid if not g.is_empty], (H, W), T, invert=True) if solid else np.zeros((H, W), bool)
     canopy = (nd > NDSM_TREE) & ~blocked
@@ -266,7 +268,15 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
             per_label[tr[3]] = per_label.get(tr[3], 0) + 1
     areas = np.bincount(labels.ravel())
     out = []
+    # no tree in a bridge deck's footprint: the terrain under a deck is cut down to what it spans, and the engine stands what is inside the
+    # footprint on the deck
+    from shapely import STRtree as _STRtree, points as _points
+    deck_tree = _STRtree(deck_polys) if deck_polys else None
+    n_deck = 0
     for x, z, rec, lab in trees:
+        if deck_tree is not None and len(deck_tree.query(_points(x, z), predicate="within")):
+            n_deck += 1
+            continue
         h = height_at(x, z)
         cf = {}
         if h is not None and h >= 3.0:
@@ -290,7 +300,7 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
         if rec.get("detected"):
             item["canopy_added"] = True
         out.append(item)
-    stats = {"geodanmark": sum(1 for t in out if t["src"][0].startswith("geodanmark")), "osm": n_osm, "detected": n_det, "detected_over_road": n_road,
+    stats = {"geodanmark": sum(1 for t in out if t["src"][0].startswith("geodanmark")), "osm": n_osm, "detected": n_det, "detected_over_road": n_road, "in_deck_footprint": n_deck,
              "measured_height": sum(1 for t in out if t["conf_fields"].get("height") == "measured")}
     log(f"trees {len(out)}: {stats}")
     return out, stats

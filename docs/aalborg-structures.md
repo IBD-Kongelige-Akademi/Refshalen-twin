@@ -4,8 +4,15 @@ Three kinds of geodata the twin was missing: watercourses (GeoDanmark vandløbsm
 
 ```sh
 uv run tools/geodata/city_water.py --fetch      # the GeoDanmark layers, watercourses included (once), then the water build
-PYTHONUTF8=1 uv run tools/geodata/city_structures.py      # bridges and railways (after the water: the ground under a deck over water)
+PYTHONUTF8=1 uv run tools/geodata/city_structures.py      # bridges and railways, and the terrain cut under the decks (after the water)
 uv run tools/geodata/build_city.py --osm-source api --stage furniture --stage index --force furniture   # trees off the decks and the water
+```
+
+`city_structures.py` edits the tiles' terrain layers, so the index stage runs after it. It keeps each tile's original terrain in
+`data/city/work/terrain_orig/` and always starts from that, so a rerun gives the same terrain. After a terrain rebuild (`--stage cells`),
+delete that folder and run it again.
+
+```sh
 ```
 
 ## Watercourses
@@ -35,8 +42,14 @@ furniture stage caches.
 - The ground under a deck is the water where the deck is over water, else the terrain. The build stores it with every outline vertex
   and axis station, so the engine needs no terrain to draw a deck that spans tiles.
 
-**Result:** 34 structures, 3 ha; 6 stand more than 2.5 m over the ground (Limfjordsbroen up to 8 m over the fjord, Østre Allé 8 m
-over the railway).
+**The terrain under a deck.** The compiled terrain carried many bridges: a ridge across the fjord along Limfjordsbroen, a mound
+over the railway at Vesterbro. Under every deck, the terrain is now set to the ground beside the bridge. Each cell takes a value between
+the two points 2.5 m outside the deck's edge, across the nearest carried way, so a railway cutting or a road runs on under the bridge.
+Over water that ground is the bed, 1 m under the water level. Cells are only ever lowered: 5,341 of them in 11 tiles. Deck heights are
+measured on the terrain as compiled, before the cut.
+
+**Result:** 34 structures, 3 ha; 13 stand more than 2.5 m over the ground (Limfjordsbroen up to 12 m over the fjord, Østre Allé 8 m
+over the railway, Vesterbro 4 m over the tracks).
 
 **Engine** (`js/structures.js`, `js/structures-geometry.js`, `js/deck-field.js`):
 - **Geometry.** A deck has its top, a soffit and fascia where it stands clear, and concrete parapets on road and rail decks (railings on
@@ -46,29 +59,33 @@ over the railway).
   and cyclists (`agentLevel`: each one's last ground, reset by a jump of more than 5 m, a respawn) use it: what drives or walks onto a
   bridge stays on, what passes under stays under. Near Østre Allé, 9 of 10 pedestrians seen in a raised deck's footprint walked under
   it, and the cyclists on the cycle bridges rode on them.
-- **Road surfaces.** The road worker drops the draped surface triangles under a deck that stands clear of the terrain (the deck is drawn
-  there). Where the terrain already carries a bridge (the fjord bridges: the compiled terrain runs across the water at deck height), it
-  drops only the steep triangles, the kerb skirts that hung from the deck down to the water.
-- **Furniture** stands on the ground without the decks: a tree beside or under a bridge is not lifted onto it. The tree build masks
-  the decks for detected crowns (the DSM over a deck is the deck).
+- **Road surfaces.** The road worker drops the draped surface triangles under a deck that stands clear of the terrain, so no lane
+  marking, kerb or cycle lane lies on or under a raised deck; the deck draws its own plain top. Steep triangles (kerb skirts) within
+  3 m of a deck over its ground go too.
+- **Furniture** stands on the decks, so the lamps on a bridge stay on it now that the terrain under it is cut away. No tree stands in
+  a deck's footprint: the tree build masks the decks for detected crowns (the DSM over a deck is the deck) and drops any tree inside one.
 
 ## Railways
 
 OSM `railway=rail` and disused tracks, not in tunnels: 69 tracks, 13.7 km (main, branch, siding, yard; 8 disused).
 - Each track is a ballast bed with concrete sleepers painted on it and two rails at the standard gauge (1435 mm). A disused track has
   dark, rusty rails.
-- Tracks lie at the terrain height, or on their deck where they are tagged a bridge. The build stores the heights every 4 m.
+- Tracks lie at the terrain height (cut under the decks, so a track passes under a bridge), or on their deck where they are tagged a
+  bridge. The build stores the heights every 4 m.
 
 ## Not done
 
-- **Waterline fragments.** Small green ground pieces are left at the waterline along Limfjordsbroen, where the water's ground cut meets
-  the bridge strip.
+- **Waterline fragments.** A few small green ground pieces still show at the waterline under Limfjordsbroen, where the water outline
+  leaves gaps along the bridge.
+- **Under a bridge.** A road under a bridge has no surface for the bridge's width (the deck above, the bare ground under it), and a lamp
+  in a deck's footprint stands on the deck even when it is under it.
 - **Bridge shapes.** Every bridge has the same section: no bascule span on Limfjordsbroen, no truss on Jernbanebroen, no stairs or ramps
   modelled apart from the terrain.
-- **The deck top.** Under a raised deck the deck's own top is plain (asphalt, paving or ballast): the road markings are not redrawn on it.
+- **The deck top.** A raised deck's top is plain (asphalt, paving or ballast): the road markings are not redrawn on it.
 - **Trains.** None run.
 - **Platforms.** `railway=platform` and the station are not modelled.
 - **Watercourse levels.** They are a stand-in (the terrain percentile), not a surveyed water level.
 
 Shots: `docs/structures/limfjordsbroen.jpg` (the deck on its piers over the fjord, traffic and Plusbuses on it),
+`docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro),
 `docs/structures/railway.jpg` (two tracks by the harbour). `?debug=nostructures` switches the layer off.

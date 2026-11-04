@@ -760,9 +760,6 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   // bridge decks and railway tracks (the `structures` layer): the ground model stands on the decks (js/deck-field.js withDecks), so the
   // agents, the furniture and the player drive and walk over a bridge; levelAt keeps what passes under it under it
   const deckField = createDeckField();
-  // the ground without the decks: street furniture stands on it (a tree beside or under a bridge is not on its deck; where the terrain
-  // carries a bridge, as across the fjord, the lamps on it stand on the deck all the same)
-  const groundOffDecks = { heightAt: tiledHeight.heightAt, terrainAt: tiledHeight.terrainAt };
   Object.assign(tiledHeight, withDecks(deckField, { heightAt: tiledHeight.heightAt, terrainAt: tiledHeight.terrainAt }));
   if (!flags.has('nostructures')) {
     const structures = createStructuresLayer(scene, { field: deckField });
@@ -823,7 +820,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
 
   let furniture = null;
   if (roads && !flags.has('nofurniture') && city.meta.furniture) {
-    furniture = createStreetFurniture(scene, null, { streaming: true, treeDate, groundHeight: groundOffDecks, lakeDistance: lakes?.lakeDistance || null, adoptMesh });
+    furniture = createStreetFurniture(scene, null, { streaming: true, treeDate, groundHeight: tiledHeight, lakeDistance: lakes?.lakeDistance || null, adoptMesh });
     const zonesOn = !flags.has('noplace');
     const M = 30;
     layers.push({
@@ -845,7 +842,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
           }
         }
         furniture.addTile(ctx.id, doc, { place });
-        staticIndex.set(`f:${ctx.id}`, buildStaticColliders(null, { furniturePlan: furniture.tilePlan(ctx.id), carSpecs: BODY_SPECS, groundHeight: groundOffDecks }));
+        staticIndex.set(`f:${ctx.id}`, buildStaticColliders(null, { furniturePlan: furniture.tilePlan(ctx.id), carSpecs: BODY_SPECS, groundHeight: tiledHeight }));
       },
       remove: (id) => { furniture.removeTile(id); staticIndex.remove(`f:${id}`); }
     });
