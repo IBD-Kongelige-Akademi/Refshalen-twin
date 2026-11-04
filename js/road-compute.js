@@ -41,77 +41,152 @@ export function makeRoadJob(ctx, { near, terrain, decks = null }) {
     surfaces: sf ? { ...sf, own: undefined, surfaces: sf.surfaces, markings: sf.markings } : null,
     surfacesOwn: sf?.own ? { surfaces: indicesOf(sf.surfaces, sf.own.surfaces), markings: indicesOf(sf.markings, sf.own.markings) } : null,
     terrain: chunks.length ? { header: { width: terrain.header.width, height: terrain.header.height, cell: terrain.header.cell, bbox: terrain.header.bbox }, chunks } : null,
-    // the bridge decks that stand clear of the ground: the road surfaces under and on them are left to the deck (js/structures.js)
+    // the bridge decks that stand clear of the ground: the road surfaces are sorted onto and under them (settleOnDecks)
     decks: (decks || []).filter((d) => d.clear > DECK_CLEAR).map((d) => ({ id: d.id, ring: d.ring, holes: d.holes, axes: d.axes }))
   };
 }
 
-const DECK_CLEAR = 0.4; // m: a road surface triangle where a deck stands this far over the ground is the deck's
+const DECK_CLEAR = 0.4; // m: where a deck stands this far over the ground the road surfaces there are sorted onto or under it
 const SKIRT_REACH = 3.0; // m round a steep triangle that a deck is looked for
+const ON_DECK_LIFT = 0.06; // m: a surface lifted onto a deck lies this much over the deck's measured top (the deck top is drawn 0.03 up)
+const MIXED_STEP = 0.6; // m: a triangle part on a deck, part off it, that spans more height than this is dropped
+const OWN_REACH = 6.0; // m past its half width that a deck's own way claims the surfaces (its pavements, kerbs and cycle lanes)
 
 /**
- * Hand the road surfaces over to the decks (in place): a triangle under a deck that stands clear of the terrain there (a road passing under
- * a bridge, a bridge the terrain does not carry) is dropped, the deck is drawn instead; where the terrain carries a bridge (the fjord
- * bridges: the surfaces lie on the deck), only the steep triangles go, the kerb skirts that would hang from the deck to the water.
+ * The road centrelines a vertex is sorted by: every road, pavement line and cycle track of the job with its id and half width, and
+ * a bounding box to skip the far ones.
  */
-function clipToDecks(meshes, decks, terrain) {
-  if (!decks?.length) return 0;
+function centrelines(geo) {
+  const out = [];
+  for (const list of [geo.roads, geo.cycleTracks]) {
+    for (const r of list || []) {
+      const p = r?.pts;
+      if (!r?.id || !p || p.length < 4) continue;
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      for (let i = 0; i < p.length; i += 2) { x0 = Math.min(x0, p[i]); x1 = Math.max(x1, p[i]); z0 = Math.min(z0, p[i + 1]); z1 = Math.max(z1, p[i + 1]); }
+      out.push({ id: r.id, pts: p, half: (r.width || 3) / 2, box: [x0, z0, x1, z1] });
+    }
+  }
+  return out;
+}
+
+function distToLine(p, x, z) {
+  let best = Infinity;
+  for (let i = 2; i < p.length; i += 2) {
+    const ax = p[i - 2], az = p[i - 1], dx = p[i] - ax, dz = p[i + 1] - az;
+    const l2 = dx * dx + dz * dz || 1e-9;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2));
+    best = Math.min(best, (ax + dx * t - x) ** 2 + (az + dz * t - z) ** 2);
+  }
+  return Math.sqrt(best);
+}
+
+/**
+ * Sort the road surfaces onto and under the decks (in place). Where a deck stands clear of the ground, a vertex belongs to the way it
+ * was drawn for (the mesh's `owner`, js/road-surfaces.js), else (the pavement and register ground) to the nearest way (its distance
+ * past the way's half width): the deck's own ways (the bridge road, its pavements and cycle lanes, within OWN_REACH)
+ * are lifted onto the deck top, keeping their height over the ground (paint over asphalt, a kerb's rise), so the bridge keeps its lane
+ * markings; anything else (a road passing under, the paving round it) stays on the ground under the deck. A triangle that would join
+ * the deck to the ground under it is dropped, as are the steep triangles (kerb skirts) within SKIRT_REACH of a deck over the water
+ * that are not on it. Returns { lifted, dropped }.
+ */
+export function settleOnDecks(meshes, decks, terrain, geo = {}) {
+  if (!decks?.length) return { lifted: 0, dropped: 0 };
   const field = createDeckField();
   field.add('job', decks);
+  const own = new Map(decks.map((d) => [d.id, new Set((d.axes || []).map((a) => a.way))]));
+  const lines = centrelines(geo);
   const ground = (x, z) => (terrain ? terrain.heightAt(x, z) : 0);
-  // a deck that stands over what the build found under it (the water under a fjord bridge)
-  const overGround = (x, z) => {
+  const OUT = 0, ON = 1, UNDER = 2;
+  /** { cls, y }: the vertex's class and, on a deck, its height there; `way` = the way the vertex was drawn for, when known */
+  const sort = (x, y, z, way = null) => {
+    const info = field.deckInfo(x, z);
+    if (!info) return { cls: OUT, y };
+    const g = ground(x, z);
+    if (info.y - g <= DECK_CLEAR) return { cls: OUT, y };
+    const mine = own.get(info.deck.id);
+    const lift = { cls: ON, y: info.y + ON_DECK_LIFT + Math.max(0, y - g) };
+    if (way !== null) return mine.has(way) ? lift : { cls: UNDER, y };
+    let best = Infinity, bestOwn = false;
+    for (const l of lines) {
+      const b = l.box;
+      if (x < b[0] - 30 || x > b[2] + 30 || z < b[1] - 30 || z > b[3] + 30) continue;
+      const d = distToLine(l.pts, x, z) - l.half;
+      if (d < best - 1e-6 || (Math.abs(d - best) <= 1e-6 && mine.has(l.id))) { best = d; bestOwn = mine.has(l.id); }
+    }
+    // no way near (a fjord bridge's register surfaces): the deck's
+    if (bestOwn ? best <= OWN_REACH : best > OWN_REACH) return lift;
+    return { cls: UNDER, y };
+  };
+  const overWater = (x, z) => {
     const info = field.deckInfo(x, z);
     if (!info) return false;
     const under = deckGround(info.deck, x, z);
     return under !== null && info.y - under > DECK_CLEAR;
   };
-  const raised = (x, z, ny) => {
-    const info = field.deckInfo(x, z);
-    if (info && info.y - ground(x, z) > DECK_CLEAR) return true;
-    if (Math.abs(ny) >= 0.6) return false;
-    // a steep triangle (a kerb skirt) on or along such a deck: the register's surfaces reach a few metres past the bridge outline
-    return overGround(x, z) || overGround(x + SKIRT_REACH, z) || overGround(x - SKIRT_REACH, z) || overGround(x, z + SKIRT_REACH) || overGround(x, z - SKIRT_REACH);
-  };
+  const skirt = (x, z) => overWater(x, z) || overWater(x + SKIRT_REACH, z) || overWater(x - SKIRT_REACH, z) || overWater(x, z + SKIRT_REACH) || overWater(x, z - SKIRT_REACH);
   const normalY = (p, a, b, c) => {
     const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
     const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
     const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
     return ny / (Math.hypot(nx, ny, nz) || 1);
   };
-  let dropped = 0;
+  // a triangle (vertex offsets a, b, c into pos, classes ca, cb, cc) after the vertices are settled: keep it?
+  const keepTri = (pos, a, b, c, ca, cb, cc) => {
+    const on = (ca === ON) + (cb === ON) + (cc === ON);
+    const under = (ca === UNDER) + (cb === UNDER) + (cc === UNDER);
+    if (on && under) return false; // it would hang from the deck to the ground
+    if (on && on < 3) {
+      // on the deck and off it: fine at a bridge end where the deck meets the ground, a curtain where the surface runs past the outline
+      const ya = pos[a + 1], yb = pos[b + 1], yc = pos[c + 1];
+      if (Math.max(ya, yb, yc) - Math.min(ya, yb, yc) > MIXED_STEP) return false;
+    }
+    if (on || under) return true;
+    if (Math.abs(normalY(pos, a, b, c)) >= 0.6) return true;
+    return !skirt((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3);
+  };
+  let lifted = 0, dropped = 0;
   for (const m of meshes) {
     const pos = m.position;
+    const n = pos.length / 3;
+    const cls = new Uint8Array(n);
+    const owner = m.owner && m.owner.length === n ? m.owner : null;
+    for (let v = 0; v < n; v++) {
+      const o = v * 3;
+      const s = sort(pos[o], pos[o + 1], pos[o + 2], owner && owner[v] >= 0 ? m.owners[owner[v]] : null);
+      cls[v] = s.cls;
+      if (s.cls === ON) { pos[o + 1] = s.y; lifted++; }
+    }
     if (m.index) {
       const keep = [];
       for (let t = 0; t < m.index.length; t += 3) {
-        const a = m.index[t] * 3, b = m.index[t + 1] * 3, c = m.index[t + 2] * 3;
-        if (raised((pos[a] + pos[b] + pos[c]) / 3, (pos[a + 2] + pos[b + 2] + pos[c + 2]) / 3, normalY(pos, a, b, c))) { dropped++; continue; }
-        keep.push(m.index[t], m.index[t + 1], m.index[t + 2]);
+        const ia = m.index[t], ib = m.index[t + 1], ic = m.index[t + 2];
+        if (!keepTri(pos, ia * 3, ib * 3, ic * 3, cls[ia], cls[ib], cls[ic])) { dropped++; continue; }
+        keep.push(ia, ib, ic);
       }
       if (keep.length !== m.index.length) m.index = new Uint32Array(keep);
     } else {
       // non-indexed (the ground-surface meshes): drop whole triangles from every per-vertex attribute
-      const n = pos.length / 9;
-      const keepTri = [];
-      for (let t = 0; t < n; t++) {
+      const nt = n / 3;
+      const kept = [];
+      for (let t = 0; t < nt; t++) {
         const o = t * 9;
-        if (raised((pos[o] + pos[o + 3] + pos[o + 6]) / 3, (pos[o + 2] + pos[o + 5] + pos[o + 8]) / 3, normalY(pos, o, o + 3, o + 6))) dropped++;
-        else keepTri.push(t);
+        if (keepTri(pos, o, o + 3, o + 6, cls[t * 3], cls[t * 3 + 1], cls[t * 3 + 2])) kept.push(t);
+        else dropped++;
       }
-      if (keepTri.length !== n) {
+      if (kept.length !== nt) {
         for (const key of Object.keys(m)) {
           const arr = m[key];
-          if (!ArrayBuffer.isView(arr) || arr.length % (n * 3) !== 0 || arr.length === 0) continue;
-          const per = arr.length / (n * 3); // components per vertex
-          const out = new arr.constructor(keepTri.length * 3 * per);
-          keepTri.forEach((t, k) => out.set(arr.subarray(t * 3 * per, (t + 1) * 3 * per), k * 3 * per));
+          if (!ArrayBuffer.isView(arr) || arr.length % (nt * 3) !== 0 || arr.length === 0) continue;
+          const per = arr.length / (nt * 3); // components per vertex
+          const out = new arr.constructor(kept.length * 3 * per);
+          kept.forEach((t, k) => out.set(arr.subarray(t * 3 * per, (t + 1) * 3 * per), k * 3 * per));
           m[key] = out;
         }
       }
     }
   }
-  return dropped;
+  return { lifted, dropped };
 }
 
 /** @returns {{ meshes: object[], heightGrid: { bbox, cell, data }|null }} */
@@ -131,7 +206,8 @@ export function computeRoadSurfaces(job) {
     if (surfacesOwn) surfaces.own = { surfaces: new Set(surfacesOwn.surfaces.map((i) => sf.surfaces[i])), markings: new Set(surfacesOwn.markings.map((i) => sf.markings[i])) };
   }
   const meshes = computeSurfaceMeshes(geo, near ? surfaces : null, terrain, { lite: !near });
-  clipToDecks(meshes, job.decks, terrain);
+  settleOnDecks(meshes, job.decks, terrain, geo);
+  for (const m of meshes) { delete m.owner; delete m.owners; } // only the sorting needs them
   let heightGrid = null;
   if (near && bounds) {
     const grid = buildGroundHeightGrid(geo, surfaces, [bounds[0] - HEIGHT_MARGIN, bounds[1] - HEIGHT_MARGIN, bounds[2] + HEIGHT_MARGIN, bounds[3] + HEIGHT_MARGIN]);

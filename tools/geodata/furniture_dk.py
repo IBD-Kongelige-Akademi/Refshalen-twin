@@ -308,6 +308,61 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
 
 # --------------------------------------------------------------------------------------------------------------- the rest
 
+UNDER_DECK_CLEAR_M = 0.4  # js/road-compute.js DECK_CLEAR
+OWN_REACH_M = 6.0  # js/road-compute.js OWN_REACH
+
+
+def mark_under_decks(doc, roads, keys) -> int:
+    """Items in a bridge deck's footprint where the deck stands clear of the ground (city_structures.py) that belong to a way under
+    it, not to the deck's own ways, get `under: 1`: the engine stands them on the ground under the deck (js/street-furniture-data.js
+    furnitureGround). The same rule as the road surfaces (js/road-compute.js settleOnDecks): the item belongs to the nearest road
+    (distance past its half width); the deck's own within OWN_REACH_M, else what is under it. Returns the number marked."""
+    from shapely import STRtree as _STRtree, points as _points
+    from shapely.geometry import LineString, Polygon
+
+    decks = {}
+    for sp in sorted(BC.TILES_DIR.glob("*/structures.json")):
+        for d in (json.loads(sp.read_text(encoding="utf-8")).get("decks") or []):
+            if len(d.get("ring", [])) >= 6 and d.get("clear", 0) > UNDER_DECK_CLEAR_M:
+                decks[d["id"]] = d
+    if not decks:
+        return 0
+    dl = list(decks.values())
+    polys = [Polygon([(d["ring"][i], d["ring"][i + 1]) for i in range(0, len(d["ring"]), 2)]).buffer(0) for d in dl]
+    dtree = _STRtree(polys)
+    lines = [(r["id"], LineString(list(zip(r["pts"][0::2], r["pts"][1::2]))), (r.get("width") or 3) / 2)
+             for r in roads if r.get("id") and len(r.get("pts") or []) >= 4]
+    ltree = _STRtree([l for _, l, _ in lines])
+    n = 0
+    for key in keys:
+        for it in doc.get(key) or []:
+            x, z = it.get("x"), it.get("z")
+            if x is None or z is None:
+                continue
+            p = _points(x, z)
+            for k in dtree.query(p, predicate="within"):
+                d = dl[k]
+                pts = [(a["pts"][m], a["pts"][m + 1], a["pts"][m + 2], a["pts"][m + 3]) for a in d["axes"] for m in range(0, len(a["pts"]), 4)]
+                if not pts:
+                    continue
+                _, _, y, g = min(pts, key=lambda q: (q[0] - x) ** 2 + (q[1] - z) ** 2)
+                if y - g <= UNDER_DECK_CLEAR_M:
+                    continue
+                own = {a["way"] for a in d["axes"]}
+                best, best_own = float("inf"), False
+                for j in ltree.query(p.buffer(30.0)):
+                    rid, line, half = lines[j]
+                    dist = line.distance(p) - half
+                    if dist < best - 1e-6 or (abs(dist - best) <= 1e-6 and rid in own):
+                        best, best_own = dist, rid in own
+                if not (best <= OWN_REACH_M if best_own else best > OWN_REACH_M):
+                    it["under"] = 1
+                    n += 1
+                break
+    log(f"furniture under a bridge deck (stands on the ground under it): {n}")
+    return n
+
+
 def footprint_test(buildings):
     """(x, z) -> True inside a building footprint (local frame)."""
     from shapely import STRtree

@@ -26,11 +26,17 @@ const JUNCTION_TRIM = 7; // m of cycle track before a junction that is painted b
 const DRAPE_STEP = 6; // m: ribbons are split to this length when they follow terrain
 const RENDERED_MARKINGS = new Set(['white', 'crossing', 'arrow', 'symbol', 'bay', 'bump', 'bluecycle', 'red', 'yellow']);
 
+// the way (road or cycle track id) the builders are drawing: every vertex records it (Layer `owner`), so the road worker can tell the
+// bridge road from the road under it where both lie in a deck's footprint (js/road-compute.js settleOnDecks)
+let drawing = null;
+
 class Layer {
   // `terrain`: the ground model the layer is draped on (js/terrain.js); y values given to the builders are offsets above it
-  constructor(terrain = null) { this.pos = []; this.idx = []; this.uv = []; this.terrain = terrain && !terrain.flat ? terrain : null; }
+  constructor(terrain = null) { this.pos = []; this.idx = []; this.uv = []; this.own = []; this.terrain = terrain && !terrain.flat ? terrain : null; }
+  mark(n) { for (let i = 0; i < n; i++) this.own.push(drawing); }
   quad(a, b, c, d, y, uvs) { // four (x, z) corners in order, optional four (u, v) pairs
     const o = this.pos.length / 3;
+    this.mark(4);
     for (const p of [a, b, c, d]) this.pos.push(p[0], y, p[1]);
     if (uvs) for (const q of uvs) this.uv.push(q[0], q[1]);
     else for (let i = 0; i < 4; i++) this.uv.push(0, 0);
@@ -39,6 +45,7 @@ class Layer {
   // a sloped quad: four (x, z) corners with a height each, wound so it faces up
   quadY(pts, ys) {
     const o = this.pos.length / 3;
+    this.mark(4);
     const cross = (pts[1][0] - pts[0][0]) * (pts[2][1] - pts[0][1]) - (pts[1][1] - pts[0][1]) * (pts[2][0] - pts[0][0]);
     for (let k = 0; k < 4; k++) { this.pos.push(pts[k][0], ys[k], pts[k][1]); this.uv.push(0, 0); }
     if (cross >= 0) this.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
@@ -47,12 +54,24 @@ class Layer {
   // a vertical quad over the (x, z) edge a-b between heights y0 and y1
   wall(a, b, y0, y1, u0 = 0, u1 = 0) {
     const o = this.pos.length / 3;
+    this.mark(4);
     this.pos.push(a[0], y0, a[1], b[0], y0, b[1], b[0], y1, b[1], a[0], y1, a[1]);
     this.uv.push(u0, 0, u1, 0, u1, 0, u0, 0);
     this.idx.push(o, o + 1, o + 2, o, o + 2, o + 3);
   }
   get vertexCount() { return this.pos.length / 3; }
-  arrays() { return { position: drapePositions(new Float32Array(this.pos), this.terrain), kuv: new Float32Array(this.uv), index: new Uint32Array(this.idx) }; }
+  arrays() {
+    // owner: per vertex an index into owners (-1: no way)
+    const owners = [];
+    const at = new Map();
+    const owner = new Int32Array(this.own.length);
+    this.own.forEach((id, i) => {
+      if (id == null) { owner[i] = -1; return; }
+      if (!at.has(id)) { at.set(id, owners.length); owners.push(id); }
+      owner[i] = at.get(id);
+    });
+    return { position: drapePositions(new Float32Array(this.pos), this.terrain), kuv: new Float32Array(this.uv), index: new Uint32Array(this.idx), owner, owners };
+  }
 }
 
 function polyLength(pts) {
@@ -192,6 +211,7 @@ function dashed(layer, pts, o, w, dash, period, y) {
 function fillRing(layer, ring, y, holes) {
   const { pts, idx } = triangulatePolygon(ring, holes);
   const o = layer.pos.length / 3;
+  layer.mark(pts.length / 2);
   for (let i = 0; i < pts.length; i += 2) {
     layer.pos.push(pts[i], y, pts[i + 1]);
     layer.uv.push(0, 0);
@@ -590,6 +610,7 @@ export function buildRoadSurfaceArrays(geo, { surfaces = null, pavement = false,
   const piecesOf = (pts, list, fn) => { for (const [a, b] of list) { const q = slicePts(pts, a, b); if (q.length >= 4) fn(q, a); } };
   for (const r of ownList(geo, 'roads')) {
     if (!VEHICULAR.has(r.class) || !r.pts || r.pts.length < 4 || r.drop) continue;
+    drawing = r.id ?? null;
     const w = carriagewayWidth(r);
     const h = w / 2;
     const L = polyLength(r.pts);
@@ -698,9 +719,11 @@ export function buildRoadSurfaceArrays(geo, { surfaces = null, pavement = false,
 
   // side-street mouths: kerb returns round the corners of through streets, ramps up to the raised crossings of the
   // small ones (their pavement-level plateaus are pavement.js triangles)
+  drawing = null;
   for (const [mouthRoad, list] of layouts) {
     if (!isOwned(geo, 'roads', geo.roads[mouthRoad])) continue;
     for (const m of list) {
+      drawing = geo.roads[m.mouth.road]?.id ?? null;
       for (const arc of m.arcs) {
         // the carriageway side of the arc: toward the junction centre
         const t = [arc[arc.length - 2] - arc[0], arc[arc.length - 1] - arc[1]];
@@ -717,9 +740,11 @@ export function buildRoadSurfaceArrays(geo, { surfaces = null, pavement = false,
 
   for (const c of ownList(geo, 'cycleTracks')) {
     if (!c.pts || c.pts.length < 4) continue;
+    drawing = c.id ?? null;
     const hw = (c.width || CYCLE_W) / 2;
     ribbon(cycle, c.pts, -hw, hw, SURFACE_Y.cycle - 0.002);
   }
+  drawing = null;
   if (!pavement) for (const s of ownList(geo, 'sidewalks')) if (s.ring && s.ring.length >= 6) fillRing(sidewalk, s.ring, pavementY);
 
   // KK markings as decals on whichever surface they lie on
@@ -784,8 +809,8 @@ export function computeSurfaceMeshes(geo, surfaces, terrain, { lite = false } = 
   for (const [name, layer] of Object.entries(layers)) {
     if (!layer.vertexCount) continue;
     if (lite && LITE_SKIPS.has(name)) continue;
-    const { position, kuv, index } = layer.arrays();
-    meshes.push({ name: `road-${name}`, cls: name, ground: false, position, kuv, index, seed: null, normal: vertexNormals(position, index) });
+    const { position, kuv, index, owner, owners } = layer.arrays();
+    meshes.push({ name: `road-${name}`, cls: name, ground: false, position, kuv, index, seed: null, normal: vertexNormals(position, index), owner, owners });
   }
   if (lite) return meshes; // the mid ring: carriageways, kerbs and cycle tracks; no markings, pavements or register ground
   for (const [key, bucket] of buildGroundBuckets(geo, surfaces, terrain)) {

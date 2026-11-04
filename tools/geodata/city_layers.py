@@ -129,6 +129,7 @@ def stage_furniture(a, tiles, cells) -> None:
     doc["lamps"] = FD.build_lamps(roads, bbox, bl["buildings"])
     doc["parkingBays"] = FD.build_parking(bbox, bl["buildings"])
     doc.update(FD.build_osm_lists(roads, bl["buildings"]))
+    FD.mark_under_decks(doc, rl["roads"], ("lamps", "benches", "bins", "bollards", "bikeRacks", "glassContainers", "busStops", "monuments"))
     for k in ("parkMeters", "binStands", "rescuePosts", "lakeLights"):
         doc[k] = []
     doc["stats"] = {k: len(doc[k]) for k in T.FURNITURE_LISTS}

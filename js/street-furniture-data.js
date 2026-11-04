@@ -341,6 +341,40 @@ export function busStopParts(stops, groundHeight) {
 const place_ = (items, groundHeight) =>
   (items || []).map((i) => ({ ...i, cx: i.x, cz: i.z, y: groundHeight ? groundHeight.heightAt(i.x, i.z) : 0 }));
 
+const UNDER_REACH = 3; // m round an item under a deck (`under`) where the ground under the deck stands in for the deck
+
+/**
+ * The ground the furniture stands on: `groundHeight`, except round the items the build found under a bridge deck (`under: 1`,
+ * tools/geodata/furniture_dk.py mark_under_decks), where the ground under the deck (`baseHeightAt`) is used, so a lamp beside the
+ * road under a bridge is not lifted onto the deck over it.
+ */
+export function furnitureGround(doc, groundHeight) {
+  if (!groundHeight?.baseHeightAt) return groundHeight;
+  const cells = new Map();
+  for (const list of Object.values(doc || {})) {
+    if (!Array.isArray(list)) continue;
+    for (const it of list) {
+      if (!it?.under || !Number.isFinite(it.x) || !Number.isFinite(it.z)) continue;
+      const k = `${Math.floor(it.x / UNDER_REACH)},${Math.floor(it.z / UNDER_REACH)}`;
+      if (!cells.has(k)) cells.set(k, []);
+      cells.get(k).push(it.x, it.z);
+    }
+  }
+  if (!cells.size) return groundHeight;
+  const near = (x, z) => {
+    const i = Math.floor(x / UNDER_REACH), j = Math.floor(z / UNDER_REACH);
+    for (let a = i - 1; a <= i + 1; a++) {
+      for (let b = j - 1; b <= j + 1; b++) {
+        const c = cells.get(`${a},${b}`);
+        if (!c) continue;
+        for (let k = 0; k < c.length; k += 2) if ((c[k] - x) ** 2 + (c[k + 1] - z) ** 2 <= UNDER_REACH * UNDER_REACH) return true;
+      }
+    }
+    return false;
+  };
+  return { ...groundHeight, heightAt: (x, z) => (near(x, z) ? groundHeight.baseHeightAt(x, z) : groundHeight.heightAt(x, z)) };
+}
+
 /** All placed furniture of the document, with ground heights. */
 export function buildFurniturePlan(doc, groundHeight = null, { seed = 1, place = null, resolveTree = null } = {}) {
   // `place(doc)` re-places the items against the street layout (js/placement.js placeFurniture); its report rides along
@@ -350,6 +384,7 @@ export function buildFurniturePlan(doc, groundHeight = null, { seed = 1, place =
     doc = placed.doc;
     report = placed.report;
   }
+  groundHeight = furnitureGround(doc, groundHeight);
   const stops = busStopParts(doc.busStops, groundHeight);
   const racks = rackItems(doc.bikeRacks, groundHeight, seed);
   const freeBikes = place_(doc.streetBikes, groundHeight);

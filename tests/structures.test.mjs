@@ -92,3 +92,35 @@ test('AI pedestrians and cyclists keep their level under and on a bridge (agentL
     assert.equal(agentLevel(ground, rider, 60, 0), -1, `${file}: off the deck`);
   }
 });
+
+test('road surfaces: the bridge road is lifted onto its deck with its markings, a road under the deck stays on the ground', async () => {
+  const { settleOnDecks } = await import('../js/road-compute.js');
+  // the deck above carries way 'w' along z = 0; road 'u' passes under it along x = 20 on flat ground at 0
+  const d = { ...deck, axes: [{ way: 'w', kind: 'road', pts: axis.map((v, i) => (i % 4 === 3 ? 0 : v)) }] };
+  const geo = { roads: [{ id: 'w', pts: [0, 0, 40, 0], width: 8 }, { id: 'u', pts: [20, -30, 20, 30], width: 6 }], cycleTracks: [] };
+  const terrain = { heightAt: () => 0 };
+  // a strip of paint along the bridge road (z = 1) and one along the road under it (x = 21), each two triangles at 0.02 m
+  const quad = (x0, z0, x1, z1) => [x0, 0.02, z0, x1, 0.02, z0, x1, 0.02, z1, x0, 0.02, z1];
+  // at the crossing both lie inside both carriageways: the way each was drawn for (`owner`) decides
+  const owned = (id) => ({ owner: new Int32Array(4), owners: [id] });
+  const onRoad = { position: new Float32Array(quad(19, 0.8, 23, 1.2)), index: new Uint32Array([0, 1, 2, 0, 2, 3]), ...owned('w') };
+  const underRoad = { position: new Float32Array(quad(20.8, -1, 21.2, 1)), index: new Uint32Array([0, 1, 2, 0, 2, 3]), ...owned('u') };
+  // a register surface running past the outline: one vertex on the deck, two far outside on the ground
+  const curtain = { position: new Float32Array([12, 0.02, 3.5, 12, 0.02, 9, 14, 0.02, 9]), index: new Uint32Array([0, 1, 2]) };
+  const r = settleOnDecks([onRoad, underRoad, curtain], [d], terrain, geo);
+  for (let i = 1; i < 12; i += 3) assert.ok(Math.abs(onRoad.position[i] - (5 + 0.06 + 0.02)) < 1e-4, `bridge paint on the deck: ${onRoad.position[i]}`);
+  assert.equal(onRoad.index.length, 6);
+  for (let i = 1; i < 12; i += 3) assert.ok(Math.abs(underRoad.position[i] - 0.02) < 1e-6, 'the paint under the bridge stays on the ground');
+  assert.equal(underRoad.index.length, 6);
+  assert.equal(curtain.index.length, 0, 'no curtain from the deck to the ground beside it');
+  assert.ok(r.lifted >= 4 && r.dropped >= 1);
+});
+
+test('furniture under a deck stands on the ground under it, on the deck it stands on the deck', async () => {
+  const { furnitureGround } = await import('../js/street-furniture-data.js');
+  const g = { heightAt: (x, z) => (Math.abs(z) < 4 ? 5 : 0), baseHeightAt: () => 0 };
+  const fg = furnitureGround({ lamps: [{ x: 20, z: 1, under: 1 }, { x: 10, z: 3 }] }, g);
+  assert.equal(fg.heightAt(20, 1), 0, 'the lamp under the bridge');
+  assert.equal(fg.heightAt(10, 3), 5, 'the lamp on the bridge');
+  assert.equal(furnitureGround({ lamps: [{ x: 10, z: 3 }] }, g), g, 'nothing under a deck: the ground model as it was');
+});

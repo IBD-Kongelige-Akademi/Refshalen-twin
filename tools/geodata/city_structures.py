@@ -39,6 +39,7 @@ from pathlib import Path
 
 import numpy as np
 import shapely
+import shapely.ops
 from shapely import STRtree
 from shapely.geometry import LineString, Polygon, box
 from shapely.ops import unary_union
@@ -51,6 +52,7 @@ RAW_OSM = ROOT / "data" / "raw" / "city" / "osm_api"
 VEG = ROOT / "data" / "raw" / "veg"
 TERRAIN_ORIG = ROOT / "data" / "city" / "work" / "terrain_orig"  # each tile's terrain layer as the compiler wrote it
 UNDER_REACH_M = 2.5  # the ground beside a deck is sampled this far out from its edge
+SHOULDER_M = 8.0  # m round a deck that the terrain's ridge in the water is cut down to the bed
 SINK_M = 1.0  # the ground under a bridge over water lies this far under the water level
 UNDER_MIN_DROP_M = 0.3  # a terrain cell under a deck is lowered when the ground beside it lies this much lower
 VERSION = "aalborg-structures/1"
@@ -65,6 +67,20 @@ RAIL_W = 4.6  # m of deck per track
 RAILWAYS = ("rail", "light_rail", "narrow_gauge", "preserved", "tram", "disused")
 OUTLINE_GROW_M = 0.5  # a bridge way within this of an outline belongs to it
 MAX_DECK_OVER_M = 30.0
+# ---- what passes under a deck: its ground is lowered to the deck's soffit less the clearance, ramped back to the terrain at a grade
+UNDER_CLEAR_M = {"road": 4.2, "rail": 4.6, "foot": 2.5}  # soffit over the way
+UNDER_GRADE = {"road": 0.06, "rail": 0.025, "foot": 0.08}  # the ramps down to it
+DECK_THICK_M = {"road": 1.0, "rail": 1.2, "foot": 0.45}  # js/structures-geometry.js DECK.thick
+DECK_LIFT_M = 0.03  # js/structures-geometry.js DECK.lift
+UNDER_MIN_CLEAR_M = 1.5  # a way under a deck that stands less over it than this is not passing under (it joins the bridge at its end)
+UNDER_MAX_DROP_M = 4.0  # the most an underpass is lowered
+UNDER_FLOOR_M = 0.3  # an underpass stays this far over the sea
+BANK_SLOPE = 1.0  # the side of a lowered underpass: 1:1 up to the terrain
+CHAIN_TURN_DEG = 50.0  # a ramp runs on along the way's continuation where it turns less than this
+TUNNEL_MAX_M = 80.0  # a tunnel way this short under a road or railway that is not tagged a bridge is an underpass: the road gets a deck
+TUNNEL_FEASIBLE = 0.8  # a tunnel deck is kept where its tunnel can be lowered to this share of its clearance
+TUNNEL_DECK_PAD_M = {"road": 4.0, "rail": 1.0, "foot": 1.0}  # a tunnel deck is this much wider than the way it carries (the pavements)
+FOOT = ("footway", "cycleway", "path", "steps", "pedestrian", "bridleway", "track", "corridor")
 WATER_REACH_M = 3.0  # a deck point this close to the water stands over the water  # a DSM sample this far over the terrain is not a deck (a crane, a building edge)
 
 
@@ -103,10 +119,12 @@ class Heights:
         self.orig = self.dtm.grid.copy()
         # the water the water build made (city_water.py): under a bridge over it the ground is the water, not the terrain (the compiled
         # terrain carries the fjord bridges' decks across the water)
-        self.water, self.levels = [], []
+        self.water, self.levels, self.raw, self.bodies = [], [], [], []
         for wp in sorted(tiles_dir.glob("*/water.json")):
             for body in (read_json(wp) or {}).get("bodies") or []:
                 for poly in body.get("polys") or []:
+                    if poly.get("deck"):  # the water this build added under a deck (water_under_decks)
+                        continue
                     r = poly.get("ring") or []
                     if len(r) >= 6:
                         g = Polygon(list(zip(r[0::2], r[1::2])), [list(zip(h[0::2], h[1::2])) for h in poly.get("holes") or [] if len(h) >= 6]).buffer(0)
@@ -114,6 +132,8 @@ class Heights:
                             # grown: the water build leaves the bridge strip out, so a deck's outline runs along the water's edge
                             self.water.append(g.buffer(WATER_REACH_M))
                             self.levels.append(float(body["level"]))
+                            self.raw.append(g)
+                            self.bodies.append(body["id"])
         self.wtree = STRtree(self.water) if self.water else None
         self.nd = []
         for p in sorted(VEG.glob("ndsm_*.tif")):
@@ -298,6 +318,23 @@ def terrain_under_decks(decks, H) -> int:
                 if math.isfinite(orig[j, i]) and orig[j, i] - under > UNDER_MIN_DROP_M:
                     grid[j, i] = under
                     changed += 1
+        # the ridge the compiled terrain carries is wider than the outline: its shoulders in the water go down to the bed too
+        raw = getattr(H, "raw", None)
+        if raw:
+            near = [k for k, r in enumerate(raw) if r.intersects(g.buffer(SHOULDER_M))]
+            pad = int(math.ceil(SHOULDER_M / cell))
+            for j in range(max(0, j0 - pad), min(grid.shape[0], j1 + pad + 1)):
+                for i in range(max(0, i0 - pad), min(grid.shape[1], i1 + pad + 1)):
+                    cx, cz = x0 + (i + 0.5) * cell, z0 + (j + 0.5) * cell
+                    if not near or shapely.contains_xy(g, cx, cz) or g.distance(shapely.points(cx, cz)) > SHOULDER_M:
+                        continue
+                    for k in near:
+                        if shapely.contains_xy(raw[k], cx, cz):
+                            bed = H.levels[k] - SINK_M
+                            if math.isfinite(grid[j, i]) and grid[j, i] - bed > UNDER_MIN_DROP_M:
+                                grid[j, i] = bed
+                                changed += 1
+                            break
     return changed
 
 
@@ -319,6 +356,52 @@ def regrounded(d, H):
                 p[4 * k + 3] = round(float(gv), 2)
             clear = max(clear, p[4 * k + 2] - p[4 * k + 3])
     d["clear"] = round(clear, 2)
+
+
+def water_under_decks(tiles_dir: Path, decks, H) -> float:
+    """The water build leaves a bridge's strip out of the water, so under a deck over the water the ground cut to the bed would show:
+    the strip (the deck's footprint within WATER_REACH_M of the water, less the water) is added to the water body beside it in each tile's
+    water layer, marked `deck` (a rerun takes those out first). Returns the area added (m2)."""
+    if not H.raw:
+        return 0.0
+    rtree = STRtree(H.raw)
+    gaps = {}  # body id -> [polygon]
+    for d in decks:
+        if d.get("clear", 0) <= 0.4:
+            continue
+        g = d["_g"]
+        near = [k for k in rtree.query(g.buffer(WATER_REACH_M))]
+        if not near:
+            continue
+        wet = unary_union([H.raw[k] for k in near])
+        gap = g.intersection(wet.buffer(WATER_REACH_M)).difference(wet)
+        for piece in getattr(gap, "geoms", [gap]):
+            if piece.geom_type != "Polygon" or piece.area < 0.5:
+                continue
+            k = min(near, key=lambda k: H.raw[k].distance(piece))
+            gaps.setdefault(H.bodies[k], []).append(piece)
+    area = 0.0
+    for wp in sorted(tiles_dir.glob("*/water.json")):
+        doc = read_json(wp) or {}
+        tb = box(*frame.tile_bounds_local(wp.parent.name))
+        dirty = False
+        for body in doc.get("bodies") or []:
+            polys = [q for q in body.get("polys") or [] if not q.get("deck")]
+            dirty |= len(polys) != len(body.get("polys") or [])
+            for piece in gaps.get(body.get("id"), []):
+                part = piece.intersection(tb)
+                for q in getattr(part, "geoms", [part]):
+                    if q.geom_type != "Polygon" or q.area < 0.5:
+                        continue
+                    q = q.simplify(0.1, preserve_topology=True)
+                    polys.append({"ring": [round(v, 2) for c in list(q.exterior.coords)[:-1] for v in c],
+                                  "holes": [[round(v, 2) for c in list(h.coords)[:-1] for v in c] for h in q.interiors], "deck": 1})
+                    area += q.area
+                    dirty = True
+            body["polys"] = polys
+        if dirty:
+            wp.write_text(json.dumps(doc, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+    return area
 
 
 def write_terrain(tiles_dir: Path, H, ids) -> int:
@@ -350,6 +433,253 @@ def write_terrain(tiles_dir: Path, H, ids) -> int:
         path.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
         n += 1
     return n
+
+
+def kind_of(tags) -> str:
+    return "rail" if "railway" in tags else "foot" if tags.get("highway") in FOOT else "road"
+
+
+def ground_ways(els, tr, area):
+    """Every highway / railway way that is not a bridge (tunnels and covered ways too): what can pass under a deck."""
+    out = []
+    for (t, i), w in els.items():
+        if t != "way":
+            continue
+        tags = w.get("tags", {})
+        if tags.get("bridge") not in (None, "no") or tags.get("area") == "yes":
+            continue
+        if not (("highway" in tags and tags["highway"] not in ("platform", "construction", "proposed", "elevator"))
+                or tags.get("railway") in RAILWAYS):
+            continue
+        pts = to_local_line(w, els, tr)
+        if len(pts) < 2:
+            continue
+        line = LineString(pts)
+        if line.length < 0.5 or not line.intersects(area):
+            continue
+        try:
+            layer = int(str(tags.get("layer", "0")).split(";")[0])
+        except ValueError:
+            layer = 0
+        out.append({"id": f"osm:way/{i}", "tags": tags, "nodes": w["nodes"], "pts": pts, "line": line, "kind": kind_of(tags),
+                    "width": width_of(tags), "layer": layer, "name": tags.get("name", ""),
+                    "tunnel": tags.get("tunnel") not in (None, "no", "building_passage", "culvert")})
+    return out
+
+
+def chain_line(w, gways, by_node, reach):
+    """The way's centreline run on at both ends along its continuations (the way sharing the end node that turns least, under
+    CHAIN_TURN_DEG; a road continues on roads, a path on paths, a track on tracks) for up to `reach` m: the ramps of an underpass
+    reach past a short way under a bridge."""
+    def heading(a, b):
+        return math.atan2(b[1] - a[1], b[0] - a[0])
+
+    def grow(pts, nodes, end):
+        # pts / nodes: the chain so far, extended at its end `end` (1 = the last point, 0 = the first)
+        got, seen = 0.0, {w["id"]}
+        while got < reach:
+            nid = nodes[-1] if end else nodes[0]
+            a, b = (pts[-2], pts[-1]) if end else (pts[1], pts[0])
+            h0 = heading(a, b)
+            best = None
+            for j in by_node.get(nid, ()):
+                o = gways[j]
+                if o["id"] in seen or o["kind"] != w["kind"]:
+                    continue
+                if o["nodes"][0] == nid:
+                    op, on = o["pts"], o["nodes"]
+                elif o["nodes"][-1] == nid:
+                    op, on = o["pts"][::-1], o["nodes"][::-1]
+                else:
+                    continue
+                if len(op) < 2:
+                    continue
+                turn = abs((heading(op[0], op[1]) - h0 + math.pi) % (2 * math.pi) - math.pi)
+                if turn < math.radians(CHAIN_TURN_DEG) and (best is None or turn < best[0]):
+                    best = (turn, o, op, on)
+            if best is None:
+                break
+            _, o, op, on = best
+            seen.add(o["id"])
+            got += LineString(op).length
+            if end:
+                pts, nodes = pts + list(op[1:]), nodes + list(on[1:])
+            else:
+                pts, nodes = list(op[::-1][:-1]) + pts, list(on[::-1][:-1]) + nodes
+        return pts, nodes
+
+    pts, nodes = list(w["pts"]), list(w["nodes"])
+    if len(nodes) != len(pts):  # nodes outside the extract: no continuation
+        return LineString(pts)
+    pts, nodes = grow(pts, nodes, 1)
+    pts, nodes = grow(pts, nodes, 0)
+    return LineString(pts)
+
+
+def tunnel_decks(gways, buildings, H, first_id):
+    """Short tunnels (TUNNEL_MAX_M) under a road or railway that is not tagged a bridge (a footway under Vesterbro, Kærlundsvej under
+    Østre Allé): the way over the tunnel gets a deck as wide as the tunnel's corridor, its top on the way's surface, so the tunnel can
+    be lowered under it. Tunnels inside a building (car park ramps, passages) are left alone."""
+    lines = [w["line"] for w in gways]
+    tree = STRtree(lines)
+    btree = STRtree(buildings) if buildings else None
+    pieces = []  # (polygon, upper way index)
+    tunnels = []
+    for k, tw in enumerate(gways):
+        if not tw["tunnel"] or tw["line"].length > TUNNEL_MAX_M:
+            continue
+        if btree is not None and len(btree.query(tw["line"].interpolate(0.5, normalized=True), predicate="within")):
+            continue
+        corridor = tw["line"].buffer(tw["width"] / 2 + 1.5, cap_style="flat")
+        hit = False
+        for j in tree.query(tw["line"], predicate="crosses"):
+            up = gways[j]
+            if up["tunnel"] or up["layer"] < tw["layer"] or set(up["nodes"]) & set(tw["nodes"]):
+                continue
+            q = tw["line"].intersection(up["line"])
+            if q.is_empty or (btree is not None and len(btree.query(q, predicate="within"))):
+                continue
+            strip = up["line"].buffer(up["width"] / 2 + TUNNEL_DECK_PAD_M[up["kind"]], cap_style="flat").intersection(corridor)
+            if strip.area > 2.0:
+                pieces.append((strip, j))
+                hit = True
+        if hit:
+            tunnels.append(k)
+    if not pieces:
+        return [], []
+    merged = unary_union([p.buffer(0.15) for p, _ in pieces]).buffer(-0.15)
+    groups = list(merged.geoms) if hasattr(merged, "geoms") else [merged]
+    decks = []
+    for g in groups:
+        if g.is_empty or g.area < 4.0:
+            continue
+        members = sorted({j for p, j in pieces if p.intersects(g)})
+        axes = []
+        for j in members:
+            part = gways[j]["line"].intersection(g.buffer(2.0))
+            segs = [part] if part.geom_type == "LineString" else [s for s in getattr(part, "geoms", []) if s.geom_type == "LineString"]
+            for s in segs:
+                if s.length < 1.0:
+                    continue
+                prof, _ = deck_profile(list(s.coords), gways[j]["width"], H, narrow=gways[j]["width"] < 5)
+                axes.append({"way": gways[j]["id"], "kind": gways[j]["kind"], "pts": [v for pp in prof for v in pp]})
+        if not axes:
+            continue
+        kinds = {a["kind"] for a in axes}
+        kind = "rail" if kinds == {"rail"} else "road" if "road" in kinds or "rail" in kinds else "foot"
+        g = g.simplify(0.25, preserve_topology=True)
+        ext, ext_g = ring_with_ground(list(g.exterior.coords)[:-1], H)
+        names = [gways[j]["name"] for j in members if gways[j]["name"]]
+        decks.append({"id": f"deck:{first_id + len(decks)}", "name": names[0] if names else "", "kind": kind, "ring": ext, "ringG": ext_g,
+                      "holes": [], "holesG": [], "axes": axes, "clear": 0.0, "tunnel": 1, "_g": g})
+    return decks, [gways[k]["id"] for k in tunnels]
+
+
+def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False):
+    """Under every deck, the ways that pass under it (not the ways it carries) get their ground lowered to the deck's soffit less
+    UNDER_CLEAR_M, ramped back up to the terrain at UNDER_GRADE along the way and its continuations, with 1:1 banks at the sides; never
+    more than UNDER_MAX_DROP_M, never under the sea, only ever lowered. A way counts as passing under where the deck stands
+    UNDER_MIN_CLEAR_M over it (or it is one of `tunnel_ids`, a tunnel under a tunnel deck). Works on H.dtm.grid in place (not when
+    `dry`); returns (cells lowered, report rows (deck id, deck name, way id, way name, kind, clearance before, after, depth))."""
+    grid = H.dtm.grid
+    x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
+    floor = -frame.ORIGIN[2] + UNDER_FLOOR_M
+    tunnel_ids = set(tunnel_ids)
+    tree = STRtree([w["line"] for w in gways])
+    by_node = {}
+    for j, w in enumerate(gways):
+        for nid in (w["nodes"][0], w["nodes"][-1]):
+            by_node.setdefault(nid, []).append(j)
+    changed, rows = 0, []
+    for d in decks:
+        g = d["_g"]
+        carried = {a["way"] for a in d["axes"]}
+        thick = DECK_THICK_M[d["kind"]]
+        axpts = np.array([a["pts"][m:m + 3] for a in d["axes"] for m in range(0, len(a["pts"]), 4)], float)
+        for j in tree.query(g, predicate="intersects"):
+            w = gways[j]
+            if w["id"] in carried or w["line"].intersection(g).length < 0.5:
+                continue
+            reach = UNDER_MAX_DROP_M / UNDER_GRADE[w["kind"]] + 10.0
+            line = chain_line(w, gways, by_node, reach)
+            n = max(2, int(math.ceil(line.length)) + 1)
+            s = np.linspace(0.0, line.length, n)
+            st = shapely.line_interpolate_point(line, s)
+            xs, zs = shapely.get_x(st), shapely.get_y(st)
+            gr = H.ground(xs, zs)
+            ok = np.isfinite(gr)
+            inside = shapely.contains_xy(g, xs, zs) & ok
+            if not inside.any():
+                continue
+            # the soffit over each station inside the deck: the nearest axis point's deck top
+            dd = (axpts[None, :, 0] - xs[inside, None]) ** 2 + (axpts[None, :, 1] - zs[inside, None]) ** 2
+            soffit = axpts[np.argmin(dd, axis=1), 2] + DECK_LIFT_M - thick
+            over = soffit - gr[inside]
+            under = over > UNDER_MIN_CLEAR_M - thick if w["id"] not in tunnel_ids else np.ones(len(over), bool)
+            # stations over the water need nothing (the ground there is the water)
+            if H.wtree is not None:
+                wet = np.array([len(H.wtree.query(shapely.points(x, z), predicate="within")) > 0 for x, z in zip(xs[inside], zs[inside])])
+                under &= ~wet
+            if not under.any():
+                continue
+            target = soffit - UNDER_CLEAR_M[w["kind"]]
+            si = s[inside][under]
+            ti = np.maximum(target[under], np.maximum(gr[inside][under] - UNDER_MAX_DROP_M, floor))
+            need = gr[inside][under] - ti
+            if float(need.max()) < 0.05:
+                rows.append((d["id"], d["name"], w["id"], w["name"], w["kind"], round(float(over[under].min()), 2), round(float(over[under].min()), 2), 0.0))
+                continue
+            grade = UNDER_GRADE[w["kind"]]
+            cap = np.min(ti[None, :] + grade * np.abs(s[:, None] - si[None, :]), axis=1)
+            prof = np.where(ok, np.minimum(np.where(ok, gr, np.inf), cap), np.nan)
+            low = ok & (prof < gr - 0.02)
+            if not low.any():
+                continue
+            # the cells along the lowered stretch: the profile at their projection, the bank beyond the way's half width
+            after = soffit[under] - np.interp(si, s, prof)
+            row = (d["id"], d["name"], w["id"], w["name"], w["kind"], round(float(over[under].min()), 2), round(float(after.min()), 2),
+                   round(float(np.nanmax(gr[low] - prof[low])), 2))
+            if dry:
+                rows.append(row)
+                continue
+            k0, k1 = int(np.argmax(low)), int(len(low) - np.argmax(low[::-1]) - 1)
+            part = shapely.ops.substring(line, s[k0], s[k1]) if k1 > k0 else line
+            depth = float(np.nanmax(gr[low] - prof[low]))
+            half = w["width"] / 2
+            pad = half + depth / BANK_SLOPE + cell
+            bx0, bz0, bx1, bz1 = part.buffer(pad).bounds
+            i0, i1 = max(0, int(math.floor((bx0 - x0) / cell))), min(grid.shape[1] - 1, int(math.ceil((bx1 - x0) / cell)))
+            j0, j1 = max(0, int(math.floor((bz0 - z0) / cell))), min(grid.shape[0] - 1, int(math.ceil((bz1 - z0) / cell)))
+            if i1 < i0 or j1 < j0:
+                continue
+            ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1))
+            cx, cz = x0 + (ii + 0.5) * cell, z0 + (jj + 0.5) * cell
+            pts = shapely.points(cx.ravel(), cz.ravel())
+            dist = shapely.distance(part, pts)
+            sp = shapely.line_locate_point(line, pts)
+            pv = np.interp(sp, s, np.where(np.isfinite(prof), prof, gr if np.isfinite(gr).all() else 0.0))
+            v = pv + np.maximum(0.0, dist - half) * BANK_SLOPE
+            sub = grid[j0:j1 + 1, i0:i1 + 1].ravel()
+            hit = (dist <= pad) & np.isfinite(sub) & (v < sub - 0.02)
+            if hit.any():
+                sub = sub.copy()
+                sub[hit] = v[hit]
+                grid[j0:j1 + 1, i0:i1 + 1] = sub.reshape(ii.shape)
+                changed += int(hit.sum())
+            rows.append(row)
+    return changed, rows
+
+
+def feasible_tunnel_decks(tdecks, gways, H, tunnel_ids):
+    """The tunnel decks whose tunnel can be lowered to TUNNEL_FEASIBLE of its clearance (the city centre lies so near the sea that a
+    car park ramp cannot): the others are dropped, their tunnels left as they are. Judged on the terrain cut under them (the terrain
+    often carries the road across the tunnel); H.dtm.grid is left as it was."""
+    keep = H.dtm.grid.copy()
+    terrain_under_decks(tdecks, H)
+    _, rows = lower_underpasses(tdecks, gways, H, tunnel_ids, dry=True)
+    H.dtm.grid[...] = keep
+    good = {r[0] for r in rows if r[2] in tunnel_ids and r[6] >= TUNNEL_FEASIBLE * UNDER_CLEAR_M[r[4]]}
+    return [d for d in tdecks if d["id"] in good]
 
 
 def build(tiles_dir: Path, city_dir: Path) -> dict:
@@ -432,11 +762,30 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
             holes_g.append(hg)
         decks.append({"id": f"deck:{len(decks)}", "name": names[0] if names else "", "kind": kind, "ring": ext, "ringG": ext_g, "holes": holes,
                       "holesG": holes_g, "axes": axes, "clear": round(clear, 2), "_g": g})
+    # ---- underpasses: short tunnels under a road that is not tagged a bridge get a deck; then every way under a deck is lowered
+    gways = ground_ways(els, tr, area)
+    buildings = []
+    for bp in sorted(tiles_dir.glob("*/buildings.json")):
+        for b in (read_json(bp) or {}).get("buildings") or []:
+            r = b.get("ring") or []
+            if len(r) >= 6:
+                buildings.append(Polygon(list(zip(r[0::2], r[1::2]))).buffer(0))
+    tdecks, tunnel_ids = tunnel_decks(gways, buildings, H, len(decks))
+    kept = feasible_tunnel_decks(tdecks, gways, H, set(tunnel_ids))
+    log(f"underpasses: {len(tdecks)} tunnel decks over {len(tunnel_ids)} short tunnels; {len(kept)} can be lowered to their clearance: "
+        + ", ".join(f"{d['id']} {d['name']}" for d in kept))
+    for k, d in enumerate(kept):
+        d["id"] = f"deck:{len(decks) + k}"
+    tdecks = kept
+    decks += tdecks
     changed = terrain_under_decks(decks, H)
+    lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids)
+    for r in rows:
+        log("  under", *r)
     for d in decks:
         regrounded(d, H)
     log(f"decks: {len(decks)} structures, {sum(d['_g'].area for d in decks) / 1e4:.2f} ha; {sum(1 for d in decks if d['clear'] > 2.5)} stand over 2.5 m; "
-        f"terrain lowered under them in {changed} cells")
+        f"terrain lowered under them in {changed} cells; {len(rows)} ways pass under, lowered in {lowered} cells")
 
     # ---- rails
     rails = []
@@ -482,8 +831,10 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
             out[tid] = {"tile": tid, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
                         "rails": [{k: v for k, v in r.items() if k != "_g"} for r in sorted(rs, key=lambda r: r["id"])]}
     terrain_tiles = write_terrain(tiles_dir, H, ids)
+    log(f"water: {water_under_decks(tiles_dir, decks, H):.0f} m2 added under the decks over the water")
     return {"terrain_tiles": terrain_tiles, "tiles": out, "stats": {"decks": len(decks), "deck_ha": round(sum(d["_g"].area for d in decks) / 1e4, 2),
-                                    "high_decks": sum(1 for d in decks if d["clear"] > 2.5), "rails": len(rails),
+                                    "high_decks": sum(1 for d in decks if d["clear"] > 2.5), "tunnel_decks": len(tdecks),
+                                    "underpasses": len(rows), "rails": len(rails),
                                     "rail_km": round(sum(r["_g"].length for r in rails) / 1000, 2), "tiles": len(out)}}
 
 
