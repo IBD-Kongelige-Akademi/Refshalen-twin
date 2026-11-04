@@ -82,6 +82,22 @@ test('parked cars are dropped, not squeezed, where the lanes leave no room', () 
   assert.equal(placeFurniture(emptyDoc({ parkingBays: [{ x: 20, z: 2.9, yaw: Math.PI / 2, kind: 'par', src: ['a'] }] }), oneway).doc.parkingBays.length, 1);
 });
 
+test('car-park bays (kind lot) keep their pose off the street, but not in a house, the water or on each other', () => {
+  const { geo, zones } = world();
+  const bays = [
+    { x: 30, z: 25, yaw: 0, kind: 'lot', src: ['a'] }, // a car park behind the houses (unmapped ground)
+    { x: 30.5, z: 25, yaw: 0, kind: 'lot', src: ['b'] }, // overlapping the first
+    { x: 40, z: 14, yaw: 0, kind: 'lot', src: ['c'] }, // inside the terrace
+    { x: 50, z: 0, yaw: 0, kind: 'lot', src: ['d'] } // across the moving lanes
+  ];
+  const { doc, report } = placeFurniture(emptyDoc({ parkingBays: bays }), { zones, geo });
+  assert.deepEqual(doc.parkingBays.map((b) => b.src[0]), ['a']);
+  assert.deepEqual([doc.parkingBays[0].x, doc.parkingBays[0].z, doc.parkingBays[0].yaw], [30, 25, 0], 'not moved into a parking lane');
+  assert.equal(report.counts.cars.kept, 1);
+  assert.equal(report.counts.cars['dropped:lot-blocked'], 2);
+  assert.equal(report.counts.cars['dropped:blocked'], 1);
+});
+
 test('perpendicular bays need their full length clear of the moving strip', () => {
   const { geo, zones } = world(street(7.6)); // 15.2 m wide
   const bay = { x: 20, z: 4.5, yaw: 0.1, kind: 'perp', src: ['a'] }; // facing +z: across the street

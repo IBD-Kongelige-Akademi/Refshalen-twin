@@ -10,7 +10,7 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 
 Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
-**Status: phases 0–5, 4b and 4d of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase4d.md](docs/aalborg-phase4d.md) (the drone), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation). Still to come: street furniture (6), publishing (7), the whole city (8); the drivable Plusbus (4c) is optional.
+**Status: phases 0–6, 4b and 4d of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase4d.md](docs/aalborg-phase4d.md) (the drone), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation), [docs/aalborg-phase6.md](docs/aalborg-phase6.md) (trees and street furniture). Still to come: publishing (7), the whole city (8); the drivable Plusbus (4c) is optional.
 
 ## Run it
 
@@ -86,7 +86,7 @@ The project code is available under the [MIT License](LICENSE). Forked from [cop
 
 The generated Aalborg data carries the licences of its sources:
 
-- Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur: GeoDanmark (Bygning, Vejkant, Vejmidte, Sø, Kyst, Havn, Bassin, Træ, Skov, Rekreativt område, Begravelsesområde), BBR, DAGI and DHM, under the [terms for free geographic data](https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf) (CC BY 4.0), read through [datagrundlag.dk](https://datagrundlag.dk/om/) (MapCentia's mirror, no licence of its own).
+- Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur: GeoDanmark (Bygning, Vejkant, Vejmidte, Sø, Kyst, Havn, Bassin, Træ, Trægruppe, Mast, Parkering, Skov, Rekreativt område, Begravelsesområde), DAR, BBR, DAGI and DHM, under the [terms for free geographic data](https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf) (CC BY 4.0), read through [datagrundlag.dk](https://datagrundlag.dk/om/) (MapCentia's mirror, no licence of its own).
 - © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), Open Database License (ODbL): roads, signals, lamps, water, parks. Anything derived from them stays under the ODbL.
 - The LoD2.2 building model is a user-supplied Geoflow CityJSON; its source and licence are still to be recorded (docs/aalborg-phase2.md).
 

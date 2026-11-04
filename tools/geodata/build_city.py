@@ -93,6 +93,7 @@ OSM_QUERIES2 = {  # keys and bodies are the ones the compiler modules use (surfa
     "groundfloor": None,  # groundfloor.QUERY, filled in below
     "street_nodes": '(node["amenity"="bench"];node["leisure"="picnic_table"];node["barrier"="bollard"];node["amenity"="waste_basket"];'
                     'node["amenity"="recycling"];node["amenity"="bicycle_parking"];node["highway"="bus_stop"];node["amenity"="shelter"]["shelter_type"="public_transport"];);out;',
+    "trees_art": '(node["natural"="tree"];node["tourism"="artwork"];node["historic"~"^(memorial|monument)$"];);out;',
 }
 OSM_QUERIES = {
     "roads": 'way["highway"];out geom tags;',

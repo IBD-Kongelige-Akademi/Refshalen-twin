@@ -10,6 +10,7 @@ the answers to build_city.OSM_QUERIES and OSM_QUERIES2 are rebuilt from it with 
     squares      place=square, pedestrian areas                                  -> ways with geometry, relations with member geometry
     groundfloor  shops, venues, crafts, offices, hotels (groundfloor.QUERY)      -> nodes, ways and relations with a `center` (out center)
     street_nodes benches, bins, bollards, racks, bus stops                       -> nodes with tags
+    trees_art    natural=tree, artworks, memorials and monuments                 -> nodes with tags
 
 Raw API answers are cached under data/raw/city/osm_api/. Map data © OpenStreetMap contributors (ODbL).
 """
@@ -156,6 +157,7 @@ QUERIES = {  # build_city.OSM_QUERIES / OSM_QUERIES2 as select() arguments
     "squares": {"way": _square, "relation": _square_rel},
     "groundfloor": {"way": _venue, "relation": _venue, "node": _venue, "center": True},
     "street_nodes": {"node": _street_node},
+    "trees_art": {"node": lambda t: t.get("natural") == "tree" or t.get("tourism") == "artwork" or t.get("historic") in ("memorial", "monument")},
 }
 
 

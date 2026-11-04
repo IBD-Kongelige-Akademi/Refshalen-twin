@@ -227,7 +227,9 @@ export function placeFurniture(doc, { zones, geo }) {
 
   // ---------------------------------------------------------------------------------------- 1. parked cars
   const bays = [];
+  const lots = []; // off-street car-park bays (kind 'lot'): they keep their own pose, see below
   for (const b of doc.parkingBays || []) {
+    if (b.kind === 'lot') { lots.push(b); continue; }
     const road = roads.nearest(b.x, b.z, 14);
     if (!road) { drop('cars', 'no-road', b); continue; }
     const absLat = Math.abs(road.lat);
@@ -287,6 +289,18 @@ export function placeFurniture(doc, { zones, geo }) {
     placedBays.push({ ...b, x: +ok.x.toFixed(2), z: +ok.z.toFixed(2), yaw: +c.yaw.toFixed(3) });
     const d = Math.hypot(ok.x - b.x, ok.z - b.z);
     if (d > 0.05) note('cars', 'aligned', b, d);
+    bump('cars', 'kept');
+  }
+  // car parks: a bay stays where the register's outline put it, as long as the car is clear of buildings, water, the moving lanes
+  // and the cycle tracks and of what already stands there (the zone map has no car-park class: their asphalt is unmapped ground)
+  lots.sort((p, q) => p.x - q.x || p.z - q.z);
+  for (const b of lots) {
+    const cov = zones.cover(b.x, b.z, b.yaw, CAR.w, CAR.d);
+    if (cov.building > 0.02 || cov.water > 0 || cov.moving > 0.02 || cov.cycle > 0.02) { drop('cars', 'lot-blocked', b); continue; }
+    const box = obb(b.x, b.z, b.yaw, CAR.w, CAR.d + CAR.slack);
+    if (obst.hit(box)) { drop('cars', 'blocked', b); continue; }
+    obst.add(box, 'car');
+    placedBays.push(b);
     bump('cars', 'kept');
   }
   out.parkingBays = placedBays;

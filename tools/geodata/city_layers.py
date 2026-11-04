@@ -1,9 +1,10 @@
-"""Stage 2 of build_city.py: surfaces, furniture, groundfloor (and the Frederiksberg substitutions) for the whole city.
+"""Stage 2 of build_city.py: surfaces, furniture, groundfloor and streets for the whole city.
 
 These layers are sparse, so they are compiled once citywide (area = the city bbox) with the same functions the district build
 uses, reading the citywide raw layers under data/raw/city/ (fetch.cache_dir is pointed there), and then cut into the 500 m
-tiles by centroid ownership exactly as tile_split.py does. Entrances and vegetation are per-cell / per-street jobs and live in
-city_layers2.py.
+tiles by centroid ownership exactly as tile_split.py does. The furniture comes from national data and OSM (furniture_dk.py);
+the sources standing in for Copenhagen's registers are listed in coverage.md ("Source substitutions"). Entrances and
+vegetation are per-cell / per-street jobs and live in city_layers2.py.
 """
 from __future__ import annotations
 
@@ -97,113 +98,41 @@ def stage_surfaces(a, tiles, cells) -> None:
 
 # ----------------------------------------------------------------------------------------------------------- furniture
 
-def movia_stops_citywide(bbox) -> dict:
-    """Movia Stoppestedsudstyr (ArcGIS MapServer) for the city bbox, paged (the service caps a response)."""
-    import furniture as F
-
-    path = BC.RAW_CITY / "movia_stoppestedsudstyr.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    x0, y0, x1, y1 = bbox
-    feats, off = [], 0
-    while True:
-        r = S.request("GET", F.MOVIA, what="movia", params={
-            "where": "1=1", "geometry": f"{x0},{y0},{x1},{y1}", "geometryType": "esriGeometryEnvelope", "inSR": "25832", "outSR": "25832",
-            "spatialRel": "esriSpatialRelIntersects", "outFields": "*", "f": "json", "returnGeometry": "true",
-            "resultOffset": off, "resultRecordCount": 1000})
-        r.raise_for_status()
-        d = r.json()
-        got = d.get("features", [])
-        feats += got
-        if not got or not d.get("exceededTransferLimit"):
-            break
-        off += len(got)
-    doc = {"features": feats}
-    S.atomic_write(path, BC.dump(doc))
-    return doc
-
-
 def stage_furniture(a, tiles, cells) -> None:
+    """Street trees and furniture from GeoDanmark, the DHM height models and OSM (furniture_dk.py), cut into tiles by point."""
     if BC.is_done("furniture") and not a.force_stage("furniture"):
         return
     t0 = time.time()
-    fetch = _citywide(tiles)
-    import frb
+    _citywide(tiles)
+    import envsecret
     import furniture as F
+    import furniture_dk as FD
 
     bbox = BC.city_bbox_utm(tiles)
-    movia = movia_stops_citywide(bbox)
-    F.movia_stops = lambda refresh: movia  # noqa: E731 - the module fetches per area without paging
-    rl = load_tile_lists(tiles, "roads", ["roads", "water", "points.trees"])
+    rl = load_tile_lists(tiles, "roads", ["roads", "water"])
     bl = load_tile_lists(tiles, "buildings", ["buildings"])
-    geo = {"roads": rl["roads"], "water": rl["water"], "buildings": bl["buildings"], "points": {"trees": rl["points.trees"]}}
-    log(f"[furniture] inputs: {len(geo['roads'])} roads, {len(geo['buildings'])} buildings, {len(geo['points']['trees'])} geodata trees")
-    roads = F.RoadIndex(geo["roads"])
-    kk = lambda name: fetch.kk_layer(name)  # noqa: E731 - cached citywide files
+    log(f"[furniture] inputs: {len(rl['roads'])} roads, {len(bl['buildings'])} buildings")
+    roads = F.RoadIndex(rl["roads"])
     doc = {
         "version": "cph-furniture/1", "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "frame": {"epsg": 25832, "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": BC.city_local_bbox(tiles)},
         "yaw": "direction the object faces: model +z -> (sin yaw, cos yaw) in (x, z); bays/racks: axis of the row/car",
         "attribution": [
-            "Københavns Kommune open data (CC BY 4.0): trae_basis, pullert, affaldskurve, parkeringspladser, parkomater, ask_glascontainer, monumenter, cykelstativ",
-            "Citelum / Københavns Kommune, Belysning master + wirer + ledninger (CC BY 4.0)",
-            "Movia Stoppestedsudstyr (licence not stated)",
-            "KK automatisk detekterede træer (beta), byinventar (licence not stated: confirm with bydata@kk.dk before redistribution)",
-            "Frederiksberg Kommune GC2 (licence not stated): træregister, skraldespande, cykelstativer, bænke, glascontainere, busstoppesteder, parkeringspladser, monumenter",
-            "© OpenStreetMap contributors (ODbL): Frederiksberg bollards, street lamps, waste baskets",
+            "Indeholder data fra Klimadatastyrelsen / GeoDanmark (Træ, Trægruppe, Mast, Parkering) og DHM (Overflade, Terræn), "
+            "CC BY 4.0, via datagrundlag.dk",
+            "© OpenStreetMap contributors (ODbL): street lamps, benches, bins, bollards, bicycle parking, recycling, bus stops, trees, artworks",
         ],
-        "licences": {F.LIC_KK: "Creative Commons Attribution 4.0", F.LIC_NONE: "dataset has no licence statement; treat as unconfirmed",
-                     "ODbL": "Open Database License 1.0"},
+        "licences": {FD.LIC_GDK: "Creative Commons Attribution 4.0", FD.LIC_OSM: "Open Database License 1.0"},
     }
-    doc["trees"] = F.build_trees(kk, geo)
-    log(f"[furniture] trees {len(doc['trees'])} ({time.time() - t0:.0f}s)")
-    doc["lamps"] = F.build_lamps(roads, geo["buildings"], False)
-    doc["parkingBays"] = F.build_parking(kk, roads)
-    simple, _extra = F.build_simple(kk, roads)
-    doc.update(simple)
-    doc["bikeRacks"] = F.build_bike_racks(kk, roads)
-    doc["busStops"] = F.build_bus_stops(False, roads)
-    doc["lakeLights"] = F.build_lake_lights(geo, roads)
-    log(f"[furniture] KK/Citelum/Movia lists done ({time.time() - t0:.0f}s)")
-
-    # Frederiksberg: GC2 registers + OSM
-    osm_nodes = json.loads((BC.RAW_CITY / "osm_street_nodes.json").read_text()) if (BC.RAW_CITY / "osm_street_nodes.json").exists() else None
-    osm_lamps = json.loads((BC.RAW_CITY / "osm_nodes.json").read_text())
-    fr, _ = frb.furniture(F, roads, osm_nodes)
-    poly = frb.frb_polygon()
-    n_before = {k: len(doc[k]) for k in fr}
-    have_bus = frb._Grid([(b["x"], b["z"]) for b in doc["busStops"]])
-    for k, items in fr.items():
-        if k == "busStops":
-            items = [b for b in items if not have_bus.near(b["x"], b["z"], 15.0)]
-        doc[k] = doc.get(k, []) + items
-    # benches / bike racks from the Frederiksberg point registers (same records as the geodata points, with a yaw)
-    for b in frb.bench_points(poly, osm_nodes):
-        doc["benches"].append({"x": b["x"], "z": b["z"], "yaw": F.face_road(roads, b["x"], b["z"]), "length": 1.8, "src": b["src"],
-                               "conf": "observed", "conf_fields": {"yaw": "inferred", "length": "inferred"}, "licence": frb.LIC})
-    for r in frb.rack_points():
-        s = F.side_to_road(roads, r["x"], r["z"])
-        doc["bikeRacks"].append({"x": r["x"], "z": r["z"], "yaw": round(math_atan2(s[2], s[3]), 3) if s else 0.0, "capacity": r["capacity"],
-                                 "src": r["src"], "conf": "observed", "conf_fields": {**r.get("conf_fields", {}), "yaw": "inferred"}, "licence": frb.LIC})
-    # street lamps: OSM street_lamp nodes inside Frederiksberg (no lamp register is published); fixture details are defaults
-    n_lamps = 0
-    for el in osm_lamps.get("elements", []):
-        if el.get("type") != "node" or el.get("tags", {}).get("highway") != "street_lamp":
-            continue
-        e, n = frb.S_to_utm(el["lon"], el["lat"])
-        if not poly.contains(frb._point(e, n)):
-            continue
-        x, z = frb._local((e, n))
-        c = F.classify_lamp(None, None, None)
-        doc["lamps"].append({"x": x, "z": z, "yaw": F.face_road(roads, x, z), "mount": "mast", "pole": "tube", "pole_h": 6.0, "arm": None,
-                             "pole_text": None, "fixture": None, "source_text": None, **c, "installed": None,
-                             "src": [f"osm:node/{el['id']}"], "conf": "observed",
-                             "conf_fields": {"mount": "inferred", "pole": "inferred", "pole_h": "inferred", "light": "inferred", "cct": "inferred"},
-                             "licence": "ODbL"})
-        n_lamps += 1
-    added = {k: len(doc[k]) - n_before.get(k, 0) for k in fr}
-    doc["stats"] = {k: len(v) for k, v in doc.items() if isinstance(v, list)}
-    doc["stats"]["frederiksberg_added"] = {**added, "lamps": n_lamps}
+    token = envsecret.require("DHM_TERRAIN_TOKEN", "GSEARCH_TOKEN")
+    doc["trees"], tree_stats = FD.build_trees(cells, bbox, bl["buildings"], rl["water"], token)
+    doc["lamps"] = FD.build_lamps(roads, bbox, bl["buildings"])
+    doc["parkingBays"] = FD.build_parking(bbox, bl["buildings"])
+    doc.update(FD.build_osm_lists(roads, bl["buildings"]))
+    for k in ("parkMeters", "binStands", "rescuePosts", "lakeLights"):
+        doc[k] = []
+    doc["stats"] = {k: len(doc[k]) for k in T.FURNITURE_LISTS}
+    doc["stats"]["trees_by_source"] = tree_stats
 
     L = BC.Layers(set(tiles))
     for key in T.FURNITURE_LISTS:
@@ -213,29 +142,23 @@ def stage_furniture(a, tiles, cells) -> None:
     meta = T._without(doc, T.FURNITURE_LISTS)
     meta["list_keys"] = [k for k in T.FURNITURE_LISTS if k in doc]
     _put_meta("furniture", meta)
+    s = doc["stats"]
     _add_subst([
-        {"item": "street lamps", "source": "OSM highway=street_lamp (no Frederiksberg lamp inventory is open)", "count": n_lamps,
-         "note": "mast type, height 6 m, light source and colour temperature are defaults (inferred); no wire-suspended lamps"},
-        {"item": "bollards", "source": "OSM barrier=bollard (no register)", "count": added.get("bollards", 0), "note": "material/colour defaults (inferred)"},
-        {"item": "bins, glass containers", "source": "GC2 byrum.skraldespande, affald.glascontainere (+ OSM waste baskets)",
-         "count": added.get("bins", 0) + added.get("glassContainers", 0), "note": "bin stands (ask_standpladser) not available"},
-        {"item": "bus stops", "source": "Movia Stoppestedsudstyr (regional) + GC2 busstoppesteder_frederiksberg where Movia has none within 15 m",
-         "count": added.get("busStops", 0), "note": "GC2 stops: shelter/bin/countdown flags from the table, bench/cycle parking unknown"},
-        {"item": "parking bays", "source": "GC2 mobilitet.parkeringspladser (polygons)", "count": added.get("parkingBays", 0),
-         "note": "bay kind and orientation inferred from the polygon shape; occupancy by the engine as elsewhere"},
-        {"item": "monuments", "source": "GC2 byrum_ekstern.monumenter (current versions)", "count": added.get("monuments", 0), "note": ""},
-        {"item": "benches, bike racks (furniture lists)", "source": "GC2 byrum.baenk + OSM; GC2 cykelstativer + 2020 cykelparkering",
-         "count": added.get("benches", 0) + added.get("bikeRacks", 0), "note": "bench length 1.8 m default; byinventar (KK) has no Frederiksberg equivalent"},
+        {"item": "street trees", "source": "GeoDanmark Træ + Trægruppe, OSM natural=tree, crowns detected in DSM - DTM",
+         "count": s["trees"], "note": f"{tree_stats['detected']} detected crowns; heights measured for {tree_stats['measured_height']}; "
+                                      "no species register: genus from OSM where tagged, else the engine's context mix"},
+        {"item": "street lamps", "source": "OSM highway=street_lamp + GeoDanmark Mast near carriageways", "count": s["lamps"],
+         "note": "tube poles 6 / 8 m, LED 3000 K (inferred); no wire-suspended lamps"},
+        {"item": "parking bays", "source": "GeoDanmark Parkering (closed car-park outlines)", "count": s["parkingBays"],
+         "note": "no kerb-side parking register: street parking is left empty"},
+        {"item": "benches, bins, bollards, bike racks, glass containers", "source": "OSM", "count": sum(s[k] for k in ("benches", "bins", "bollards", "bikeRacks", "glassContainers")),
+         "note": "orientation towards the street inferred"},
+        {"item": "bus stops", "source": "OSM highway=bus_stop (Nordjyllands Trafikselskab stops)", "count": s["busStops"],
+         "note": "shelter / bench / bin from the OSM tags"},
+        {"item": "parking meters, bin stands, rescue posts", "source": "none open in Aalborg", "count": 0, "note": ""},
     ])
     BC.mark_done("furniture", seconds=round(time.time() - t0, 1), tiles=n, stats=doc["stats"])
     log(f"[furniture] {doc['stats']} in {n} tiles ({time.time() - t0:.0f}s)")
-
-
-def math_atan2(y, x):
-    import math
-
-    return math.atan2(y, x)
-
 
 # --------------------------------------------------------------------------------------------------------- groundfloor
 
