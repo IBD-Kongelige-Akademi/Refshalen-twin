@@ -4,13 +4,14 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 
 - 3,340 buildings at their GeoDanmark footprints with DHM-measured heights and BBR use, year and materials; 91 % with measured LoD2.2 roofs and walls.
 - Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph; AI Plusbuses on line 2's real route, stopping at its stops.
-- The Limfjord at sea level with quay walls along the harbour front, the city's lakes and parks.
+- The Limfjord at sea level with quay walls along the harbour front, the city's lakes, streams and parks.
+- Bridges on piers at their measured deck heights (Limfjordsbroen, Østre Allé, the foot bridges) and the railway tracks.
 - Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); six teleports and scenic cameras.
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
 
 Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
-**Status: phases 0–6, 4b, 4c and 4d of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase4c.md](docs/aalborg-phase4c.md) (the Plusbus), [docs/aalborg-phase4d.md](docs/aalborg-phase4d.md) (the drone), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation), [docs/aalborg-phase6.md](docs/aalborg-phase6.md) (trees and street furniture). Still to come: publishing (7), the whole city (8).
+**Status: phases 0–6, 4b, 4c and 4d of the Aalborg plan** (the 2 × 2 km district, E 555000–557000, N 6322000–6324000). Notes per phase: [docs/aalborg-phase1.md](docs/aalborg-phase1.md), [docs/aalborg-phase2.md](docs/aalborg-phase2.md), [docs/aalborg-phase3.md](docs/aalborg-phase3.md), [docs/aalborg-phase4.md](docs/aalborg-phase4.md), [docs/aalborg-phase4b.md](docs/aalborg-phase4b.md) (overview map), [docs/aalborg-phase4c.md](docs/aalborg-phase4c.md) (the Plusbus), [docs/aalborg-phase4d.md](docs/aalborg-phase4d.md) (the drone), [docs/aalborg-phase5.md](docs/aalborg-phase5.md) (photo facades, windows, entrances, shopfronts, vegetation), [docs/aalborg-phase6.md](docs/aalborg-phase6.md) (trees and street furniture), [docs/aalborg-structures.md](docs/aalborg-structures.md) (bridges, railways, watercourses). Still to come: publishing (7), the whole city (8).
 
 ## Run it
 
@@ -26,7 +27,7 @@ python3 tools/hosting/serve_range.py --port 8010   # then open http://127.0.0.1:
 |---|---|
 | `?hooks` | Exposes the running scene as `globalThis.__twin` for headless checks. |
 | `?debug=footprints` | Draws the buildings, water and parks as flat polygons. |
-| `?debug=nobuildings`, `?debug=noroads`, `?debug=nowater` | Skip those layers. |
+| `?debug=nobuildings`, `?debug=noroads`, `?debug=nowater`, `?debug=nostructures` | Skip those layers. |
 | `?stream=<m>&streammid=<m>` | Shrinks (or grows) the near and mid streaming rings. |
 | `?water=simple` | Sky reflection only, no planar reflection pass. |
 | `?date=2026-06-21`, `?time=12:00` | Scene date and solar clock time (Europe/Copenhagen, the Danish time zone; CET/CEST handled). |
@@ -47,7 +48,8 @@ uv run tools/geodata/build_city.py --stage geo --stage cells         # road grap
 uv run tools/geodata/build_city.py --stage streets                   # kerbs, cycle strips, derived pavements (GeoDanmark Vejkant)
 uv run --no-project --with numpy,shapely python tools/lod2/from_cityjson.py <model.city.jsonl>
 uv run tools/geodata/build_city.py --stage lod2 --stage index --stage report
-uv run tools/geodata/city_water.py --fetch                           # the Limfjord, lakes, quay walls, green ground
+uv run tools/geodata/city_water.py --fetch                           # the Limfjord, lakes, streams, quay walls, green ground
+PYTHONUTF8=1 uv run tools/geodata/city_structures.py                # bridges and railways (after the water)
 PYTHONUTF8=1 uv run tools/geodata/far_lod.py                          # the far ring (on Windows: set PYTHONUTF8=1)
 uv run tools/geodata/build_city.py --stage index --stage report
 ```

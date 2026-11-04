@@ -277,6 +277,8 @@ export function createTileData({ index, meta, streets = null, lakes = null, geo,
         },
         /** The tile's `water` layer (generic water, ground cut, green ground), or null. */
         get water() { return entries.get(id)?.layers.get('water') || null; },
+        /** The tile's `structures` layer (bridge decks and railway tracks, tools/geodata/city_structures.py), or null. */
+        get structures() { return entries.get(id)?.layers.get('structures') || null; },
         get furniture() {
           const asm = createFurnitureAssembler(meta);
           asm.addTile(entries.get(id)?.layers.get('furniture'));

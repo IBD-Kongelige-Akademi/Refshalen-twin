@@ -97,6 +97,9 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   // =========================================================================
   // Vehicles rest on the terrain (js/terrain.js via the scene's ground model); 0 on the flat plane
   const groundAt = (x, z) => (options.groundHeight ? options.groundHeight.terrainAt(x, z) : 0);
+  // a vehicle's ground from where it is now: on a bridge deck when it drove onto it, under it when it passes beneath (js/deck-field.js)
+  const levelAt = (x, z, y) => (options.groundHeight?.levelAt ? options.groundHeight.levelAt(x, z, y) : groundAt(x, z));
+  const vehicleGround = (v) => (Number.isFinite(v.gy) ? v.gy : groundAt(v.x, v.z));
   let network = null;
   let nodes = [];
   let edges = [];
@@ -526,7 +529,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     frameCollisionActors.length = 0;
     for (let i = 0; i < vehicleCollisionActors.length; i++) {
       const actor = vehicleCollisionActors[i], v = vehicles[i];
-      actor.x = v.x; actor.y = groundAt(v.x, v.z); actor.z = v.z;
+      actor.x = v.x; actor.y = vehicleGround(v); actor.z = v.z;
       actor.heading = Math.atan2(v.tx, v.tz) - v.nose + v.yawOffset;
       actor.prevX = v.prevX; actor.prevZ = v.prevZ;
       if (v.plus) {
@@ -1525,6 +1528,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     v.dl = v.dlv = 0;
     v.vx = v.vz = v.yawOffset = v.yawVel = v.pitch = v.pitchVel = v.roll = v.rollVel = 0;
     locate(v);
+    v.gy = levelAt(v.x, v.z, NaN);
     v.prevX = v.x;
     v.prevZ = v.z;
     v.yaw = Math.atan2(v.tx, v.tz);
@@ -1683,11 +1687,11 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     for (let w = 0; w < count; w++) {
       const wz = axles ? axles[w] : w === 0 ? halfBase : -halfBase;
       dummy.rotation.set(v.wheelSpin + w * 0.55, rotY + (w === 0 ? v.steer : 0), roll, 'YXZ');
-      dummy.position.set(v.x - halfTrack * cosY + wz * sinY, radius + groundAt(v.x, v.z), v.z + halfTrack * sinY + wz * cosY);
+      dummy.position.set(v.x - halfTrack * cosY + wz * sinY, radius + vehicleGround(v), v.z + halfTrack * sinY + wz * cosY);
       dummy.updateMatrix();
       leftInst.setMatrixAt(i + w, dummy.matrix);
 
-      dummy.position.set(v.x + halfTrack * cosY + wz * sinY, radius + groundAt(v.x, v.z), v.z - halfTrack * sinY + wz * cosY);
+      dummy.position.set(v.x + halfTrack * cosY + wz * sinY, radius + vehicleGround(v), v.z - halfTrack * sinY + wz * cosY);
       dummy.updateMatrix();
       rightInst.setMatrixAt(i + w, dummy.matrix);
     }
@@ -1716,7 +1720,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     const bodyInst = near ? bodies[c.bodyType].near : bodies[c.bodyType].far;
     const slot = bodyInst.count++;
 
-    dummy.position.set(c.x, groundAt(c.x, c.z), c.z);
+    dummy.position.set(c.x, vehicleGround(c), c.z);
     dummy.rotation.set(c.pitch, rotY, c.roll, 'YXZ');
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -1749,7 +1753,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     // Soft Under-Car Contact Shadow (AO) stays flat on the asphalt
     const visIdx = visibleCars++;
     dummy.rotation.set(0, rotY, 0, 'YXZ');
-    dummy.position.set(c.x, 0.018 + groundAt(c.x, c.z), c.z);
+    dummy.position.set(c.x, 0.018 + vehicleGround(c), c.z);
     dummy.scale.set(spec.width + 0.3, 1.0, spec.length + 0.5);
     dummy.updateMatrix();
     carShadowInst.setMatrixAt(visIdx, dummy.matrix);
@@ -1788,14 +1792,14 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     if (hasView && !visible(b.x, b.z, 22)) return;
 
     const i = visibleBuses++;
-    dummy.position.set(b.x, 0.018 + groundAt(b.x, b.z), b.z);
+    dummy.position.set(b.x, 0.018 + vehicleGround(b), b.z);
     dummy.rotation.set(0, rotY, 0, 'YXZ');
     dummy.scale.set(spec.width + 0.32, 1.0, spec.length + 0.55);
     dummy.updateMatrix();
     busShadowInst.setMatrixAt(i, dummy.matrix);
 
     // Lofted Bus Body is defined in ground-relative Y (0.36m skirt to 3.0m roof crown)
-    dummy.position.set(b.x, groundAt(b.x, b.z), b.z);
+    dummy.position.set(b.x, vehicleGround(b), b.z);
     dummy.rotation.set(b.pitch, rotY, b.roll, 'YXZ');
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
@@ -1840,7 +1844,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       const m = art.module(i);
       const spec = URBINO_24_SPECS[i];
       const set = plusModuleSets[i];
-      const y = groundAt(m.x, m.z);
+      const y = levelAt(m.x, m.z, vehicleGround(v));
       const sinY = Math.sin(m.yaw), cosY = Math.cos(m.yaw);
       dummy.position.set(m.x, y, m.z);
       dummy.rotation.set(0, m.yaw, 0, 'YXZ');
@@ -1874,7 +1878,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       const { a, b } = art.bellows(j);
       const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
       const len = Math.hypot(a.x - b.x, a.z - b.z);
-      dummy.position.set(mx, groundAt(mx, mz), mz);
+      dummy.position.set(mx, levelAt(mx, mz, vehicleGround(v)), mz);
       dummy.rotation.set(0, len > 0.05 ? Math.atan2(a.x - b.x, a.z - b.z) : a.yaw, 0, 'YXZ');
       dummy.scale.set(1, 1, Math.max(0.6, len / 0.7));
       dummy.updateMatrix();
@@ -1935,7 +1939,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
 
         const baseInt = (v.bus ? HEADLIGHTS.busIntensity : HEADLIGHTS.intensity) * beamScale * fade;
         // Match the body instance, including suspension and impact rotation.
-        dummy.position.set(v.x, groundAt(v.x, v.z), v.z);
+        dummy.position.set(v.x, vehicleGround(v), v.z);
         dummy.rotation.set(v.pitch, v.yaw + v.yawOffset, v.roll, 'YXZ');
         dummy.scale.set(1, 1, 1);
         dummy.updateMatrix();
@@ -2073,6 +2077,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       knock(v, dt);
       pose(v, dt);
       if (v.plus) posePlus(v);
+      v.gy = levelAt(v.x, v.z, v.gy);
       lap(v.plus ? 'drivePlus' : 'drive');
     }
     lap('drive');

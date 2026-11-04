@@ -233,7 +233,7 @@ function addBikeCable(parent, points, material, radius = 0.0032) {
 }
 
 // Walking surface for the player's pedestrian (its rig samples it around its feet)
-const personGround = (controllers, x, z) => controllers.getGroundHeight(x, z, 'person');
+const personGround = (controllers, x, z) => controllers.getGroundHeight(x, z, 'person', controllers.entities?.person?.position.y);
 
 class ThirdPersonControllerManager {
   constructor(scene, colliders = []) {
@@ -1481,7 +1481,7 @@ class ThirdPersonControllerManager {
     for (let i = 0; i < 3; i++) {
       const m = art.module(i);
       const mod = bus.modules[i];
-      const y = this.getGroundHeight(m.x, m.z, 'car');
+      const y = this.getGroundHeight(m.x, m.z, 'car', mod.group.position.y);
       if (i === 0) bus.position.y = y;
       mod.group.position.set(m.x, y, m.z);
       mod.group.rotation.y = m.yaw;
@@ -1499,16 +1499,20 @@ class ThirdPersonControllerManager {
     a.x = mid.x; a.z = mid.z; a.yaw = mid.yaw;
     for (let j = 0; j < 2; j++) {
       const ends = art.bellows(j);
-      const y = this.getGroundHeight((ends.a.x + ends.b.x) / 2, (ends.a.z + ends.b.z) / 2, 'car');
+      const y = this.getGroundHeight((ends.a.x + ends.b.x) / 2, (ends.a.z + ends.b.z) / 2, 'car', bus.modules[j].group.position.y);
       bus.bellows[j].update(ends.a, ends.b, y);
     }
   }
 
   // The walking surface of the person and the cyclist follows the street surface model (terrain + carriageway, cycle track,
-  // raised pavement, ramps; set by main.js from world.groundHeight); everything else drives on the bare terrain
-  getGroundHeight(x, z, mode = 'person') {
+  // raised pavement, ramps; set by main.js from world.groundHeight); everything else drives on the bare terrain. With `y` (where the
+  // entity is now), a bridge deck (js/deck-field.js levelAt) carries it only when it is on the deck's level: driving onto a bridge from
+  // its end keeps it on, passing under it keeps it under
+  getGroundHeight(x, z, mode = 'person', y = undefined) {
     if (!this.groundField) return 0.0;
-    if (mode === 'person' || mode === 'cyclist') return this.groundField.heightAt(x, z);
+    const walk = mode === 'person' || mode === 'cyclist';
+    if (Number.isFinite(y) && this.groundField.levelAt) return this.groundField.levelAt(x, z, y, walk);
+    if (walk) return this.groundField.heightAt(x, z);
     return this.groundField.terrainAt ? this.groundField.terrainAt(x, z) : 0.0;
   }
 
@@ -1528,7 +1532,7 @@ class ThirdPersonControllerManager {
   // What the drone stands on at (x, z) when it is at height y: the terrain, or a building top under the point no more than
   // DRONE_FLIGHT.step above y (it settles onto a roof from above; a wall it meets sideways stops it instead)
   droneSupportAt(x, z, y) {
-    let support = this.getGroundHeight(x, z, 'drone');
+    let support = this.getGroundHeight(x, z, 'drone', y);
     for (const c of this.nearColliders(x, z, 0.5)) {
       const top = this.droneTopAt(c, x, z);
       if (top !== null && top > support && top <= y + DRONE_FLIGHT.step) support = top;
@@ -1767,7 +1771,7 @@ class ThirdPersonControllerManager {
   // pedals, helmet on its head
   poseCharacters(dt) {
     const p = this.entities.person;
-    const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person');
+    const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
     p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
     p.crowd.begin();
     p.crowd.add(p.rig, 0);
@@ -1864,7 +1868,7 @@ class ThirdPersonControllerManager {
     p.position.z += Math.cos(p.heading) * p.speed * dt;
     this.resolveHorizontalCollision(p.position, 0.48, null, p, previousPosition);
 
-    const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person');
+    const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
     if (this.keys.up && p.position.y <= groundY + 0.02) {
       p.verticalVel = 5.2;
     }
@@ -1914,7 +1918,7 @@ class ThirdPersonControllerManager {
     c.vz *= tireGripDamp;
 
     this.resolveHorizontalCollision(c.position, 1.35, c, c, { x: prevX, z: prevZ });
-    c.position.y = this.getGroundHeight(c.position.x, c.position.z, 'car');
+    c.position.y = this.getGroundHeight(c.position.x, c.position.z, 'car', c.position.y);
 
     // 3-DOF Spring-Damper Chassis Suspension (Pitch, Roll & Vertical Heave)
     const targetPitch = -Math.max(-1, Math.min(1, acceleration / CAR_DRIVE.acceleration)) * 0.026;
@@ -1988,7 +1992,7 @@ class ThirdPersonControllerManager {
     art.follow(b.position.x - Math.sin(b.heading) * ahead, b.position.z - Math.cos(b.heading) * ahead, b.heading);
 
     // the trailing modules: a new contact with a building undoes the move (one already in contact, after a teleport, may drive out)
-    const y = this.getGroundHeight(b.position.x, b.position.z, 'car');
+    const y = this.getGroundHeight(b.position.x, b.position.z, 'car', b.position.y);
     const hits = [false, !!this.busModuleContact(art.module(1), y), !!this.busModuleContact(art.module(2), y)];
     if ((hits[1] && !b.blocked[1]) || (hits[2] && !b.blocked[2])) {
       art.restore(saved);
@@ -2040,7 +2044,7 @@ class ThirdPersonControllerManager {
     b.position.x += Math.sin(b.heading) * b.speed * dt;
     b.position.z += Math.cos(b.heading) * b.speed * dt;
     this.resolveHorizontalCollision(b.position, mode === 'cargobike' ? 1.4 : 0.65, null, b, previousPosition);
-    b.position.y = this.getGroundHeight(b.position.x, b.position.z, mode);
+    b.position.y = this.getGroundHeight(b.position.x, b.position.z, mode, b.position.y);
 
     const targetLean = -turnInput * Math.min(1.0, Math.abs(b.speed) / 9.0) * 0.34;
     b.leanAngle += (targetLean - b.leanAngle) * Math.min(1, dt * 9);
@@ -2106,7 +2110,7 @@ class ThirdPersonControllerManager {
     d.position.x += d.velX * dt;
     d.position.z += d.velZ * dt;
     d.position.y += d.verticalSpeed * dt;
-    const ground = this.getGroundHeight(d.position.x, d.position.z, 'drone');
+    const ground = this.getGroundHeight(d.position.x, d.position.z, 'drone', d.position.y);
     if (d.position.y > ground + F.ceiling) {
       d.position.y = ground + F.ceiling;
       if (d.verticalSpeed > 0) d.verticalSpeed = 0;

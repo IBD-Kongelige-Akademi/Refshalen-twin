@@ -173,6 +173,17 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
 
     solid = [Polygon(utm_ring(b["ring"])).buffer(0.5) for b in buildings if len(b["ring"]) >= 6]
     solid += [Polygon(utm_ring(w["ring"])).buffer(0) for w in water if len(w.get("ring", [])) >= 6]
+    # and the water the water build made (city_water.py: the fjord, the harbour, lakes and the streams), where it has run
+    for wp in sorted(BC.TILES_DIR.glob("*/water.json")):
+        for body in (json.loads(wp.read_text(encoding="utf-8")).get("bodies") or []):
+            for poly in body.get("polys") or []:
+                if len(poly.get("ring", [])) >= 6:
+                    solid.append(Polygon(utm_ring(poly["ring"])).buffer(0))
+    # and the bridge decks (city_structures.py): the DSM over a deck is the deck, not a crown
+    for sp in sorted(BC.TILES_DIR.glob("*/structures.json")):
+        for deck in (json.loads(sp.read_text(encoding="utf-8")).get("decks") or []):
+            if len(deck.get("ring", [])) >= 6:
+                solid.append(Polygon(utm_ring(deck["ring"])).buffer(0.5))
     blocked = geometry_mask([g for g in solid if not g.is_empty], (H, W), T, invert=True) if solid else np.zeros((H, W), bool)
     canopy = (nd > NDSM_TREE) & ~blocked
     canopy = ndimage.binary_opening(canopy, np.ones((2, 2), bool))

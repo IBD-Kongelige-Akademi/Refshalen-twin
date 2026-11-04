@@ -295,7 +295,7 @@ async function createStore(index, source) {
   const cache = new Map(); // tile id -> Promise<{ [layer]: payload }>
   const loadTile = (tid) => {
     if (!cache.has(tid)) {
-      const names = [...Object.keys(index.tiles[tid]?.layers || {}), ...(post?.streets?.tiles?.[tid] ? ['streets'] : []), ...(post?.water?.tiles?.[tid] ? ['water'] : []), ...(post?.appearance?.tiles?.[tid] ? ['appearance'] : [])].filter((n) => !n.endsWith('.bin'));
+      const names = [...Object.keys(index.tiles[tid]?.layers || {}), ...(post?.streets?.tiles?.[tid] ? ['streets'] : []), ...(post?.water?.tiles?.[tid] ? ['water'] : []), ...(post?.appearance?.tiles?.[tid] ? ['appearance'] : []), ...(post?.structures?.tiles?.[tid] ? ['structures'] : [])].filter((n) => !n.endsWith('.bin'));
       cache.set(tid, Promise.all(names.map(async (n) => [n, await json(`${tid}/${n}.json`)])).then(Object.fromEntries));
     }
     return cache.get(tid);
@@ -305,7 +305,7 @@ async function createStore(index, source) {
     return source.bin(`${tid}/lod2.bin`);
   };
   // The streamer (js/tile-streamer.js) keeps the payloads itself: one layer per request, abortable, never cached here.
-  const layerSize = (tid, name) => index.tiles[tid]?.layers?.[name] || (name === 'streets' ? post?.streets?.tiles?.[tid] : name === 'water' ? post?.water?.tiles?.[tid] : name === 'appearance' ? post?.appearance?.tiles?.[tid] : 0) || 0;
+  const layerSize = (tid, name) => index.tiles[tid]?.layers?.[name] || (name === 'streets' ? post?.streets?.tiles?.[tid] : name === 'water' ? post?.water?.tiles?.[tid] : name === 'appearance' ? post?.appearance?.tiles?.[tid] : name === 'structures' ? post?.structures?.tiles?.[tid] : 0) || 0;
   const hasLayer = (tid, name) => !!index.tiles[tid] && layerSize(tid, name) > 0;
   const fetchLayer = (tid, name, signal) => (hasLayer(tid, name) ? json(`${tid}/${name}.json`, signal) : Promise.resolve(null));
   /** The request a layer is served by (one per layer unpacked, one per pack packed): the streamer caps requests, not layers. */

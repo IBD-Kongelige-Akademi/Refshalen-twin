@@ -23,7 +23,7 @@ function mesh() {
 
 test('two- and three-axle vehicles pack wheel slots without overwriting one another', () => {
   const dummy = dummyObject(), left = mesh(), right = mesh();
-  const place = productionFunction('placeWheels', { dummy, groundAt: () => 3 });
+  const place = productionFunction('placeWheels', { dummy, groundAt: () => 3, vehicleGround: () => 3 });
   const car = { x: 10, z: 20, wheelSpin: 0.3, steer: 0.15 };
   place(car, 0, 0, 0, 0.37, 0.82, 1.4, left, right);
   place(car, 2, 0, 0, 0.48, 1.24, 7.1, left, right, 0.48, [7.1, 0.2, -6.9]);
@@ -47,7 +47,7 @@ for (const near of [true, false]) {
     let wheels = 0;
     const render = productionFunction('renderCar', {
       BODY_SPECS: { crossoverEV: spec }, bodies: { crossoverEV: meshes }, dummy: dummyObject(),
-      groundAt: () => 2, hasView: false, focusX: 0, focusZ: 0, CAR_PROXY_DISTANCE: 90,
+      groundAt: () => 2, vehicleGround: () => 2, hasView: false, focusX: 0, focusZ: 0, CAR_PROXY_DISTANCE: 90,
       camX: 0, camY: 0, camZ: 0, MAX_LIGHT_DIST_SQ: 0, clock: 0,
       dirtyPaint: new Set(), dirtyState, visibleCars: 0, wheelCars: 0,
       carShadowInst: shadow, carWheelLeftInst: {}, carWheelRightInst: {}, placeWheels() { wheels++; }
