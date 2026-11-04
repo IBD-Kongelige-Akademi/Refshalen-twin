@@ -73,3 +73,22 @@ test('a track lies at the heights it carries, two rails on a ballast bed with sl
   const disused = buildTrackArrays({ id: 'd', kind: 'disused', bridge: 0, pts });
   assert.ok(!new Set(disused.arrays.kind).has(KIND.steel), 'a disused track has rusty rails');
 });
+
+test('AI pedestrians and cyclists keep their level under and on a bridge (agentLevel)', async () => {
+  const { readFileSync } = await import('node:fs');
+  for (const file of ['../js/pedestrian-system.js', '../js/cyclists.js']) {
+    const src = readFileSync(new URL(file, import.meta.url), 'utf8');
+    const body = src.match(/const AGENT_JUMP = 5;\r?\nfunction agentLevel[^]*?\r?\n\}/)[0];
+    const agentLevel = new Function(`${body}; return agentLevel;`)();
+    const f = createDeckField();
+    f.add('a', [deck]);
+    const ground = withDecks(f, { heightAt: () => -1, terrainAt: () => -1 });
+    const under = {};
+    assert.equal(agentLevel(ground, under, 20, -1), 5, `${file}: placed on the deck's footprint with no history: the deck`);
+    const walker = { gy: -1, gx: 20, gz: -1 };
+    for (let x = 20; x < 30; x++) assert.equal(agentLevel(ground, walker, x, -1), -1, `${file}: under the deck it stays under`);
+    const rider = { gy: 5, gx: 2, gz: 0 };
+    for (let x = 2; x < 30; x++) assert.equal(agentLevel(ground, rider, x, 0), 5, `${file}: on the deck it stays on`);
+    assert.equal(agentLevel(ground, rider, 60, 0), -1, `${file}: off the deck`);
+  }
+});

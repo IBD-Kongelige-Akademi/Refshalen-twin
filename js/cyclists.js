@@ -67,6 +67,18 @@ export function buildCyclistNetworkFor(geo, signalNodes = []) {
  * @param geo data/cph-geodata.json
  * @param signalNodes road-network nodes with signals, which supply the cycle lights' offsets and arms
  */
+// An agent's ground from where it is now (js/deck-field.js levelAt): on a bridge deck once it walked or rode onto it, under the deck when
+// it passes beneath. `a.gy` is its last ground; a jump of more than AGENT_JUMP (a respawn) starts it afresh.
+const AGENT_JUMP = 5;
+function agentLevel(groundHeight, a, x, z) {
+  if (!groundHeight) return null;
+  if (!groundHeight.levelAt) return groundHeight.heightAt(x, z);
+  if (!(Math.abs(x - (a.gx ?? Infinity)) < AGENT_JUMP && Math.abs(z - (a.gz ?? Infinity)) < AGENT_JUMP)) a.gy = NaN;
+  a.gx = x;
+  a.gz = z;
+  return (a.gy = groundHeight.levelAt(x, z, a.gy, true));
+}
+
 export function createCyclistSystem(scene, geo, signalNodes = [], { groundHeight = null, network: prebuilt = null } = {}) {
   let network = prebuilt || buildCyclistNetworkFor(geo, signalNodes);
   const sim = createCyclists(network, { count: NUM_CYCLISTS });
@@ -136,7 +148,7 @@ export function createCyclistSystem(scene, geo, signalNodes = [], { groundHeight
       const distance = focus ? Math.hypot(c.x - focus.x, c.z - focus.z) : 0;
       if (!c.placed || distance > DRAW_RADIUS || (visible && !visible(c.x, c.z, 4))) continue;
       drawn++;
-      const y = groundHeight ? groundHeight.heightAt(c.x, c.z) : 0;
+      const y = Number.isFinite(c.gy) ? c.gy : groundHeight ? groundHeight.heightAt(c.x, c.z) : 0;
       b.root.position.set(c.x, y, c.z);
       b.root.rotation.set(0, c.yaw, 0);
       b.lean.rotation.z = b.look.variant === 'cargo-trike' ? c.lean * 0.2 : c.lean;
@@ -213,7 +225,7 @@ export function createCyclistSystem(scene, geo, signalNodes = [], { groundHeight
       const rider = sim.riders[i];
       actor.x = rider.x;
       actor.z = rider.z;
-      actor.y = groundHeight ? groundHeight.heightAt(rider.x, rider.z) : 0;
+      actor.y = agentLevel(groundHeight, rider, rider.x, rider.z) ?? 0; // every frame, drawn or not: the rider's ground stays continuous
       actor.heading = rider.yaw;
       actor.placed = rider.placed;
     }

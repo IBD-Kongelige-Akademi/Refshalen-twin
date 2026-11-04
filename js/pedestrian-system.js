@@ -10,6 +10,18 @@ const PED_SPAWN_DISTANCE = 150;
 const PED_AVOID_INTERVAL = 0.12;
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
+// An agent's ground from where it is now (js/deck-field.js levelAt): on a bridge deck once it walked or rode onto it, under the deck when
+// it passes beneath. `a.gy` is its last ground; a jump of more than AGENT_JUMP (a respawn) starts it afresh.
+const AGENT_JUMP = 5;
+function agentLevel(groundHeight, a, x, z) {
+  if (!groundHeight) return null;
+  if (!groundHeight.levelAt) return groundHeight.heightAt(x, z);
+  if (!(Math.abs(x - (a.gx ?? Infinity)) < AGENT_JUMP && Math.abs(z - (a.gz ?? Infinity)) < AGENT_JUMP)) a.gy = NaN;
+  a.gx = x;
+  a.gz = z;
+  return (a.gy = groundHeight.levelAt(x, z, a.gy, true));
+}
+
 function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals, mayCross, walkOn, visible, nearView, blockAt, groundHeight = null }) {
   let clock = 0;
   let focusX = 0, focusZ = 140;
@@ -525,7 +537,8 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
   const SIDEWALK_Y = 0.22;
   const CROSSWALK_Y = 0.012;
   function pedGround(p, x, z) {
-    if (groundHeight) return groundHeight.heightAt(x, z); // the street surface model: pavement 0.20, carriageway 0.02
+    // the street surface model (pavement 0.20, carriageway 0.02), on a deck only where the pedestrian is on it
+    if (groundHeight) return groundHeight.levelAt ? groundHeight.levelAt(x, z, p.gy, true) : groundHeight.heightAt(x, z);
     if (!p.node) return SIDEWALK_Y;
     const t = (x - p.ax) * p.ux + (z - p.az) * p.uz;
     return t > 2 && t < p.len - 2 ? CROSSWALK_Y : SIDEWALK_Y;
@@ -537,6 +550,7 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     const draw = !hasView || visible(p.x, p.z, 7);
     const partner = p.conversation && (p.conversation.a === p ? p.conversation.b : p.conversation.a);
     const heading = partner ? Math.atan2(partner.x - p.x, partner.z - p.z) : Math.atan2(p.ux * p.dir, p.uz * p.dir);
+    agentLevel(groundHeight, p, p.x, p.z);
     p.rig.update(dt, p.x, p.z, heading, pedGround, p, 0, draw);
     if (!draw) return;
     pedCrowd.add(p.rig, Math.hypot(p.x - focusX, p.z - focusZ));
