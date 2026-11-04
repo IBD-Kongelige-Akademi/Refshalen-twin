@@ -72,7 +72,15 @@ GREEN_TOL_M = 1.0
 MIN_GREEN_M2 = 40.0
 MIN_CUT_M2 = 2.0  # overlaps smaller than this are ignored (lakes.py MIN_CUT_M2)
 DECK_ABOVE_M = 1.0  # a surface whose terrain over the water stands this far above it is a bridge deck
-GDK_TYPES = ("soe", "bassin", "rekreativtomraade", "begravelsesomraade", "skov", "kyst", "havn")  # kyst / havn: the coast lines
+GDK_TYPES = ("soe", "bassin", "rekreativtomraade", "begravelsesomraade", "skov", "kyst", "havn", "vandloebsmidte", "vandloebskant")
+# kyst / havn: the coast lines; vandloebsmidte / vandloebskant: watercourse centrelines and banks (the surfaces are derived: stream_bodies)
+STREAM_STEP_M = 2.0  # m between the samples along a watercourse centreline
+STREAM_PIECE_M = 20.0  # a stream is cut into pieces this long, each at the terrain level over it (streams slope)
+STREAM_BANK_MAX_M = 12.0  # a GeoDanmark bank line within this of the centreline sets the half-width on its side
+STREAM_WIDTH = {"0-2.5": 1.5, "2.5-12": 4.0}  # m, by GeoDanmark midtebredde where no bank lines are drawn (else STREAM_WIDTH_DEFAULT)
+STREAM_WIDTH_DEFAULT = 2.5
+STREAM_LEVEL_Q = 85.0  # the water of a stream piece stands at this percentile of the terrain over it (the ground mesh is coarser than the
+STREAM_LIFT_M = 0.08  # channel, so at the median it would sink under it) plus this
 GREEN_LANDUSE = ("grass", "cemetery", "village_green", "recreation_ground", "meadow", "allotments", "forest")
 OSM_EXTRA = ('(way["landuse"~"^(grass|cemetery|village_green|recreation_ground|meadow|allotments|forest)$"];'
              'relation["landuse"~"^(grass|cemetery|village_green|recreation_ground|meadow|allotments|forest)$"];'
@@ -179,7 +187,8 @@ def fetch(force: bool = False, city_dir: Path = ROOT / "data" / "city") -> None:
         feats = []
         for f in fc["features"]:
             p = f["properties"]
-            keep = {k: p.get(k.lower()) for k in ("id_lokalId", "soetype", "bassintype", "anvendelse", "havnetype") if p.get(k.lower()) is not None}
+            keep = {k: p.get(k.lower()) for k in ("id_lokalId", "soetype", "bassintype", "anvendelse", "havnetype", "vandloebstype", "midtebredde",
+                                                  "synligvandloebsmidte", "synligvandloebskant") if p.get(k.lower()) is not None}
             feats.append({"type": "Feature", "geometry": f["geometry"], "properties": keep})
         S.atomic_write(path, json.dumps({"type": "FeatureCollection", "features": feats}, ensure_ascii=False, separators=(",", ":")))
         log(f"[fetch] gdk {t}: {len(feats)} features")
@@ -291,8 +300,9 @@ class Dtm:
         out[ok] = self.grid[j[ok], i[ok]]
         return out
 
-    def median_in(self, poly):
-        """Median terrain over a polygon (x / z coordinates) sampled at the cell size; None when nothing is covered."""
+    def median_in(self, poly, q=50.0):
+        """Median (or the q-th percentile) of the terrain over a polygon (x / z coordinates) sampled at the cell size; None when nothing
+        is covered."""
         inner = poly.buffer(-1.0)
         use = inner if not inner.is_empty else poly
         x0, z0, x1, z1 = use.bounds
@@ -313,7 +323,7 @@ class Dtm:
             c = use.representative_point()
             r = self.at(c.x, c.y)
             return None if np.isnan(r) else float(r)
-        return float(np.median(v))
+        return float(np.percentile(v, q))
 
 
 # ------------------------------------------------------------------------------------------------------- orientation
@@ -535,6 +545,97 @@ def gdk_lines(name):
     return out
 
 
+def gdk_line_features(name):
+    """[(properties, line geometry in x / z)] of a GeoDanmark line layer (like gdk_lines, with the properties)."""
+    doc = read_json(RAW_WATER / f"gdk_{name}.json")
+    out = []
+    for f in (doc or {}).get("features", []):
+        try:
+            g = shapely.force_2d(shape(f["geometry"]))
+            g = shapely.transform(g, lambda a: np.column_stack([a[:, 0] - frame.ORIGIN[0], -(a[:, 1] - frame.ORIGIN[1])]))
+            if not g.is_empty:
+                out.append((f.get("properties") or {}, g))
+        except Exception:  # noqa: BLE001
+            continue
+    return out
+
+
+def _visible(v) -> bool:
+    return str(v).lower() not in ("0", "false", "nej", "")
+
+
+def stream_bodies(dtm, water):
+    """Watercourse surfaces (GeoDanmark has no open `vandloebsflade`): each visible, open centreline (vandloebsmidte: Almindelig, not
+    Roerlagt, not hidden under a road) widened to its banks (vandloebskant within STREAM_BANK_MAX_M on each side, else the width class),
+    cut into STREAM_PIECE_M pieces, each flat at the STREAM_LEVEL_Q percentile of the terrain over it + STREAM_LIFT_M. Water the lakes and the sea already cover is
+    left out. Returned as pond-like bodies: flat, no shore walls, no ground cut (the channel is the terrain's)."""
+    mids = gdk_line_features("vandloebsmidte")
+    kants = [g for _, g in gdk_line_features("vandloebskant")]
+    ktree = STRtree(kants) if kants else None
+    out = []
+
+    def lines(g):
+        return [g] if g.geom_type == "LineString" else [x for x in getattr(g, "geoms", []) if x.geom_type == "LineString"]
+
+    def bank(px, pz, nx, nz, default):
+        if ktree is None:
+            return default
+        ray = LineString([(px, pz), (px + nx * STREAM_BANK_MAX_M, pz + nz * STREAM_BANK_MAX_M)])
+        best = None
+        for j in ktree.query(ray, predicate="intersects"):
+            hit = ray.intersection(kants[j])
+            for q in ([hit] if hit.geom_type == "Point" else getattr(hit, "geoms", [])):
+                if q.geom_type == "Point":
+                    d = math.hypot(q.x - px, q.y - pz)
+                    if d > 0.3 and (best is None or d < best):
+                        best = d
+        return best if best is not None else default
+
+    for props, g in mids:
+        if props.get("vandloebstype") != "Almindelig" or not _visible(props.get("synligvandloebsmidte", 1)):
+            continue
+        half = STREAM_WIDTH.get(str(props.get("midtebredde")), STREAM_WIDTH_DEFAULT) / 2
+        for line in lines(g):
+            pts = densify(list(line.coords), STREAM_STEP_M)
+            if len(pts) < 2:
+                continue
+            left, right = [], []
+            for i, (px, pz) in enumerate(pts):
+                ax, az = pts[max(0, i - 1)]
+                bx, bz = pts[min(len(pts) - 1, i + 1)]
+                l = math.hypot(bx - ax, bz - az) or 1.0
+                nx, nz = -(bz - az) / l, (bx - ax) / l
+                left.append(bank(px, pz, nx, nz, half))
+                right.append(bank(px, pz, -nx, -nz, half))
+            # a bank line missing on a stretch: the median of the neighbourhood, so the outline does not jump
+            sm = lambda a: [float(np.median(a[max(0, i - 2):i + 3])) for i in range(len(a))]  # noqa: E731
+            left, right = sm(left), sm(right)
+            step = max(2, int(round(STREAM_PIECE_M / STREAM_STEP_M)))
+            for s in range(0, len(pts) - 1, step):
+                e = min(len(pts) - 1, s + step)
+                ring_l, ring_r = [], []
+                for i in range(s, e + 1):
+                    px, pz = pts[i]
+                    ax, az = pts[max(0, i - 1)]
+                    bx, bz = pts[min(len(pts) - 1, i + 1)]
+                    l = math.hypot(bx - ax, bz - az) or 1.0
+                    nx, nz = -(bz - az) / l, (bx - ax) / l
+                    ring_l.append((px + nx * left[i], pz + nz * left[i]))
+                    ring_r.append((px - nx * right[i], pz - nz * right[i]))
+                piece = Polygon(ring_l + ring_r[::-1]).buffer(0)
+                if not water.is_empty:
+                    piece = piece.difference(water)
+                for q in polys(piece):
+                    if q.area < 4.0:
+                        continue
+                    lvl = dtm.median_in(q, STREAM_LEVEL_Q)
+                    if lvl is None:
+                        continue
+                    out.append({"poly": q, "level": round(float(lvl) + STREAM_LIFT_M, 2), "pond": True, "kind": "stream", "name": "",
+                                "sea": False, "moat": False})
+    return out
+
+
 def beach_nodes():
     """Points (x / z) of OSM bathing places and "... Strand" name nodes (Amager Strandpark, Hellerup Strand)."""
     out = []
@@ -687,6 +788,10 @@ def build(args) -> int:
         pond = p.area < POND_MAX_M2 and not is_sea
         kind = "pond" if pond else classify_kind([s[1] for s in hits], is_sea, p.area)
         bodies.append({"id": f"w:{k}", "poly": p, "level": round(float(lvl), 2), "pond": pond, "kind": kind, "name": SEA_NAME if is_sea and SEA_NAME else named[0][1] if named else "", "sea": is_sea, "moat": moat})
+    streams = stream_bodies(dtm, unary_union([b["poly"] for b in bodies]) if bodies else Polygon())
+    for k, s in enumerate(streams):
+        bodies.append({"id": f"s:{k}", **s})
+    log(f"streams: {len(streams)} pieces, {sum(s['poly'].area for s in streams):.0f} m2 (GeoDanmark vandloebsmidte + vandloebskant)")
     lakes_b = [b for b in bodies if not b["pond"]]
     cut_water = unary_union([b["poly"] for b in lakes_b])
     all_water = unary_union([cut_water] + [b["poly"] for b in bodies if b["pond"]])
@@ -889,9 +994,10 @@ def build(args) -> int:
               "bbox": [round(v) for v in b["poly"].bounds], "sea": b["sea"]} for b in lakes_b]
     header = {
         "version": VERSION, "sea": SEA,
-        "method": "GeoDanmark soe + bassin and OSM natural=water polygons, the sea from the OSM coastline; levels from the compiled terrain; "
+        "method": "GeoDanmark soe + bassin and OSM natural=water polygons, the sea from the OSM coastline, watercourse surfaces from GeoDanmark "
+                  "vandloebsmidte widened to vandloebskant; levels from the compiled terrain; "
                   "shore walls by development; tools/geodata/city_water.py",
-        "stats": {"bodies": len(lakes_b), "ponds": len(bodies) - len(lakes_b), "quay_km": round(shore_m["q"] / 1000, 1), "bank_km": round(shore_m["b"] / 1000, 1), "beach_km": round(shore_m["s"] / 1000, 1),
+        "stats": {"bodies": len(lakes_b), "ponds": len(bodies) - len(lakes_b) - len(streams), "streams": len(streams), "quay_km": round(shore_m["q"] / 1000, 1), "bank_km": round(shore_m["b"] / 1000, 1), "beach_km": round(shore_m["s"] / 1000, 1),
                   "water_km2": round(cut_water.area / 1e6, 3), "green_km2": round(green_in / 1e6, 3), "tiles": len(sizes)},
         "bodies": table, "far": far, "override": None,
     }
