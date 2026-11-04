@@ -147,15 +147,33 @@ The Plusbus runs only on NT line 2. OSM maps it as two route relations, "Bybus 2
 **In the viewer**, AI Plusbuses spawned on Boulevarden and drove the route in both directions. An AI bus standing at a stop was not
 watched there (the stop is covered by the unit test; the player's bus at a stop is in `plusbus-doors.jpg`).
 
+## Perf
+
+The plan's target is at most 0.5 ms extra with four AI Plusbuses. **Measured: +0.44 ms a frame.**
+
+`traffic.update` times its phases when `globalThis.__trafficProfile` is an object (ms summed per phase, the Plusbuses apart, and
+a frame count; off by default). Windows of 15 s were taken on Boulevarden with the four buses on the road and with them removed,
+alternating:
+
+| ms per frame | with | without |
+|---|---|---|
+| collisions | 2.31 | 2.14 |
+| other traffic driving | 1.46 | 1.31 |
+| Plusbus driving and posing | 0.12 | – |
+| Plusbus rendering | 0.04 | – |
+| placing a Plusbus | 0.01 | – |
+| pedestrians (a control: the buses do not touch them) | 0.54 | 0.55 |
+| **traffic total** | **6.18** | **5.74** |
+
+- **Noise.** The first pair of windows was noisy: the page's load drifted, and every phase, the pedestrian ones included, ran about
+  twice as long in one of them. Comparing timings only where the control phases match is what keeps the numbers honest. The earlier
+  "+1.0 to +2.6 ms" came from such drift.
+- **Fixed: placing a waiting Plusbus.** It made 16 random attempts each time it was scanned (0.24 ms a frame). It now draws from a
+  cached list of the near route edges, refreshed with the near edges, and tries at most every 0.5 s: 0.01 ms.
+- **Not measured:** the GPU side (6 more instanced draws, and their shadows).
+
 ## Not done
 
-- **Perf: the target is not met.** The plan asks for at most 0.5 ms extra with four AI Plusbuses. `traffic.update` was timed in the
-  viewer (about 10 fps there, so noisy) with the four buses on Boulevarden and with them removed, in two pairs of 12–15 s windows:
-  - median 13.9 vs 11.3 ms, then 11.6 vs 10.6 ms: **+1.0 to +2.6 ms**;
-  - the means disagree in sign between the pairs.
-
-  The route code is not where it goes: projecting the four buses onto line 2 is 0.03 ms a frame. Likely suspects are the collision
-  stage (four 28 t boxes) and traffic queued behind 24.7 m vehicles. A profiler run is needed.
 - **The terminal hairpin.** See the acceptance above.
 - **Bellows.** The AI buses' bellows are straight sleeves, so the outside of a tight bend shows a gap.
 - **Network swaps.** A streamed network swap retires the AI Plusbuses with the rest of the traffic, and they are placed again out of

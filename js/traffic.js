@@ -324,6 +324,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
         busLines.push({ ref: line.ref, path: p, cum, stops: (d.stops || []).map((s) => s.s), back: !/Hospitalsbyen/.test(d.to || '') });
       }
     }
+    refreshNearRoute();
   }
   // The nearest point of line L's path to (x, z): s along it, distance, and the path's direction there
   const lineHit = { s: 0, d: 0, tx: 0, tz: 1 };
@@ -798,6 +799,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       const dx = e.sx + e.dx * s - focusX, dz = e.sz + e.dz * s - focusZ;
       if (dx * dx + dz * dz < NEAR_RADIUS * NEAR_RADIUS) nearEdges.push(e);
     }
+    if (typeof refreshNearRoute === 'function') refreshNearRoute(); // `typeof`: the unit tests lift this function out of its closure
     for (const n of nodes) {
       const dx = n.x - focusX, dz = n.z - focusZ;
       if (n.signal && dx * dx + dz * dz < NEAR_RADIUS * NEAR_RADIUS) nearSignals.push(n);
@@ -1532,16 +1534,24 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   }
 
   // A Plusbus goes in the curb lane of an edge on one of the lines' routes, its stops ahead of it still to serve
-  function spawnPlus(v, rMin, rMax, protectView) {
-    if (!busLines.length || !nearEdges.length) return false;
-    for (let attempt = 0; attempt < 16; attempt++) {
-      const e = nearEdges[Math.floor(Math.random() * nearEdges.length)];
+  // The near edges a Plusbus could be placed on, with their line: rebuilt with the near edges (refreshNear) and when the lines arrive
+  const nearRoute = [];
+  function refreshNearRoute() {
+    nearRoute.length = 0;
+    for (const e of nearEdges) {
       // the old town's links are short: the nose has to fit on the edge, the tail may reach back over the one before
-      if (!e || e.len < v.half + 6) continue;
-      const first = Math.floor(Math.random() * busLines.length);
-      let li = -1;
-      for (let k = 0; k < busLines.length && li < 0; k++) if (onLine(e, (first + k) % busLines.length)) li = (first + k) % busLines.length;
-      if (li < 0) continue;
+      if (e.len < URBINO_24.length / 2 + 6.2) continue;
+      for (let li = 0; li < busLines.length; li++) if (onLine(e, li)) nearRoute.push(e, li);
+    }
+  }
+
+  const PLUS_SPAWN_RETRY = 0.5; // s between a waiting Plusbus's placement attempts
+  function spawnPlus(v, rMin, rMax, protectView) {
+    if (!nearRoute.length || clock < (v.nextSpawnTry || 0)) return false;
+    v.nextSpawnTry = clock + PLUS_SPAWN_RETRY;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const k = 2 * Math.floor(Math.random() * (nearRoute.length / 2));
+      const e = nearRoute[k], li = nearRoute[k + 1];
       const lane = curbLane(e);
       const along = (focusX - e.sx) * e.dx + (focusZ - e.sz) * e.dz;
       const minS = Math.max(Math.min(v.half + 2, e.len - v.half - 3), along - rMax);
@@ -1995,8 +2005,14 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     const jump = Math.hypot(focusX - lastFocusX, focusZ - lastFocusZ) > 140;
     lastFocusX = focusX;
     lastFocusZ = focusZ;
+    // Opt-in phase timings for profiling (set globalThis.__trafficProfile = {}): ms per phase summed over frames, the Plusbuses apart
+    const prof = globalThis.__trafficProfile || null;
+    let lapT = prof ? performance.now() : 0;
+    const lap = (name) => { if (!prof) return; const now = performance.now(); prof[name] = (prof[name] || 0) + now - lapT; lapT = now; };
+    if (prof) prof.frames = (prof.frames || 0) + 1;
     refreshNear();
     updateView(camera);
+    lap('near');
 
     const playerGround = playerEntity && options.groundHeight
       ? (options.groundHeight.heightAt?.(playerEntity.position.x, playerEntity.position.z)
@@ -2029,8 +2045,11 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       if (d <= (jump ? NEAR_RADIUS : VEHICLE_RADIUS)) continue;
       budget--;
       spawnVehicle(v, jump ? 0 : 100, NEAR_RADIUS, !jump);
+      lap(v.plus ? 'spawnPlus' : 'spawn');
     }
+    lap('spawn');
     buildOccupancy();
+    lap('occupancy');
     for (const m of bodyMeshes) m.count = 0;
     litVehicleCount = 0;
     wheelCars = 0;
@@ -2054,13 +2073,17 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       knock(v, dt);
       pose(v, dt);
       if (v.plus) posePlus(v);
+      lap(v.plus ? 'drivePlus' : 'drive');
     }
+    lap('drive');
 
     // Pedestrians and road vehicles complete their movement before any actor batches are populated.
     pedestrianSystem.simulate(dt, elapsed, focusX, focusZ, jump, hasView, activeMode);
+    lap('pedestrians');
     const collisionActors = syncCollisionActors(playerEntity, activeMode);
     if (collisionPhase) collisionPhase(collisionActors, { dt, elapsed, focusPos, playerEntity, activeMode });
     else localCollisionStage.resolve(collisionActors, { dt });
+    lap('collide');
 
     // Corrections from the contact pass now feed the body, wheel, light, pedestrian and shadow batches.
     for (const v of vehicles) {
@@ -2070,6 +2093,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       if (v.plus) renderPlus(v);
       else if (v.bus) renderBus(v);
       else renderCar(v);
+      lap(v.plus ? 'renderPlus' : 'render');
     }
     const hideEmpty = ++updates > 2;
     for (const m of bodyMeshes) {
@@ -2120,10 +2144,13 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     }
     syncInst(plusBellowsInst, plusBellowsCount);
     syncInst(plusShadowInst, plusShadowCount);
+    lap('render');
     updateTrafficLights();
+    lap('lights');
 
     // 2. Pedestrians
     pedestrianSystem.render(dt);
+    lap('pedestrianRender');
 
     // 3. Collision sparks, including the player's own impacts against buildings
     if (playerEntity && playerEntity.lastCollisionSpark) {
@@ -2132,6 +2159,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       playerEntity.lastCollisionSpark = null;
     }
     updateSparks(dt);
+    lap('sparks');
   }
 
   if (options.debug) Object.assign(options.debug, { room, alongside, mergingAhead, yieldOncoming, yieldToCrossTraffic, boxBusy, vehicles });
