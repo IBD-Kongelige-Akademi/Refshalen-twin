@@ -205,6 +205,8 @@ export function createCityCollisions({ staticIndex = null, groundHeight = null }
   }
 
   function addPair(lo, hi) {
+    // a full table would make the probe below spin for ever: once it is half full, stop; broadphase grows the tables and fills again
+    if (gridOverflow) return;
     const pair = lo * 65536 + hi;
     const mask = pairCap - 1;
     let h = Math.imul(pair, 0x9E3779B1) >>> (32 - pairBits);
@@ -221,6 +223,7 @@ export function createCityCollisions({ staticIndex = null, groundHeight = null }
   function addCell(ix, iz, index) {
     // 15 bits per axis keep the key a small integer; an 8 m grid wraps after 262 km, and an aliased cell only adds candidate pairs
     // that the exact test rejects
+    if (gridOverflow) return; // as in addPair: the tables grow before the cells fill up
     const key = ((ix & 0x7fff) << 15) | (iz & 0x7fff);
     const mask = cellCap - 1;
     let h = Math.imul(key, 0x85EBCA6B) >>> (32 - cellBits);
@@ -285,6 +288,7 @@ export function createCityCollisions({ staticIndex = null, groundHeight = null }
     fillGrid(actors);
     while (gridOverflow) { growTables(); resetGrid(); fillGrid(actors); } // a busier frame than the tables were sized for
     stats.candidatePairs = pairCount;
+    stats.maxCandidatePairs = Math.max(stats.maxCandidatePairs || 0, pairCount);
   }
 
   function fillGrid(actors) {
@@ -298,6 +302,7 @@ export function createCityCollisions({ staticIndex = null, groundHeight = null }
       for (let ix = actor._cellIX0; ix <= actor._cellIX1; ix++) {
         for (let iz = actor._cellIZ0; iz <= actor._cellIZ1; iz++) addCell(ix, iz, index);
       }
+      if (gridOverflow) return;
     }
   }
 

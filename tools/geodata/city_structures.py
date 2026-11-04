@@ -52,7 +52,7 @@ RAW_OSM = ROOT / "data" / "raw" / "city" / "osm_api"
 VEG = ROOT / "data" / "raw" / "veg"
 TERRAIN_ORIG = ROOT / "data" / "city" / "work" / "terrain_orig"  # each tile's terrain layer as the compiler wrote it
 UNDER_REACH_M = 2.5  # the ground beside a deck is sampled this far out from its edge
-SHOULDER_M = 8.0  # m round a deck that the terrain's ridge in the water is cut down to the bed
+CUT_KINDS = ("sea", "river")  # the water bodies the terrain is cut under (they have shore walls; streams and ponds lie on the ground)
 SINK_M = 1.0  # the ground under a bridge over water lies this far under the water level
 UNDER_MIN_DROP_M = 0.3  # a terrain cell under a deck is lowered when the ground beside it lies this much lower
 VERSION = "aalborg-structures/1"
@@ -119,7 +119,7 @@ class Heights:
         self.orig = self.dtm.grid.copy()
         # the water the water build made (city_water.py): under a bridge over it the ground is the water, not the terrain (the compiled
         # terrain carries the fjord bridges' decks across the water)
-        self.water, self.levels, self.raw, self.bodies = [], [], [], []
+        self.water, self.levels, self.raw, self.bodies, self.kinds = [], [], [], [], []
         for wp in sorted(tiles_dir.glob("*/water.json")):
             for body in (read_json(wp) or {}).get("bodies") or []:
                 for poly in body.get("polys") or []:
@@ -134,6 +134,7 @@ class Heights:
                             self.levels.append(float(body["level"]))
                             self.raw.append(g)
                             self.bodies.append(body["id"])
+                            self.kinds.append(body.get("kind"))
         self.wtree = STRtree(self.water) if self.water else None
         self.nd = []
         for p in sorted(VEG.glob("ndsm_*.tif")):
@@ -318,23 +319,6 @@ def terrain_under_decks(decks, H) -> int:
                 if math.isfinite(orig[j, i]) and orig[j, i] - under > UNDER_MIN_DROP_M:
                     grid[j, i] = under
                     changed += 1
-        # the ridge the compiled terrain carries is wider than the outline: its shoulders in the water go down to the bed too
-        raw = getattr(H, "raw", None)
-        if raw:
-            near = [k for k, r in enumerate(raw) if r.intersects(g.buffer(SHOULDER_M))]
-            pad = int(math.ceil(SHOULDER_M / cell))
-            for j in range(max(0, j0 - pad), min(grid.shape[0], j1 + pad + 1)):
-                for i in range(max(0, i0 - pad), min(grid.shape[1], i1 + pad + 1)):
-                    cx, cz = x0 + (i + 0.5) * cell, z0 + (j + 0.5) * cell
-                    if not near or shapely.contains_xy(g, cx, cz) or g.distance(shapely.points(cx, cz)) > SHOULDER_M:
-                        continue
-                    for k in near:
-                        if shapely.contains_xy(raw[k], cx, cz):
-                            bed = H.levels[k] - SINK_M
-                            if math.isfinite(grid[j, i]) and grid[j, i] - bed > UNDER_MIN_DROP_M:
-                                grid[j, i] = bed
-                                changed += 1
-                            break
     return changed
 
 
@@ -358,17 +342,43 @@ def regrounded(d, H):
     d["clear"] = round(clear, 2)
 
 
-def water_under_decks(tiles_dir: Path, decks, H) -> float:
-    """The water build leaves a bridge's strip out of the water, so under a deck over the water the ground cut to the bed would show:
-    the strip (the deck's footprint within WATER_REACH_M of the water, less the water) is added to the water body beside it in each tile's
-    water layer, marked `deck` (a rerun takes those out first). Returns the area added (m2)."""
+def terrain_in_water(H, gaps) -> int:
+    """The terrain under the sea and the rivers (CUT_KINDS), and under the water added beneath the decks (`gaps`), goes down to the bed
+    (SINK_M under the water level) wherever it stands higher: the compiled terrain carries the fjord bridges as ridges across the water,
+    wider than their outlines. The bridges keep their heights (the decks are measured on the terrain as compiled). Only ever lowered;
+    returns the number of cells."""
+    grid = H.dtm.grid
+    x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
+    level_of = dict(zip(H.bodies, H.levels))
+    kind_of = dict(zip(H.bodies, H.kinds))
+    polys = [(g, lv) for g, lv, k in zip(H.raw, H.levels, H.kinds) if k in CUT_KINDS]
+    polys += [(g, level_of[b]) for b, pieces in gaps.items() for g in pieces if kind_of.get(b) in CUT_KINDS]
+    n = 0
+    for g, level in polys:
+        bx0, bz0, bx1, bz1 = g.bounds
+        i0, i1 = max(0, int(math.floor((bx0 - x0) / cell))), min(grid.shape[1] - 1, int(math.ceil((bx1 - x0) / cell)))
+        j0, j1 = max(0, int(math.floor((bz0 - z0) / cell))), min(grid.shape[0] - 1, int(math.ceil((bz1 - z0) / cell)))
+        if i1 < i0 or j1 < j0:
+            continue
+        ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1))
+        inside = shapely.contains_xy(g, x0 + (ii + 0.5) * cell, z0 + (jj + 0.5) * cell)
+        sub = grid[j0:j1 + 1, i0:i1 + 1]
+        bed = level - SINK_M
+        hit = inside & np.isfinite(sub) & (sub - bed > UNDER_MIN_DROP_M)
+        if hit.any():
+            sub[hit] = bed
+            n += int(hit.sum())
+    return n
+
+
+def water_gaps(decks, H) -> dict:
+    """The water build leaves a bridge's strip out of the water: under a deck over the water, the strip (the deck's footprint within
+    WATER_REACH_M of the water, less the water), by the id of the water body beside it."""
     if not H.raw:
-        return 0.0
+        return {}
     rtree = STRtree(H.raw)
     gaps = {}  # body id -> [polygon]
     for d in decks:
-        if d.get("clear", 0) <= 0.4:
-            continue
         g = d["_g"]
         near = [k for k in rtree.query(g.buffer(WATER_REACH_M))]
         if not near:
@@ -380,6 +390,12 @@ def water_under_decks(tiles_dir: Path, decks, H) -> float:
                 continue
             k = min(near, key=lambda k: H.raw[k].distance(piece))
             gaps.setdefault(H.bodies[k], []).append(piece)
+    return gaps
+
+
+def write_water_gaps(tiles_dir: Path, gaps) -> float:
+    """The gaps (water_gaps) added to the water bodies in each tile's water layer, marked `deck` (a rerun takes those out first).
+    Returns the area added (m2)."""
     area = 0.0
     for wp in sorted(tiles_dir.glob("*/water.json")):
         doc = read_json(wp) or {}
@@ -779,6 +795,9 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
     tdecks = kept
     decks += tdecks
     changed = terrain_under_decks(decks, H)
+    gaps = water_gaps(decks, H)
+    wet = terrain_in_water(H, gaps)
+    log(f"water: the terrain cut to the bed under the sea and the rivers in {wet} cells")
     lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids)
     for r in rows:
         log("  under", *r)
@@ -831,7 +850,7 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
             out[tid] = {"tile": tid, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
                         "rails": [{k: v for k, v in r.items() if k != "_g"} for r in sorted(rs, key=lambda r: r["id"])]}
     terrain_tiles = write_terrain(tiles_dir, H, ids)
-    log(f"water: {water_under_decks(tiles_dir, decks, H):.0f} m2 added under the decks over the water")
+    log(f"water: {write_water_gaps(tiles_dir, gaps):.0f} m2 added under the decks over the water")
     return {"terrain_tiles": terrain_tiles, "tiles": out, "stats": {"decks": len(decks), "deck_ha": round(sum(d["_g"].area for d in decks) / 1e4, 2),
                                     "high_decks": sum(1 for d in decks if d["clear"] > 2.5), "tunnel_decks": len(tdecks),
                                     "underpasses": len(rows), "rails": len(rails),

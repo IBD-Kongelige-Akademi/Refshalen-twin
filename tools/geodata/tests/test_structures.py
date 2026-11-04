@@ -70,3 +70,16 @@ def test_the_bridge_road_itself_and_a_way_that_joins_it_at_grade_are_not_lowered
     changed, rows = CS.lower_underpasses([d], [own, low], H)
     assert changed == 0 and rows == []
     assert np.array_equal(H.dtm.grid, H.orig)
+
+
+def test_the_terrain_under_the_sea_goes_to_the_bed_and_a_stream_keeps_its_ground():
+    H = _flat(h=-4.8)
+    H.dtm.grid[40:60, :] = 6.0  # a bridge ridge across both
+    sea = Polygon([(0, 0), (100, 0), (100, 200), (0, 200)])
+    stream = Polygon([(120, 0), (180, 0), (180, 200), (120, 200)])
+    H.raw, H.levels, H.bodies, H.kinds = [sea, stream], [-3.85, -2.0], ["w:0", "w:1"], ["sea", "stream"]
+    n = CS.terrain_in_water(H, {})
+    assert n > 0
+    assert float(H.dtm.grid[50, 25]) == np.float32(-3.85 - CS.SINK_M), "the ridge in the sea is cut to the bed"
+    assert float(H.dtm.grid[50, 75]) == 6.0, "the ridge over the stream stays"
+    assert float(H.dtm.grid[10, 25]) == np.float32(-4.8), "the sea floor within 0.3 m of the bed stays"

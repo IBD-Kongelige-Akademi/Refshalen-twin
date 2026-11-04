@@ -43,9 +43,12 @@ furniture stage caches.
 **The terrain under a deck.** The compiled terrain carried many bridges: a ridge across the fjord along Limfjordsbroen, a mound
 over the railway at Vesterbro. Under every deck, the terrain is now set to the ground beside the bridge. Each cell takes a value between
 the two points 2.5 m outside the deck's edge, across the nearest carried way, so a railway cutting or a road runs on under the bridge.
-Over water that ground is the bed, 1 m under the water level. The ridge is wider than the outline, so its shoulders in the water within
-8 m of a deck go down to the bed too. Cells are only ever lowered: 7,774 of them in 12 tiles. Deck heights are
-measured on the terrain as compiled, before the cut.
+Over water that ground is the bed, 1 m under the water level. Cells are only ever lowered: 5,484 of them under the decks.
+
+**The terrain in the water.** The ridges the compiled terrain carries across the fjord are wider than the bridge outlines. So all the
+terrain under the sea and the rivers goes down to the bed wherever it stands higher: 196,541 cells in 14 tiles. The terrain under the
+water added beneath the decks goes down too. Streams and ponds keep their ground, since they lie on it with no shore walls. The bridges
+keep their heights: the decks are measured on the terrain as compiled, before any cut.
 
 **Water under a deck.** The water build leaves a bridge's strip out of the water. Under a deck over the water, the strip (the footprint
 within 3 m of the water, less the water) is added to the water body beside it: 695 m², so the bed under the bridge no longer shows as

@@ -157,3 +157,15 @@ test('sparse thousand-actor broadphase generates bounded candidate work', () => 
   assert.ok(result.stats.candidatePairs < 20, `candidate count ${result.stats.candidatePairs} stays local`);
   assert.equal(result.stats.contacts, 0);
 });
+
+test('a crowd with more candidate pairs than the broadphase tables hold resolves (the tables grow; the hash probe never spins)', () => {
+  const stage = createCityCollisions();
+  // 200 pedestrians in one 8 m cell: 19,900 candidate pairs, far more than the 4,096-slot pair table it starts with
+  const crowd = Array.from({ length: 200 }, (_, i) => actor('person', (i % 20) * 0.3, Math.floor(i / 20) * 0.3));
+  const t0 = Date.now();
+  stage.resolve(crowd, { dt: 1 / 60 });
+  assert.ok(Date.now() - t0 < 5000);
+  assert.equal(stage.stats.candidatePairs, 200 * 199 / 2);
+  stage.resolve(crowd, { dt: 1 / 60 });
+  assert.ok(stage.stats.candidatePairs > 4096, 'the next frame (the crowd pushed apart a little) on the grown tables');
+});
