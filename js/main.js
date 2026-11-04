@@ -524,6 +524,8 @@ async function initApp() {
     onTeleport: (x, z) => teleportTo(x, z)
   });
   world.fetchCityJson?.('map.json').then((doc) => mapSystem.setData(doc)).catch((e) => console.info('[map] no data/city/map.json:', e?.message || e));
+  // line 2's route for the AI Plusbuses (tools/geodata/bus_lines.py)
+  world.fetchCityJson?.('bus-lines.json').then((doc) => trafficSystem.setBusLines?.(doc)).catch((e) => console.info('[traffic] no data/city/bus-lines.json:', e?.message || e));
   const openMapBtn = document.getElementById('btn-open-map');
   if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
 

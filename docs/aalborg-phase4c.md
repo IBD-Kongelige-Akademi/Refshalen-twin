@@ -74,10 +74,54 @@ The destination sign reads `+ PLUSBUS · CENTRUM`; no line number is shown. Shot
   while driving straight and in a full turn.
 - The livery shot is `docs/phase4c/plusbus-livery.jpg`. A shot of the open doors is still to take.
 
+## AI Plusbuses on line 2
+
+The Plusbus runs only on NT line 2. OSM maps it as two route relations, "Bybus 2: Væddeløbsbanen => Hospitalsbyen" and back
+(`loc_name` "Plusbussen").
+
+**The route data.** `tools/geodata/bus_lines.py` writes `data/city/bus-lines.json`:
+
+- It reads the OSM API cache (`data/raw/city/osm_api/`).
+- It chains each direction's route ways in relation order and keeps the longest run inside the district, 3.4 km each way.
+- It projects the stops onto that path. 4 stops each way are within the district, among them Jomfru Ane Gade (Borgergade) and
+  Jyllandsgade.
+- build_city's `index` stage writes the file and names it in `data/tiles/index.json` (`city.busLines`), so the hosting packs carry it.
+
+**In traffic** (`js/traffic.js`, section 2b), four AI Plusbuses run the route:
+
+- **Spawning.** A Plusbus spawns in the curb lane of a route edge: an edge within 14 m of a direction's path, running its way. It may
+  spawn on a short old-town edge with its tail over the edge before.
+- **Following the route.** At every junction it takes the move onto the next route edge. One that strays off the route (the line
+  leaves the network) is retired out of sight and placed again.
+- **Driving.** The traffic model drives it as a 24.7 m vehicle, so cars keep their distance behind the tail. Its front module follows
+  the lane path and the trailing modules follow their hitches, as on the player's bus.
+- **Stops.** It pulls up with its nose at each stop and stands 14 s with the doors open. The doors shut before it moves off.
+- **Collisions.** It collides as its front module, with a mass of 28 t.
+- **Rendering.** Instanced: three module bodies, the front one under its direction's sign (2 HOSPITALSBYEN or 2 VÆDDELØBSBANEN);
+  straight bellows sleeves turned and stretched between the faces; four axles of wheels.
+
+**The regular AI buses** (12 m and 18 m) now wear the same NT colours. Their signs show lines that run through the district in OSM:
+12 GISTRUP and 16 CITY SYD. Shot of an AI Plusbus on Boulevarden: `docs/phase4c/plusbus-line2.jpg`.
+
+**Tests.** `tests/plusbus-traffic.test.cjs` checks:
+
+- route edges, against the oncoming carriageway and parallel and cross streets;
+- the move choice and going off route;
+- the next stop from the front bumper, with passed stops counted as served;
+- the dwell: the doors open for 14 s and shut before moving off.
+
+`tools/geodata/tests/test_bus_lines.py` checks the way chaining, gaps and clipping.
+
+**In the viewer**, AI Plusbuses spawned on Boulevarden and drove the route in both directions. A stop with the doors open was not
+seen there: the page ran at about 1 fps while the window was in the background.
+
 ## Not done
 
-- **AI Plusbuses on the real route** (optional in the plan). The perf target "0.5 ms extra with four AI Plusbuses" belongs to them
-  and was not measured.
+- **Perf.** The perf target "0.5 ms extra with four AI Plusbuses" was not measured; the browser pane's frame rate is not reliable
+  enough for it.
+- **Bellows.** The AI buses' bellows are straight sleeves, so the outside of a tight bend shows a gap.
+- **Network swaps.** A streamed network swap retires the AI Plusbuses with the rest of the traffic, and they are placed again out of
+  sight.
 - **Bus headlight beams.** The bus has no headlight spotlights: two more lights would recompile every material. Its lamps glow at night.
 - **Sound.** The bus uses the street-bus motor voice, not an electric whine.
 - **Body.** No pitch on slopes. The modules ride level at their own ground height.

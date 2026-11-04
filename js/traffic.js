@@ -17,11 +17,16 @@ import {
   buildLoftedBusBodyGeometry,
   buildBusWheelGeo,
   createBusWheelMaterial,
-  createLoftedBusMaterial
+  createLoftedBusMaterial,
+  URBINO_24_SPECS,
+  URBINO_24_FRONT_BACK,
+  buildBusBellowsGeometry
 } from './actor-models.js';
+import { URBINO_24, createArticulation } from './articulated-bus.js';
 
 // js/traffic.js
 // Copenhagen traffic and pedestrians on the road graph road-network.js derives from the centreline graph:
+// - Four AI Plusbuses (Solaris Urbino 24, double-articulated) run line 2's real route both ways and stop at its stops (section 2b).
 // - 120 cars (European crossovers, hatchbacks, estates, vans and taxis) and 12 buses keep to their lanes and follow the vehicle
 //   ahead (Intelligent Driver Model), change lanes to overtake or to reach a turn lane, turn into other streets,
 //   stop for the signals at the junctions the register places (signal-plan.js), give way to oncoming traffic when
@@ -33,6 +38,9 @@ import {
 
 const NUM_CARS = 120;
 const NUM_BUSES = 12;
+const NUM_PLUSBUSES = 4;
+const PLUS_DWELL = 14; // s standing at a stop with the doors open
+const PLUS_ROUTE_TOLERANCE = 14; // m: an edge within this of a line's path, running its way, is on the route
 const JAM_WAIT = 100; // s
 // How long (s) a vehicle may stand held inside a solid (a junction curve cutting a building corner, a lane under a parked car)
 // before it is placed afresh: its lane cannot take it out, so it would stay wedged until JAM_WAIT
@@ -43,6 +51,7 @@ const PINNED_DEPTH = 0.1; // m of overlap with a solid that counts as wedged (a 
 // acceleration drivers accept in bends, which sets how fast they take each turn or lane shift
 const CAR_DRIVER = { a: 2.0, b: 3.0, T: 1.2, s0: 2.0, aLat: 3.5 };
 const BUS_DRIVER = { a: 1.1, b: 2.5, T: 1.5, s0: 2.5, aLat: 2.0 };
+const PLUS_DRIVER = { a: 1.0, b: 2.2, T: 1.6, s0: 3.0, aLat: 1.6 };
 const LOOKAHEAD = 70; // metres a driver looks ahead for vehicles, stop lines and signals
 
 // Retire distant actors even when looking their way: keeping them indefinitely starves upcoming streets.
@@ -246,8 +255,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   }
   const busBodyMeshes = Object.values(busSets).map((b) => b.body);
   const busWheelMat = createBusWheelMaterial();
-  const busWheelLeftInst = new THREE.InstancedMesh(buildBusWheelGeo(-1), busWheelMat, NUM_BUSES * 3);
-  const busWheelRightInst = new THREE.InstancedMesh(buildBusWheelGeo(1), busWheelMat, NUM_BUSES * 3);
+  const busWheelLeftInst = new THREE.InstancedMesh(buildBusWheelGeo(-1), busWheelMat, NUM_BUSES * 3 + NUM_PLUSBUSES * 4);
+  const busWheelRightInst = new THREE.InstancedMesh(buildBusWheelGeo(1), busWheelMat, NUM_BUSES * 3 + NUM_PLUSBUSES * 4);
   const busShadowInst = new THREE.InstancedMesh(unitPlane, contactShadowMat, NUM_BUSES);
   busShadowInst.renderOrder = 998;
   busWheelLeftInst.castShadow = busWheelLeftInst.receiveShadow = true;
@@ -260,8 +269,104 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     Object.assign(bus, { spec, massRatio: spec.massRatio });
     buses.push(bus);
   }
-  const vehicles = [...cars, ...buses];
+
+  // =========================================================================
+  // 2b. AI PLUSBUSES (LINE 2: SOLARIS URBINO 24)
+  // =========================================================================
+  // Line 2's paths and stops come from data/city/bus-lines.json (tools/geodata/bus_lines.py, setBusLines). The traffic model drives
+  // each Plusbus as a 24.7 m vehicle in the curb lane of the edges on its route (onLine): its front module follows the lane path, the
+  // trailing modules follow their hitches (js/articulated-bus.js). It stops at each stop for PLUS_DWELL s with its doors open; one
+  // that strays off the route is retired once out of sight and placed on the route again.
+  const plusModuleSpecs = [URBINO_24_SPECS[0], URBINO_24_FRONT_BACK, URBINO_24_SPECS[1], URBINO_24_SPECS[2]];
+  const plusSets = {};
+  for (const spec of plusModuleSpecs) {
+    const geo = buildLoftedBusBodyGeometry(spec);
+    const states = new THREE.InstancedBufferAttribute(new Float32Array(NUM_PLUSBUSES * 4), 4);
+    geo.setAttribute('busState', states);
+    const body = new THREE.InstancedMesh(geo, createLoftedBusMaterial(spec), NUM_PLUSBUSES);
+    body.name = `traffic-${spec.name}`;
+    body.castShadow = body.receiveShadow = true;
+    plusSets[spec.name] = { body, states, count: 0 };
+    group.add(body);
+  }
+  const plusBellowsInst = new THREE.InstancedMesh(buildBusBellowsGeometry(),
+    new THREE.MeshStandardNodeMaterial({ color: 0x9a9fa3, roughness: 0.62, metalness: 0.25 }), NUM_PLUSBUSES * 2);
+  plusBellowsInst.castShadow = true;
+  const plusShadowInst = new THREE.InstancedMesh(unitPlane, contactShadowMat, NUM_PLUSBUSES * 3);
+  plusShadowInst.renderOrder = 998;
+  group.add(plusBellowsInst, plusShadowInst);
+  const plusbuses = [];
+  for (let i = 0; i < NUM_PLUSBUSES; i++) {
+    const v = createVehicle(true, URBINO_24.length / 2 + 0.2, URBINO_24.width / 2, 6, PLUS_DRIVER, 10);
+    Object.assign(v, {
+      plus: true, massRatio: 0.1,
+      // the collision box is the front module's (city-collisions sees it at the module, js/controllers.js does the same for the player);
+      // zFront / headlight place the headlamps from the vehicle centre
+      spec: { name: 'urbino24', width: URBINO_24.width, length: 10, height: URBINO_24.height, wheelRadius: 0.48, zFront: URBINO_24.length / 2, headlight: [0.79, 0.8] },
+      art: createArticulation(), artPlaced: false, line: -1, offRoute: false, frontS: 0, servedS: -Infinity, stopD: Infinity,
+      dwell: 0, doors: 0, cox: 0, coz: 0, frontYaw: 0
+    });
+    plusbuses.push(v);
+  }
+  const vehicles = [...cars, ...buses, ...plusbuses];
   group.add(busWheelLeftInst, busWheelRightInst);
+
+  // Line paths: { path (flat x, z), cum (metres to each vertex), stops (s), back (towards Væddeløbsbanen: the other sign) }
+  let busLines = [];
+  const lineEdgeCache = new WeakMap();
+  function setBusLines(doc) {
+    busLines = [];
+    for (const line of doc?.lines || []) {
+      for (const d of line.directions || []) {
+        const p = d.path;
+        const cum = new Float64Array(p.length / 2);
+        for (let i = 1; i < cum.length; i++) cum[i] = cum[i - 1] + Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]);
+        busLines.push({ ref: line.ref, path: p, cum, stops: (d.stops || []).map((s) => s.s), back: !/Hospitalsbyen/.test(d.to || '') });
+      }
+    }
+  }
+  // The nearest point of line L's path to (x, z): s along it, distance, and the path's direction there
+  const lineHit = { s: 0, d: 0, tx: 0, tz: 1 };
+  function lineProject(L, x, z, out = lineHit) {
+    const p = L.path;
+    let best = Infinity;
+    for (let i = 1; i < L.cum.length; i++) {
+      const ax = p[2 * i - 2], az = p[2 * i - 1], dx = p[2 * i] - ax, dz = p[2 * i + 1] - az;
+      const l2 = dx * dx + dz * dz || 1e-9;
+      const t = clamp(((x - ax) * dx + (z - az) * dz) / l2, 0, 1);
+      const ex = ax + dx * t - x, ez = az + dz * t - z;
+      const d2 = ex * ex + ez * ez;
+      if (d2 < best) {
+        best = d2;
+        const l = Math.sqrt(l2);
+        out.s = L.cum[i - 1] + l * t;
+        out.tx = dx / l;
+        out.tz = dz / l;
+      }
+    }
+    out.d = Math.sqrt(best);
+    return out;
+  }
+  // Is edge e on line li's route: near its path all along, and running the same way?
+  function onLine(e, li) {
+    let c = lineEdgeCache.get(e);
+    if (!c) lineEdgeCache.set(e, (c = []));
+    if (c[li] === undefined) {
+      let ok = true;
+      for (const f of [0.1, 0.5, 0.9]) {
+        const q = lineProject(busLines[li], e.sx + e.dx * e.len * f, e.sz + e.dz * e.len * f);
+        if (q.d > PLUS_ROUTE_TOLERANCE || q.tx * e.dx + q.tz * e.dz < 0.7) { ok = false; break; }
+      }
+      c[li] = ok;
+    }
+    return c[li];
+  }
+  // The curb lane (traffic keeps right: the lane furthest along e's right vector)
+  const curbLane = (e) => {
+    let best = 0;
+    for (let i = 1; i < e.lanes.length; i++) if (e.lanes[i] > e.lanes[best]) best = i;
+    return best;
+  };
 
   // =========================================================================
   // 3. PEDESTRIAN SYSTEM
@@ -285,8 +390,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       mode: 'car',
       spec,
       bodyTop: spec.height || (v.bus ? 3.0 : 1.8),
-      radius: Math.max(v.halfWidth, v.half),
-      mass: v.bus ? 6500 : Math.max(950, 1400 / Math.max(spec.massRatio || 0.5, 0.2)),
+      radius: v.plus ? spec.length / 2 : Math.max(v.halfWidth, v.half),
+      mass: v.plus ? 28000 : v.bus ? 6500 : Math.max(950, 1400 / Math.max(spec.massRatio || 0.5, 0.2)),
       x: 0, y: 0, z: 0, prevX: 0, prevY: 0, prevZ: 0, _wasPlaced: false,
       getVelocity(out) {
         out.x = v.tx * v.speed + v.vx;
@@ -303,6 +408,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       },
       move(dx, dz) {
         shove(v, dx, dz);
+        if (v.plus) return { x: v.x + v.cox, z: v.z + v.coz }; // the box stays on the front module
         this.heading = Math.atan2(v.tx, v.tz) - v.nose + v.yawOffset;
         return v;
       },
@@ -422,6 +528,12 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       actor.x = v.x; actor.y = groundAt(v.x, v.z); actor.z = v.z;
       actor.heading = Math.atan2(v.tx, v.tz) - v.nose + v.yawOffset;
       actor.prevX = v.prevX; actor.prevZ = v.prevZ;
+      if (v.plus) {
+        // a Plusbus collides as its front module (the trailers follow its path)
+        actor.x += v.cox; actor.z += v.coz;
+        actor.prevX += v.cox; actor.prevZ += v.coz;
+        actor.heading = v.frontYaw;
+      }
       actor.placed = Boolean(v.edge);
       frameCollisionActors.push(actor);
     }
@@ -522,7 +634,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
 
   // Nothing shows until it has been placed
   const carInstances = [...bodyMeshes, carWheelLeftInst, carWheelRightInst, carShadowInst];
-  const busInstances = [...busBodyMeshes, busWheelLeftInst, busWheelRightInst, busShadowInst];
+  const busInstances = [...busBodyMeshes, busWheelLeftInst, busWheelRightInst, busShadowInst,
+    ...Object.values(plusSets).map((set) => set.body), plusBellowsInst, plusShadowInst];
   for (const inst of [...carInstances, ...busInstances, sparkInst]) {
     inst.frustumCulled = false;
     for (let i = 0; i < inst.count; i++) inst.setMatrixAt(i, zero);
@@ -777,6 +890,16 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   const weights = [];
   function chooseMove(v, fromLane) {
     const e = v.edge;
+    // a Plusbus keeps to its line: the move onto the next edge of the route (from its own lane if it can)
+    if (v.plus && v.line >= 0) {
+      let pick = null;
+      for (const m of e.moves) {
+        if (!onLine(m.to, v.line)) continue;
+        if (!pick || (m.out[v.lane] >= 0 && pick.out[v.lane] < 0)) pick = m;
+      }
+      if (pick) return pick;
+      v.offRoute = true; // the route leaves the network here (or the network's roads miss it): any move, retired out of sight
+    }
     let total = 0;
     for (let k = 0; k < e.moves.length; k++) {
       const m = e.moves[k];
@@ -1149,6 +1272,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       }
       cap = bendSpeed(v, v.conn);
     }
+    // a Plusbus pulls up with its front doors at the next stop
+    if (v.plus && v.stopD < LOOKAHEAD) worst = Math.min(worst, stopAt(v, Math.max(0, v.stopD) + 1));
     const pg = playerGap(v, 0);
     if (pg < LOOKAHEAD) {
       worst = Math.min(worst, brake(v, pg, v.pSpeed));
@@ -1216,6 +1341,31 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   }
 
   function drive(v, dt) {
+    if (v.plus) {
+      // at a stop: the doors open, stay open for PLUS_DWELL, and shut before it moves off
+      if (v.dwell > 0) {
+        v.dwell -= dt;
+        v.speed = v.acc = 0;
+        v.doors = Math.min(1, v.doors + dt);
+        if (v.dwell <= 0) v.servedS = v.nextStop;
+        return;
+      }
+      if (v.doors > 0) {
+        v.doors = Math.max(0, v.doors - dt);
+        v.speed = v.acc = 0;
+        return;
+      }
+      if (v.offRoute && !(hasView && visible(v.x, v.z, 30))) {
+        retire(v);
+        return;
+      }
+      trackLine(v);
+      if (v.stopD < 2.5 && v.speed < 0.5) {
+        v.dwell = PLUS_DWELL;
+        v.speed = v.acc = 0;
+        return;
+      }
+    }
     v.laneTimer -= dt;
     if (v.laneTimer <= 0) {
       v.laneTimer = 0.4 + Math.random() * 0.3;
@@ -1380,8 +1530,90 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     occupy(e.occ[lane], v, s);
   }
 
+  // A Plusbus goes in the curb lane of an edge on one of the lines' routes, its stops ahead of it still to serve
+  function spawnPlus(v, rMin, rMax, protectView) {
+    if (!busLines.length || !nearEdges.length) return false;
+    for (let attempt = 0; attempt < 16; attempt++) {
+      const e = nearEdges[Math.floor(Math.random() * nearEdges.length)];
+      // the old town's links are short: the nose has to fit on the edge, the tail may reach back over the one before
+      if (!e || e.len < v.half + 6) continue;
+      const first = Math.floor(Math.random() * busLines.length);
+      let li = -1;
+      for (let k = 0; k < busLines.length && li < 0; k++) if (onLine(e, (first + k) % busLines.length)) li = (first + k) % busLines.length;
+      if (li < 0) continue;
+      const lane = curbLane(e);
+      const along = (focusX - e.sx) * e.dx + (focusZ - e.sz) * e.dz;
+      const minS = Math.max(Math.min(v.half + 2, e.len - v.half - 3), along - rMax);
+      const maxS = Math.min(e.len - v.half - 3, along + rMax);
+      if (minS > maxS) continue;
+      const s = minS + Math.random() * (maxS - minS);
+      const x = e.sx + e.dx * s + e.rx * e.lanes[lane];
+      const z = e.sz + e.dz * s + e.rz * e.lanes[lane];
+      const d = Math.hypot(x - focusX, z - focusZ);
+      if (d < rMin || d > rMax || (protectView && nearView(x, z, v.half + 4, VEHICLE_SPAWN_DISTANCE))) continue;
+      if (player.active && Math.hypot(x - player.x, z - player.z) < 35) continue;
+      // the previous edge must not be another vehicle's: the tail would sit on it
+      if (s < v.half && e.from && edges.some((f) => f.to === e.from && f.occ.some((l) => l.length) && onLine(f, li))) continue;
+      if (!laneClear(e.occ[lane], s, v.half + 8)) continue;
+      if (plusbuses.some((o) => o !== v && o.edge && Math.hypot(o.x - x, o.z - z) < 120)) continue; // spread along the line
+      if (typeof spawnClear === 'function' && !spawnClear(x, z, Math.atan2(e.dx, e.dz), v.spec)) continue;
+      v.line = li;
+      v.offRoute = false;
+      v.dwell = v.doors = 0;
+      v.artPlaced = false;
+      // the stops behind its front are served already
+      v.servedS = lineProject(busLines[li], x + e.dx * v.half, z + e.dz * v.half).s;
+      place(v, e, lane, s);
+      return true;
+    }
+    return false;
+  }
+
+  // Where a Plusbus is on its line: the front bumper's distance along the path, the next stop's distance ahead of it (stopD), and
+  // off the route when the bumper is far from the path
+  function trackLine(v) {
+    const L = busLines[v.line];
+    if (!L) { v.stopD = Infinity; return; }
+    pathPoint(v, (v.conn ? v.cs : v.s) + v.half - 0.2, front);
+    const q = lineProject(L, front.x, front.z);
+    v.frontS = q.s;
+    if (q.d > PLUS_ROUTE_TOLERANCE * 1.5) v.offRoute = true;
+    v.stopD = Infinity;
+    for (const s of L.stops) {
+      if (s <= v.servedS) continue;
+      if (s < v.frontS - 3) { v.servedS = s; continue; } // passed without stopping (placed beyond it, or pushed past)
+      v.stopD = s - v.frontS;
+      v.nextStop = s;
+      break;
+    }
+  }
+
+  // The three modules from the lane path: the front module's two axles on the path (offset dl to the side), the trailers following
+  const plusFrontAxle = { x: 0, z: 0, dx: 0, dz: 0 };
+  const plusRearAxle = { x: 0, z: 0, dx: 0, dz: 0 };
+  function posePlus(v) {
+    const nose = (v.conn ? v.cs : v.s) + URBINO_24.length / 2;
+    pathPoint(v, nose - URBINO_24.axles[0], plusFrontAxle);
+    pathPoint(v, nose - URBINO_24.axles[1], plusRearAxle);
+    const h = Math.atan2(plusFrontAxle.x - plusRearAxle.x, plusFrontAxle.z - plusRearAxle.z);
+    const rx = plusRearAxle.x - v.tz * v.dl, rz = plusRearAxle.z + v.tx * v.dl;
+    const art = v.art;
+    if (!v.artPlaced || Math.hypot(art.state.x - rx, art.state.z - rz) > 6) {
+      const ahead = URBINO_24.axles[1] - (URBINO_24.modules[0].from + URBINO_24.modules[0].to) / 2;
+      art.place(rx + Math.sin(h) * ahead, rz + Math.cos(h) * ahead, h);
+      v.artPlaced = true;
+    } else {
+      art.follow(rx, rz, h);
+    }
+    const m = art.module(0);
+    v.cox = m.x - v.x;
+    v.coz = m.z - v.z;
+    v.frontYaw = m.yaw;
+  }
+
   // Put v in a free lane around the focus. Normal replenishment protects the near view; teleports can fill it.
   function spawnVehicle(v, rMin, rMax, protectView) {
+    if (v.plus) return spawnPlus(v, rMin, rMax, protectView);
     for (let attempt = 0; attempt < 12; attempt++) {
       const e = nearEdges[Math.floor(Math.random() * nearEdges.length)];
       if (!e || (v.bus && e.axis !== 'ave') || e.len < 2 * v.half + 10) continue;
@@ -1581,6 +1813,80 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     busAxles += spec.axles ? spec.axles.length : 2;
   }
 
+  // A Plusbus: three module bodies (the front one under its direction's sign), two bellows between their faces, four axles of
+  // wheels, a contact shadow per module; the doors open in the body state's w
+  let plusBellowsCount = 0;
+  let plusShadowCount = 0;
+  const plusModuleSets = [null, plusSets[URBINO_24_SPECS[1].name], plusSets[URBINO_24_SPECS[2].name]];
+  function renderPlus(v) {
+    const rotY = v.frontYaw;
+    const forwardDist = (v.x - v.prevX) * Math.sin(rotY) + (v.z - v.prevZ) * Math.cos(rotY);
+    v.wheelSpin = (v.wheelSpin + clamp(forwardDist / 0.48, -0.48, 0.48)) % (Math.PI * 2);
+    if (hasView && !visible(v.x, v.z, URBINO_24.length / 2 + 6)) return;
+    const art = v.art;
+    plusModuleSets[0] = plusSets[(busLines[v.line]?.back ? URBINO_24_FRONT_BACK : URBINO_24_SPECS[0]).name];
+    for (let i = 0; i < 3; i++) {
+      const m = art.module(i);
+      const spec = URBINO_24_SPECS[i];
+      const set = plusModuleSets[i];
+      const y = groundAt(m.x, m.z);
+      const sinY = Math.sin(m.yaw), cosY = Math.cos(m.yaw);
+      dummy.position.set(m.x, y, m.z);
+      dummy.rotation.set(0, m.yaw, 0, 'YXZ');
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      const slot = set.count++;
+      set.body.setMatrixAt(slot, dummy.matrix);
+      writeLampState(v, set.states.array, slot * 4);
+      set.states.array[slot * 4 + 3] = v.doors;
+
+      dummy.position.set(m.x, 0.018 + y, m.z);
+      dummy.scale.set(spec.width + 0.4, 1, spec.length + 0.3);
+      dummy.updateMatrix();
+      plusShadowInst.setMatrixAt(plusShadowCount++, dummy.matrix);
+
+      dummy.scale.set(1, 1, 1);
+      spec.axles.forEach((wz, k) => {
+        const steer = i === 0 && k === 0 ? v.steer : 0;
+        dummy.rotation.set(v.wheelSpin + k * 0.55, m.yaw + steer, 0, 'YXZ');
+        dummy.position.set(m.x - spec.wheelX * cosY + wz * sinY, spec.wheelRadius + y, m.z + spec.wheelX * sinY + wz * cosY);
+        dummy.updateMatrix();
+        busWheelLeftInst.setMatrixAt(busAxles, dummy.matrix);
+        dummy.position.set(m.x + spec.wheelX * cosY + wz * sinY, spec.wheelRadius + y, m.z - spec.wheelX * sinY + wz * cosY);
+        dummy.updateMatrix();
+        busWheelRightInst.setMatrixAt(busAxles, dummy.matrix);
+        busAxles++;
+      });
+    }
+    // the bellows: straight sleeves between the faces, turned halfway and stretched to the gap (the outside of a bend opens up)
+    for (let j = 0; j < 2; j++) {
+      const { a, b } = art.bellows(j);
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2;
+      const len = Math.hypot(a.x - b.x, a.z - b.z);
+      dummy.position.set(mx, groundAt(mx, mz), mz);
+      dummy.rotation.set(0, len > 0.05 ? Math.atan2(a.x - b.x, a.z - b.z) : a.yaw, 0, 'YXZ');
+      dummy.scale.set(1, 1, Math.max(0.6, len / 0.7));
+      dummy.updateMatrix();
+      plusBellowsInst.setMatrixAt(plusBellowsCount++, dummy.matrix);
+    }
+
+    const dxCam = v.x - camX;
+    const dzCam = v.z - camZ;
+    const distSq = dxCam * dxCam + dzCam * dzCam + camY * camY;
+    if (distSq < MAX_LIGHT_DIST_SQ) {
+      const d = Math.sqrt(distSq);
+      const effDist = d + Math.max(0, 5.0 - (dxCam * camFwdX + dzCam * camFwdZ)) * 3.2;
+      if (effDist < MAX_LIGHT_DIST) {
+        v._camDistSq = distSq;
+        v._effDist = effDist;
+        v._sinY = Math.sin(v.yaw);
+        v._cosY = Math.cos(v.yaw);
+        v._braking = v.acc < -0.8 || v.speed < 0.3 ? 1 : 0;
+        litVehicles[litVehicleCount++] = v;
+      }
+    }
+  }
+
   function smoothDistFade(d, start, end) {
     const t = clamp((end - d) / (end - start), 0, 1);
     return t * t * (3 - 2 * t);
@@ -1731,6 +2037,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     visibleBuses = 0;
     busAxles = 0;
     for (const set of Object.values(busSets)) set.count = 0;
+    for (const set of Object.values(plusSets)) set.count = 0;
+    plusBellowsCount = plusShadowCount = 0;
     for (let i = 0; i < vehicles.length; i++) {
       const v = vehicles[i];
       if (!v.edge) continue;
@@ -1744,6 +2052,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       locate(v);
       knock(v, dt);
       pose(v, dt);
+      if (v.plus) posePlus(v);
     }
 
     // Pedestrians and road vehicles complete their movement before any actor batches are populated.
@@ -1757,7 +2066,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       if (!v.edge) continue;
       // Route corrections can change the tangent; pack the same yaw used by the collision adapter.
       v.yaw = Math.atan2(v.tx, v.tz) - v.nose;
-      if (v.bus) renderBus(v);
+      if (v.plus) renderPlus(v);
+      else if (v.bus) renderBus(v);
       else renderCar(v);
     }
     const hideEmpty = ++updates > 2;
@@ -1803,6 +2113,12 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     syncInst(busWheelLeftInst, busAxles);
     syncInst(busWheelRightInst, busAxles);
     syncInst(busShadowInst, visibleBuses);
+    for (const set of Object.values(plusSets)) {
+      syncInst(set.body, set.count);
+      if (set.count > 0) flagRange(set.states, set.count);
+    }
+    syncInst(plusBellowsInst, plusBellowsCount);
+    syncInst(plusShadowInst, plusShadowCount);
     updateTrafficLights();
 
     // 2. Pedestrians
@@ -1825,10 +2141,12 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     setCollisionPhase,
     setSpawnClear,
     cars,
-    buses,
+    buses: [...buses, ...plusbuses],
+    plusbuses,
     peds: pedestrianSystem.peds,
     get network() { return network; },
     setNetwork,
+    setBusLines,
     collisionActors: frameCollisionActors,
     syncCollisionActors,
     collisionStats: localCollisionStage.stats,

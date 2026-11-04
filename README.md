@@ -3,7 +3,7 @@
 A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Limfjord (Budolfi, Jomfru Ane Gade, Aalborghus, the harbour front, Utzon Center and Limfjordsbroen), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
 
 - 3,340 buildings at their GeoDanmark footprints with DHM-measured heights and BBR use, year and materials; 91 % with measured LoD2.2 roofs and walls.
-- Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph.
+- Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph; AI Plusbuses on line 2's real route, stopping at its stops.
 - The Limfjord at sea level with quay walls along the harbour front, the city's lakes and parks.
 - Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); six teleports and scenic cameras.
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.

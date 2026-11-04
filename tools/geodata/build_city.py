@@ -778,6 +778,12 @@ def stage_index(a, tiles, cells) -> None:
     water_header = CITY_DIR / "water.json"
     map_doc = city_map.build(TILES_DIR, _load_json(water_header) if water_header.exists() else None)
     S.atomic_write(CITY_DIR / "map.json", dump(map_doc))
+    # line 2's route for the AI Plusbuses (js/traffic.js), from the OSM API cache the fetch stages filled
+    import bus_lines
+
+    if bus_lines.RAW.exists():
+        S.atomic_write(CITY_DIR / "bus-lines.json", json.dumps(bus_lines.build(bus_lines.load_elements(bus_lines.RAW), frame.area_local()),
+                                                              ensure_ascii=False, separators=(",", ":")))
     total = sum(e["bytes"] for e in idx_tiles.values())
     index = {"version": T.VERSION, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tileSize": frame.TILE_SIZE,
              "frame": {"epsg": 25832, "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": bbox},
@@ -785,7 +791,8 @@ def stage_index(a, tiles, cells) -> None:
                       "roadgraph": "../city/roadgraph.json" if (CITY_DIR / "roadgraph.json").exists() else None,
                       "streets": "../city/streets.json" if (CITY_DIR / "streets.json").exists() else None,
                       "lakes": "../city/lakes.json" if (CITY_DIR / "lakes.json").exists() else None,
-                      "map": "../city/map.json"},
+                      "map": "../city/map.json",
+                      "busLines": "../city/bus-lines.json" if (CITY_DIR / "bus-lines.json").exists() else None},
              "tiles": idx_tiles, "bytes": total}
     S.atomic_write(TILES_DIR / "index.json", dump(index))
     log(f"[index] {len(idx_tiles)} tiles, {total / 1e6:.1f} MB; meta.json {(CITY_DIR / 'meta.json').stat().st_size / 1e6:.2f} MB")
