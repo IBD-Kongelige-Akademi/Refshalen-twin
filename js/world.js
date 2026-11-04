@@ -54,7 +54,7 @@ const CPH_GEODATA_URL = './data/cph-geodata.json';
 const CPH_SURFACES_URL = './data/cph-surfaces.json';
 const CPH_LAKES_URL = './data/cph-lakes.json';
 const CPH_VEGETATION_URL = './data/cph-vegetation.json';
-const COLLIDING_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'drone']);
+const COLLIDING_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'drone', 'bus']);
 
 /** Optional ground-surface register and road markings (tools/geodata/surfaces.py); null when absent. */
 async function loadCphSurfaces(url = CPH_SURFACES_URL, fetchImpl = globalThis.fetch) {
@@ -303,6 +303,7 @@ function attachCollisionPhase(traffic, cyclists, { stage = null } = {}) {
           }
         },
         move(dx, dz) {
+          if (entity.type === 'bus') return entity.position; // the Plusbus's modules follow its articulation, not a push
           entity.position.x += dx;
           entity.position.z += dz;
           entity.mesh?.position?.copy(entity.position);
@@ -311,6 +312,8 @@ function attachCollisionPhase(traffic, cyclists, { stage = null } = {}) {
       });
       playerActorByEntity.set(entity, actor);
     }
+    const bus = mode === 'bus';
+    if (bus) mode = 'car'; // its front module's box
     actor.entity = entity;
     actor.kind = 'player';
     actor.mode = mode;
@@ -318,7 +321,7 @@ function attachCollisionPhase(traffic, cyclists, { stage = null } = {}) {
     actor.bodyTop = mode === 'drone' ? 0.3 : mode === 'car' ? entity.bodySpec?.height || 1.8 : 1.9;
     actor.bodyBottom = 0;
     actor.radius = mode === 'drone' ? 0.4 : mode === 'cargobike' ? 0.4 : mode === 'cyclist' ? 0.38 : mode === 'car' ? (entity.bodySpec?.width || 1.72) / 2 : mode === 'person' ? 0.48 : 0.32;
-    actor.mass = mode === 'drone' ? 0.9 : mode === 'car' ? 1250 : mode === 'cargobike' ? 135 : mode === 'cyclist' ? 95 : 72;
+    actor.mass = bus ? 28000 : mode === 'drone' ? 0.9 : mode === 'car' ? 1250 : mode === 'cargobike' ? 135 : mode === 'cyclist' ? 95 : 72;
     actor.skipStatic = entity.staticSkip || null;
     actor.x = entity.position.x; actor.y = entity.position.y; actor.z = entity.position.z;
     actor.heading = entity.heading || 0;

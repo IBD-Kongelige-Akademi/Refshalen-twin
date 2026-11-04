@@ -207,31 +207,39 @@ class CameraSystem {
         const height = entity.chaseHeight * this.zoomMultiplier + Math.sin(this.orbitPitchOffset) * dist * 0.85;
         const horizDist = Math.cos(this.orbitPitchOffset) * dist + speedLag;
 
+        // the Plusbus is framed from its middle module, so the whole 24.7 m stays in view through a turn
+        const anchor = entity.chaseAnchor;
+        const ax = anchor ? anchor.x : entity.position.x;
+        const az = anchor ? anchor.z : entity.position.z;
+        const yaw = anchor ? anchor.yaw + this.orbitYawOffset : totalYaw;
         desiredPos.set(
-          entity.position.x - Math.sin(totalYaw) * horizDist,
+          ax - Math.sin(yaw) * horizDist,
           Math.max(0.65 + ground(entity.position.x, entity.position.z), entity.position.y + height),
-          entity.position.z - Math.cos(totalYaw) * horizDist
+          az - Math.cos(yaw) * horizDist
         );
 
         const lookUpBias = entity.type === 'drone' ? 0.1
           : entity.type === 'car' ? 0.52
             : entity.type === 'cargobike' ? 1.2 : 1.55;
+        const lookYaw = anchor ? anchor.yaw : entity.heading;
         desiredLook.set(
-          entity.position.x + Math.sin(entity.heading) * 5.2,
+          ax + Math.sin(lookYaw) * 5.2,
           entity.position.y + entity.cameraTargetOffset.y + lookUpBias,
-          entity.position.z + Math.cos(entity.heading) * 5.2
+          az + Math.cos(lookYaw) * 5.2
         );
         break;
       }
 
       case 'action': {
         const sideOffset = entity.type === 'car' ? 2.65
-          : entity.type === 'drone' ? 0.9
-            : entity.type === 'cargobike' ? 1.3 : 0.95;
+          : entity.type === 'bus' ? 3.6
+            : entity.type === 'drone' ? 0.9
+              : entity.type === 'cargobike' ? 1.3 : 0.95;
         const backDist = (entity.type === 'car' ? 3.6
-          : entity.type === 'drone' ? 2.2
-            : entity.type === 'cargobike' ? 4.1 : 2.8) + speedLag;
-        const lowY = entity.type === 'drone' ? entity.position.y + 0.35 : entity.position.y + 0.92;
+          : entity.type === 'bus' ? 7.5
+            : entity.type === 'drone' ? 2.2
+              : entity.type === 'cargobike' ? 4.1 : 2.8) + speedLag;
+        const lowY = entity.type === 'drone' ? entity.position.y + 0.35 : entity.position.y + (entity.type === 'bus' ? 1.6 : 0.92);
 
         desiredPos.set(
           entity.position.x - Math.sin(entity.heading) * backDist + Math.cos(entity.heading) * sideOffset,
@@ -263,6 +271,10 @@ class CameraSystem {
           // FPV: the gimbal camera under the nose
           fwdOffset = 0.11;
           eyeY = 0.07;
+        } else if (entity.type === 'bus') {
+          // the driver's seat, behind the MetroStyle windshield
+          fwdOffset = 3.9;
+          eyeY = 2.25;
         }
 
         desiredPos.set(

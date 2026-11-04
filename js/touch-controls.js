@@ -94,7 +94,7 @@ class TouchControls {
   }
 
   setMode(mode) {
-    if (!['person', 'car', 'cyclist', 'cargobike', 'drone'].includes(mode)) return;
+    if (!['person', 'car', 'cyclist', 'cargobike', 'drone', 'bus'].includes(mode)) return;
     this.reset();
     if (!this.root) return;
     this.mode = mode;
@@ -103,7 +103,8 @@ class TouchControls {
     for (const button of this.buttons) {
       const action = button.getAttribute('data-touch-action');
       button.hidden = (action === 'up' && mode !== 'person' && mode !== 'drone')
-        || (action === 'down' && mode !== 'drone');
+        || (action === 'down' && mode !== 'drone')
+        || (action === 'boost' && mode === 'bus'); // the bus has no boost
       button.setAttribute('aria-label', labels[action]);
       const label = this.root.querySelector(`[data-touch-label="${action}"]`);
       if (label) label.textContent = labels[action];

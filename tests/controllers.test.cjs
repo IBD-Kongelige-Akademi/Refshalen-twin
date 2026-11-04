@@ -7,10 +7,11 @@ const { loadModule } = require('./helpers/module.cjs');
 const source = readFileSync(join(__dirname, '../js/controllers.js'), 'utf8');
 let collisionShapesModule;
 let staticCollidersModule;
+let articulatedBusModule;
 
 test.before(async () => {
-  [collisionShapesModule, staticCollidersModule] = await Promise.all([
-    import('../js/collision-shapes.js'), import('../js/static-colliders.js')
+  [collisionShapesModule, staticCollidersModule, articulatedBusModule] = await Promise.all([
+    import('../js/collision-shapes.js'), import('../js/static-colliders.js'), import('../js/articulated-bus.js')
   ]);
 });
 
@@ -47,6 +48,7 @@ function keyboardHarness(overrides = {}, moduleImports = {}) {
       './collision-shapes.js': collisionShapesModule,
       './static-colliders.js': staticCollidersModule,
       './rigid-meshes.js': { mergeRigidMeshes: () => ({}) },
+      './articulated-bus.js': articulatedBusModule,
       ...moduleImports
     }
   });

@@ -716,7 +716,8 @@ class OverviewMap {
   /** The GPS route from the player to the waypoint along the road graph; recomputed when the player has moved or the mode changed */
   currentRoute(px, pz, now = performance.now()) {
     if (!this.waypoint) return null;
-    const mode = this.controllerManager.activeMode === 'car' ? 'car' : 'person';
+    const active = this.controllerManager.activeMode;
+    const mode = active === 'car' || active === 'bus' ? 'car' : 'person';
     const r = this.route;
     const stale = !r || r.mode !== mode || Math.hypot(px - r.from.x, pz - r.from.z) > 15;
     if (stale && now - this.lastRouteAt >= ROUTE_EVERY_MS) {

@@ -6,7 +6,7 @@ const EPSILON = 1e-10;
 const hypot = (a, b) => Math.sqrt(a * a + b * b);
 
 export function collisionBody(mode, radius, heading, margin = 0, spec = null) {
-  const car = mode === 'car';
+  const car = mode === 'car' || mode === 'bus'; // the bus: one module's box (js/controllers.js tests the others)
   const cargoBike = mode === 'cargobike';
   const bicycle = mode === 'cyclist';
   const oriented = car || cargoBike || bicycle;

@@ -50,7 +50,7 @@ const LOOKAHEAD = 70; // metres a driver looks ahead for vehicles, stop lines an
 const VEHICLE_RADIUS = 380;
 const NEAR_RADIUS = 350;
 const VEHICLE_SPAWN_DISTANCE = 250;
-const GROUNDED_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike']);
+const GROUNDED_PLAYER_MODES = new Set(['person', 'car', 'cyclist', 'cargobike', 'bus']);
 const COLLIDING_PLAYER_MODES = new Set([...GROUNDED_PLAYER_MODES, 'drone']);
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -404,7 +404,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   }
 
   function bindPlayerCollisionActor(actor, entity, mode) {
-    const bodyMode = mode === 'car' ? 'car' : mode;
+    const bodyMode = mode === 'bus' ? 'car' : mode; // the Plusbus meets traffic as its front module's box
     if (actor.entity !== entity || actor.mode !== bodyMode) {
       actor._wasPlaced = false;
       actor.prevX = entity.position.x;
@@ -438,13 +438,15 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     if (playerEntity && COLLIDING_PLAYER_MODES.has(activeMode)) {
       const actor = activePlayerCollisionActor;
       bindPlayerCollisionActor(actor, playerEntity, activeMode);
+      const bus = activeMode === 'bus';
+      if (bus) activeMode = 'car';
       actor.spec = playerEntity.bodySpec || null;
       actor.bodyTop = activeMode === 'drone' ? 0.3 : activeMode === 'car' ? playerEntity.bodySpec?.height || 1.8 : 1.9;
       actor.bodyBottom = 0;
       actor.radius = activeMode === 'car' ? (playerEntity.bodySpec?.width || 1.72) / 2
         : activeMode === 'cargobike' ? 0.4 : activeMode === 'drone' ? 0.4 : activeMode === 'cyclist' ? 0.38 : 0.32;
       if (activeMode === 'person') actor.radius = 0.48;
-      actor.mass = activeMode === 'drone' ? 0.9 : activeMode === 'car' ? 1250 : activeMode === 'cargobike' ? 125 : activeMode === 'cyclist' ? 95 : 72;
+      actor.mass = bus ? 28000 : activeMode === 'drone' ? 0.9 : activeMode === 'car' ? 1250 : activeMode === 'cargobike' ? 125 : activeMode === 'cyclist' ? 95 : 72;
       actor.skipStatic = playerEntity.staticSkip || null;
       actor.x = playerEntity.position.x; actor.y = playerEntity.position.y; actor.z = playerEntity.position.z;
       actor.heading = playerEntity.heading || 0;

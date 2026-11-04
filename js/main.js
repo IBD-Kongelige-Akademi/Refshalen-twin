@@ -248,7 +248,7 @@ async function initApp() {
   const elControlsHint = document.getElementById('hud-controls-hint');
   const gamepadControls = new GamepadControls(controllerManager, cameraSystem, {
     onCycleMode: (step) => {
-      const modes = ['person', 'car', 'cyclist', 'drone'];
+      const modes = ['person', 'car', 'cyclist', 'drone', 'bus'];
       const activeMode = controllerManager.activeMode === 'cargobike' ? 'cyclist' : controllerManager.activeMode;
       const nextMode = modes[(modes.indexOf(activeMode) + step + modes.length) % modes.length];
       selectMode(nextMode === 'cyclist' ? lastBikeMode : nextMode);
@@ -263,10 +263,11 @@ async function initApp() {
     person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
     cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
-    drone: [[['W', 'S'], 'Fly'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Climb / Take off'], [['Q', 'C'], 'Descend / Land'], [['Shift'], 'Sport']]
+    drone: [[['W', 'S'], 'Fly'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Climb / Take off'], [['Q', 'C'], 'Descend / Land'], [['Shift'], 'Sport']],
+    bus: [[['W', 'S'], 'Drive / Brake'], [['A', 'D'], 'Steer'], [['Stop'], 'Doors open'], [['B'], 'Horn'], [['Drag'], 'Orbit']]
   };
   // Top speeds in km/h set the full scale of the speed meter for each active vehicle.
-  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, drone: 75 };
+  const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, drone: 75, bus: 70 };
 
   function renderControlHints(mode) {
     if (!elControlsHint) return;
@@ -541,6 +542,9 @@ async function initApp() {
         break;
       case 'Digit4':
         selectMode('drone');
+        break;
+      case 'Digit5':
+        selectMode('bus');
         break;
       case 'Digit6':
         selectCamera('action', true);

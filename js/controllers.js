@@ -6,8 +6,15 @@ import {
   buildCarGeometry,
   buildSteerableWheelGeo,
   createLoftedCarMaterial,
-  createDroneModel
+  createDroneModel,
+  URBINO_24_SPECS,
+  createBusBellows,
+  buildLoftedBusBodyGeometry,
+  createLoftedBusMaterial,
+  buildBusWheelGeo,
+  createBusWheelMaterial
 } from './actor-models.js';
+import { URBINO_24, createArticulation } from './articulated-bus.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import { collisionBody, buildingContact, colliderContainsPoint } from './collision-shapes.js';
@@ -42,6 +49,15 @@ const BICYCLE_DRIVE = {
   rolling: 0.08, drag: 0.004, coast: 0.2, brake: 7.5 // Backward input is scaled to 0.6, giving 4.5 m/s² braking.
 };
 const CARGO_BICYCLE_DRIVE = { ...BICYCLE_DRIVE, speed: 25 / 3.6, boostSpeed: 30 / 3.6 };
+// The Plusbus (Urbino 24 electric): 70 km/h, the electric pull-away (strong to ~30 km/h, then power-limited), no boost
+const BUS_DRIVE = {
+  speed: 70 / 3.6, boostSpeed: 70 / 3.6, reverseSpeed: 2.8, acceleration: 1.6, boostAcceleration: 1.6,
+  powerSpeed: 8.5, rolling: 0.12, drag: 0.0009, coast: 0.35, brake: 3.5
+};
+// Wheel angle, rad/s at the wheel, the comfort limit in m/s². With the trailing axles unsteered, a steady turn folds the first joint
+// to 38° at 26° of lock (35° at 24°, the second joint 28°), so the lock is 24°: the front axle then turns on a ~29 m circle.
+const BUS_STEER = { max: 24 * Math.PI / 180, rate: 0.9, lateral: 2.5 };
+const BUS_DOORS = { dwell: 1.2, time: 1.0 }; // standing still this long opens the doors; they take this long to open or close
 
 function driveSpeed(speed, throttle, boost, dt, drive) {
   const braking = speed * throttle < 0;
@@ -225,7 +241,7 @@ class ThirdPersonControllerManager {
     this._colliderIndex = null; // built on first use, see nearColliders()
     this._indexedColliders = null;
     this._indexedColliderCount = -1;
-    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'drone'
+    this.activeMode = 'car'; // 'person' | 'car' | 'cyclist' | 'cargobike' | 'drone' | 'bus'
 
     this.keys = {
       forward: false,
@@ -242,7 +258,8 @@ class ThirdPersonControllerManager {
       car: this.createCarEntity(),
       cyclist: this.createCyclistEntity(),
       cargobike: this.createCargoBikeEntity(),
-      drone: this.createDroneEntity()
+      drone: this.createDroneEntity(),
+      bus: this.createBusEntity()
     };
 
     Object.values(this.entities).forEach((ent) => {
@@ -405,9 +422,15 @@ class ThirdPersonControllerManager {
       ent.landed = false;
       ent.tiltPivot.rotation.x = ent.tiltPivot.rotation.z = 0;
       ent.tiltPivot.position.y = 0;
+    } else if (this.activeMode === 'bus') {
+      // the bus arrives straight, the trailing modules lined up behind the front one
+      ent.steerAngle = ent.standTime = ent.doors = 0;
+      ent.art.place(ent.position.x, ent.position.z, ent.heading);
+      ent.blocked = [false, false, false];
     }
     ent.mesh.position.copy(ent.position);
     ent.mesh.rotation.y = ent.heading;
+    if (this.activeMode === 'bus') this.poseBus(ent);
     return { x: ent.position.x, z: ent.position.z };
   }
 
@@ -423,7 +446,7 @@ class ThirdPersonControllerManager {
     const margin = air ? DRONE_FLIGHT.roam : 0;
     const entity = this.getActiveEntity();
     // Conservative body bounds, including car corners, bicycle wheels, the cargo frame and the drone's prop tips.
-    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], drone: [0.45, 0.3] };
+    const body = { person: [0.48, 1.9], car: [2.4, 1.9], cyclist: [1.0, 1.9], cargobike: [1.4, 1.9], drone: [0.45, 0.3], bus: [5.2, 3.3] };
     const others = Object.values(this.entities).filter(e => e !== entity && e.mesh?.visible !== false).map(e => ({
       x: e.position.x, z: e.position.z, radius: body[e.type][0],
       bottom: e.position.y, top: e.position.y + body[e.type][1]
@@ -456,6 +479,8 @@ class ThirdPersonControllerManager {
       for (const c of this.nearColliders(p.x, p.z, reach)) {
         if (buildingContact(c, p.x, baseY, p.z, shape)) return false;
       }
+      // the bus's trailing modules, lined up straight behind the front one
+      if (entity.type === 'bus' && this.busModulesBlocked(entity, p.x, p.z, heading, baseY)) return false;
       return true;
     };
     const origin = clampPoint(x, z);
@@ -1367,6 +1392,117 @@ class ThirdPersonControllerManager {
     };
   }
 
+  // =========================================================================
+  // 6. PLUSBUS (SOLARIS URBINO 24 ELECTRIC, DOUBLE-ARTICULATED)
+  // =========================================================================
+  // Three modules on two bellows (js/articulated-bus.js). The front module is the entity's mesh (entity.position is its centre, so
+  // traffic, collisions and the cameras see a 10 m vehicle); the middle and rear modules and the bellows are posed by poseBus.
+  createBusEntity() {
+    const art = createArticulation();
+    const wheelMat = createBusWheelMaterial();
+    const wheelGeo = { [-1]: buildBusWheelGeo(-1), [1]: buildBusWheelGeo(1) };
+    const modules = URBINO_24_SPECS.map((spec, i) => {
+      const group = new THREE.Group();
+      group.name = `PlayerBus${i}`;
+      const material = createLoftedBusMaterial(spec, { player: true });
+      const body = new THREE.Mesh(buildLoftedBusBodyGeometry(spec), material);
+      body.castShadow = body.receiveShadow = true;
+      group.add(body);
+      const wheels = [];
+      spec.axles.forEach((z, k) => {
+        for (const side of [-1, 1]) {
+          const steerPivot = new THREE.Group();
+          steerPivot.position.set(side * spec.wheelX, spec.wheelRadius, z);
+          const tire = new THREE.Mesh(wheelGeo[side], wheelMat);
+          tire.castShadow = true;
+          steerPivot.add(tire);
+          group.add(steerPivot);
+          wheels.push({ steerPivot, tire, steers: i === 0 && k === 0 });
+        }
+      });
+      const shadowGeo = new THREE.PlaneGeometry(spec.width + 0.4, spec.length + 0.3);
+      shadowGeo.rotateX(-Math.PI * 0.5);
+      const shadow = new THREE.Mesh(shadowGeo, createContactShadowMaterial());
+      shadow.position.y = 0.02;
+      shadow.renderOrder = 998;
+      group.add(shadow);
+      this.scene.add(group);
+      return { group, spec, state: material.userData.busState, wheels, spin: 0, x: 0, z: 0 };
+    });
+    const bellowsMat = new THREE.MeshStandardNodeMaterial({ color: 0x3a3d41, roughness: 0.86, metalness: 0.02, side: THREE.DoubleSide });
+    const bellows = [createBusBellows(bellowsMat), createBusBellows(bellowsMat)];
+    for (const b of bellows) this.scene.add(b.mesh);
+
+    // parked on Vesterbro, facing south-east towards the centre
+    const start = { x: -616.3, z: 277.9, heading: 2.757 };
+    art.place(start.x, start.z, start.heading);
+    const entity = {
+      type: 'bus',
+      label: 'Plusbus',
+      bodySpec: { width: URBINO_24.width, length: URBINO_24.modules[0].to - URBINO_24.modules[0].from, height: URBINO_24.height },
+      mesh: modules[0].group,
+      art,
+      modules,
+      bellows,
+      position: new THREE.Vector3(start.x, 0, start.z),
+      heading: start.heading,
+      speed: 0,
+      steerAngle: 0,
+      standTime: 0,
+      doors: 0, // 0 shut .. 1 open
+      blocked: [false, false, false],
+      // the chase camera frames the whole bus from behind its middle (js/cameras.js)
+      chaseAnchor: { x: 0, z: 0, yaw: 0 },
+      cameraTargetOffset: new THREE.Vector3(0, 1.6, 0),
+      chaseDistance: 24, // behind the middle module: about 12 m behind the tail, and the nose stays in frame through a turn
+      chaseHeight: 7.5
+    };
+    return entity;
+  }
+
+  // True when a module behind the front one, laid out straight behind a front module centred at (x, z), stands in a building
+  busModulesBlocked(bus, x, z, heading, y) {
+    const art = createArticulation(bus.art.layout);
+    art.place(x, z, heading);
+    for (let i = 1; i < 3; i++) if (this.busModuleContact(art.module(i), y)) return true;
+    return false;
+  }
+
+  busModuleContact(m, y) {
+    const body = collisionBody('bus', 0, m.yaw, 0, { width: URBINO_24.width, length: m.length, height: URBINO_24.height });
+    const reach = Math.max(body.extX, body.extZ) + 0.5;
+    return this.horizontalContactAt(m.x, y, m.z, body, this.nearColliders(m.x, m.z, reach));
+  }
+
+  // Place the trailing modules, the bellows and the wheels from the articulation (the front module is the entity's mesh)
+  poseBus(bus = this.entities.bus) {
+    const art = bus.art;
+    for (let i = 0; i < 3; i++) {
+      const m = art.module(i);
+      const mod = bus.modules[i];
+      const y = this.getGroundHeight(m.x, m.z, 'car');
+      if (i === 0) bus.position.y = y;
+      mod.group.position.set(m.x, y, m.z);
+      mod.group.rotation.y = m.yaw;
+      // wheels roll with the distance the module moved along itself
+      const along = (m.x - mod.x) * Math.sin(m.yaw) + (m.z - mod.z) * Math.cos(m.yaw);
+      if (Math.abs(along) < 5) mod.spin = (mod.spin + along / mod.spec.wheelRadius) % (Math.PI * 2);
+      mod.x = m.x; mod.z = m.z;
+      for (const w of mod.wheels) {
+        w.tire.rotation.x = mod.spin;
+        if (w.steers) w.steerPivot.rotation.y = bus.steerAngle;
+      }
+    }
+    const a = bus.chaseAnchor;
+    const mid = art.module(1);
+    a.x = mid.x; a.z = mid.z; a.yaw = mid.yaw;
+    for (let j = 0; j < 2; j++) {
+      const ends = art.bellows(j);
+      const y = this.getGroundHeight((ends.a.x + ends.b.x) / 2, (ends.a.z + ends.b.z) / 2, 'car');
+      bus.bellows[j].update(ends.a, ends.b, y);
+    }
+  }
+
   // The walking surface of the person and the cyclist follows the street surface model (terrain + carriageway, cycle track,
   // raised pavement, ramps; set by main.js from world.groundHeight); everything else drives on the bare terrain
   getGroundHeight(x, z, mode = 'person') {
@@ -1462,6 +1598,12 @@ class ThirdPersonControllerManager {
         nx, 0, nz, approachSpeed);
     }
 
+    if (carEntity?.type === 'bus') {
+      // 30 t does not bounce: head-on it stops, a glancing touch scrubs speed while the sweep slides it along the wall
+      const headOn = Math.abs(sinH * nx + cosH * nz);
+      carEntity.speed *= headOn > 0.6 ? 0 : 1 - 0.8 * headOn;
+      return;
+    }
     if (carEntity?.type !== 'car') return;
     const totalVx = sinH * carEntity.speed + (carEntity.vx || 0);
     const totalVz = cosH * carEntity.speed + (carEntity.vz || 0);
@@ -1673,6 +1815,8 @@ class ThirdPersonControllerManager {
       this.updateCyclist(dt, this.entities.cargobike, 'cargobike');
     } else if (this.activeMode === 'drone') {
       this.updateDrone(dt, elapsed);
+    } else if (this.activeMode === 'bus') {
+      this.updateBus(dt);
     }
 
     for (const key of Object.keys(this.entities)) {
@@ -1680,6 +1824,7 @@ class ThirdPersonControllerManager {
       e.mesh.position.copy(e.position);
       e.mesh.rotation.y = e.heading;
     }
+    this.poseBus();
 
     // Modulate clustered vehicle & bike lights by time of day (off during Midday & Golden Hour; fade in at Dusk & Night)
     const glow = cityUniforms && cityUniforms.uInteriorGlow ? cityUniforms.uInteriorGlow.value : 0.48;
@@ -1797,6 +1942,69 @@ class ThirdPersonControllerManager {
       if (w.isFront) {
         w.steerPivot.rotation.y = c.steerAngle;
       }
+    }
+  }
+
+  // The Plusbus: W / S drive and brake (reverse at walking pace from a stop), A / D steer the front axle. The front module follows a
+  // bicycle model on its 5.9 m wheelbase (its rear axle is the reference point); the trailing modules follow their hitches
+  // (js/articulated-bus.js), each joint at most 38°. A trailing module that would cut into a building stops the bus. Standing still for
+  // BUS_DOORS.dwell opens the five doors; the throttle closes them, and the bus moves off once they are shut.
+  updateBus(dt) {
+    const b = this.entities.bus;
+    const art = b.art;
+    const L = art.layout;
+    const s = art.state;
+    let throttle = this.keys.forward ? this.keys.forward : this.keys.backward ? -this.keys.backward : 0;
+
+    const standing = Math.abs(b.speed) < 0.05;
+    b.standTime = standing && !throttle ? b.standTime + dt : 0;
+    const doorStep = dt / BUS_DOORS.time;
+    b.doors = b.standTime > BUS_DOORS.dwell ? Math.min(1, b.doors + doorStep) : Math.max(0, b.doors - doorStep);
+    if (b.doors > 0 && standing) throttle = 0; // the door interlock
+
+    const braking = b.speed * throttle < 0;
+    b.speed = driveSpeed(b.speed, throttle, false, dt, BUS_DRIVE);
+
+    // steering: rate-limited at the wheel, and narrowed with speed to keep the sideways acceleration comfortable
+    const steerInput = this.keys.left ? this.keys.left : this.keys.right ? -this.keys.right : 0;
+    const limit = Math.min(BUS_STEER.max, Math.atan(BUS_STEER.lateral * L.wheelbase / Math.max(b.speed * b.speed, 1e-3)));
+    const maxStep = BUS_STEER.rate * dt;
+    b.steerAngle += Math.max(-maxStep, Math.min(maxStep, steerInput * limit - b.steerAngle));
+
+    const saved = art.save();
+    const prev = { x: b.position.x, z: b.position.z };
+    const h0 = s.headings[0];
+    const ds = b.speed * dt;
+    const h1 = h0 + ds * Math.tan(b.steerAngle) / L.wheelbase;
+    const hm = (h0 + h1) / 2;
+    const ahead = L.axles[1] - (L.modules[0].from + L.modules[0].to) / 2; // the module centre is this far ahead of its rear axle
+    // the reference axle from the module centre (traffic may have pushed it since the last frame)
+    const refX = b.position.x - Math.sin(h0) * ahead, refZ = b.position.z - Math.cos(h0) * ahead;
+    b.heading = h1;
+    b.position.x = refX + Math.sin(hm) * ds + Math.sin(h1) * ahead;
+    b.position.z = refZ + Math.cos(hm) * ds + Math.cos(h1) * ahead;
+    this.resolveHorizontalCollision(b.position, 1.35, b, b, prev);
+    art.follow(b.position.x - Math.sin(b.heading) * ahead, b.position.z - Math.cos(b.heading) * ahead, b.heading);
+
+    // the trailing modules: a new contact with a building undoes the move (one already in contact, after a teleport, may drive out)
+    const y = this.getGroundHeight(b.position.x, b.position.z, 'car');
+    const hits = [false, !!this.busModuleContact(art.module(1), y), !!this.busModuleContact(art.module(2), y)];
+    if ((hits[1] && !b.blocked[1]) || (hits[2] && !b.blocked[2])) {
+      art.restore(saved);
+      b.heading = h0;
+      b.position.x = prev.x;
+      b.position.z = prev.z;
+      b.speed = 0;
+    } else {
+      b.blocked = hits;
+    }
+    b.position.y = y;
+
+    // lamps: brake (and the stop lamps while standing), indicators while turning at low speed; doors on every module
+    this._busBlink = ((this._busBlink || 0) + dt * 1.5) % 1;
+    const blink = this._busBlink < 0.5 && Math.abs(b.steerAngle) > 0.2 && Math.abs(b.speed) < 7 ? 1 : 0;
+    for (const mod of b.modules) {
+      mod.state.value.set(braking || standing ? 1 : 0, b.steerAngle > 0 ? blink : 0, b.steerAngle < 0 ? blink : 0, b.doors);
     }
   }
 

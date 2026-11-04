@@ -1375,6 +1375,37 @@ const BUS_LONG_SPEC = {
   frontDoor: [7.96, 8.96], rearDoor: [-0.9, 0.15], thirdDoor: [-6.3, -5.25]
 };
 
+// The Plusbus: a Solaris Urbino 24 electric (24.7 m, three modules on two bellows; js/articulated-bus.js has the layout and the
+// kinematics). One spec per module, each centred on its own origin: the front module has the MetroStyle cab, the rear one the tail
+// lamps; the joint faces are flat. Doors (curb side, double leaf) and axles are module-local z. The livery is inferred from photos
+// (white, a dark glazing band, a teal skirt stripe; docs/aalborg-phase4c.md), roofs carry battery pods along all three modules.
+const URBINO_FLAT = { halfWidth: [0.05, 1.2, 2], edge: [0.05, 2.9, 2], crown: [0.05, 0.005, 2], sill: [0.03, 0.38, 2], shoulder: [0.05, 1.0, 2] };
+const urbinoModule = (name, length, extra) => {
+  const h = length / 2;
+  return {
+    ...BUS_SPEC, name, aLine: false, length, width: 2.55, zFront: h, zRear: -h, stationStep: 0.6,
+    halfWidth: [[h, 1.275], [-h, 1.275]],
+    edge: [[h, 3.0], [-h, 3.0]],
+    nose: URBINO_FLAT, tail: URBINO_FLAT, cab: false, tailFace: false, rake: 0,
+    livery: { base: 0xeef1f0, accent: 0x00908a, accentBand: [0.44, 0.66] },
+    route: 'PLUS',
+    ...extra
+  };
+};
+const URBINO_24_SPECS = [
+  urbinoModule('urbino24-front', 10.0, {
+    cab: true, metro: true, rake: 0.24, axles: [2.3, -3.6], wheelZ: 2.3,
+    nose: { halfWidth: [0.34, 1.0, 2], edge: [0.3, 2.62, 2], crown: [0.3, 0.005, 2], sill: [0.08, 0.44, 2], shoulder: [0.24, 0.95, 2] },
+    doors: [[3.25, 4.45], [-2.2, -1.0]], windowSpan: [-4.75, 3.2], pods: [[-1.2, 4.2]]
+  }),
+  urbinoModule('urbino24-middle', 7.0, { axles: [-2.35], wheelZ: -2.35, doors: [[-0.55, 0.65]], windowSpan: [-3.25, 3.25], pods: [[0, 5.4]] }),
+  urbinoModule('urbino24-rear', 6.3, {
+    tailFace: true, axles: [-0.8], wheelZ: -0.8,
+    tail: { halfWidth: [0.24, 1.08, 2], edge: [0.2, 2.76, 2], crown: [0.2, 0.005, 2], sill: [0.09, 0.46, 2], shoulder: [0.2, 0.95, 2] },
+    doors: [[1.55, 2.75], [-2.7, -1.5]], windowSpan: [-2.25, 2.9], pods: [[0.6, 3.4]]
+  })
+];
+
 // The windshield rake: the upper front leans back by up to BUS_SPEC.rake, fading out along the first metre
 function busRake(y, z, s = BUS_SPEC) {
   const along = Math.min(1, Math.max(0, (z - (s.zFront - 1.0)) / 1.0));
@@ -1387,12 +1418,13 @@ function buildLoftedBusBodyGeometry(s = BUS_SPEC) {
   const pos = body.attributes.position;
   for (let i = 0; i < pos.count; i++) pos.setZ(i, pos.getZ(i) - busRake(pos.getY(i), pos.getZ(i), s));
   body.computeVertexNormals();
-  const parts = [part(body, BUS_PARTS.BODY), part(buildBusSignGeometry(s), BUS_PARTS.SIGN)];
+  const signs = buildBusSignGeometry(s);
+  const parts = [part(body, BUS_PARTS.BODY), ...(signs ? [part(signs, BUS_PARTS.SIGN)] : [])];
 
-  // Bumpers and stalk mirrors
-  parts.push(part(roundedBox(1.24, 0.12, 0.24, 0.07, 0.03).translate(0, 0.5, s.zFront - 0.05), BUS_PARTS.TRIM));
-  parts.push(part(roundedBox(1.24, 0.11, 0.22, 0.06, 0.03).translate(0, 0.48, s.zRear + 0.05), BUS_PARTS.TRIM));
-  for (const side of [-1, 1]) {
+  // Bumpers and stalk mirrors (a module of an articulated bus has them only at the cab / tail end)
+  if (s.cab !== false) parts.push(part(roundedBox(1.24, 0.12, 0.24, 0.07, 0.03).translate(0, 0.5, s.zFront - 0.05), BUS_PARTS.TRIM));
+  if (s.tailFace !== false) parts.push(part(roundedBox(1.24, 0.11, 0.22, 0.06, 0.03).translate(0, 0.48, s.zRear + 0.05), BUS_PARTS.TRIM));
+  for (const side of s.cab !== false ? [-1, 1] : []) {
     // Mirror stalk from the roof corner, curving forward & out to a tall mirror head ahead of the windshield corner
     const stalk = new THREE.BoxGeometry(0.035, 0.035, 0.5)
       .rotateX(0.55)
@@ -1404,8 +1436,13 @@ function buildLoftedBusBodyGeometry(s = BUS_SPEC) {
 
   // Roof equipment: air-conditioning pod at the rear, hybrid battery pod ahead of it
   const roofY = s.edge[0][1] + s.crown[0][1];
-  parts.push(part(roundedBox(0.98, 0.15, 2.5, 0.12, 0.05).translate(0, roofY + 0.1, s.zRear + 2.23), BUS_PARTS.POD));
-  parts.push(part(roundedBox(0.82, 0.1, 3.0, 0.08, 0.04).translate(0, roofY + 0.06, s.zFront - 4.68), BUS_PARTS.POD));
+  if (s.pods) {
+    // an electric bus: battery pods [centre z, length] under one fairing each, the AC unit on the front one
+    for (const [z, len] of s.pods) parts.push(part(roundedBox(1.0, 0.13, len, 0.1, 0.05).translate(0, roofY + 0.12, z), BUS_PARTS.POD));
+  } else {
+    parts.push(part(roundedBox(0.98, 0.15, 2.5, 0.12, 0.05).translate(0, roofY + 0.1, s.zRear + 2.23), BUS_PARTS.POD));
+    parts.push(part(roundedBox(0.82, 0.1, 3.0, 0.08, 0.04).translate(0, roofY + 0.06, s.zFront - 4.68), BUS_PARTS.POD));
+  }
 
   if (s.joint !== undefined) {
     const sections = [];
@@ -1431,26 +1468,85 @@ function buildLoftedBusBodyGeometry(s = BUS_SPEC) {
 }
 
 /**
+ * The bellows between two modules of an articulated bus as a ribbed sleeve in world space, redrawn each frame from the two faces it
+ * joins: `update(a, b, y)` takes the rear face of the leading module and the front face of the trailing one ({ x, z, yaw }, forward
+ * (sin yaw, cos yaw)) and the ground height; the sleeve bends along a Hermite curve between them, its ribs turning with it.
+ */
+function createBusBellows(material) {
+  const rings = 15;
+  const right = (i) => {
+    const w = i % 2 ? 1.19 : 1.24;
+    const top = i % 2 ? 2.93 : 2.98;
+    return [[w, 0.42], [w, 1.6], [w, 2.82], [w - 0.08, top]];
+  };
+  const perRing = right(0).length * 2 + 1;
+  const positions = new Float32Array((rings + 1) * perRing * 3);
+  const indices = [];
+  for (let i = 0; i < rings; i++) {
+    for (let j = 0; j < perRing - 1; j++) {
+      const a = i * perRing + j, b = a + 1, c = a + perRing, d = c + 1;
+      indices.push(a, c, b, b, c, d);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+  geometry.setIndex(indices);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false; // its vertices move every frame, its bounds would have to as well
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  const update = (a, b, y) => {
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    const ta = { x: -Math.sin(a.yaw) * len, z: -Math.cos(a.yaw) * len };
+    const tb = { x: -Math.sin(b.yaw) * len, z: -Math.cos(b.yaw) * len };
+    const dyaw = Math.atan2(Math.sin(b.yaw - a.yaw), Math.cos(b.yaw - a.yaw));
+    let k = 0;
+    for (let i = 0; i <= rings; i++) {
+      const t = i / rings, t2 = t * t, t3 = t2 * t;
+      const h00 = 2 * t3 - 3 * t2 + 1, h10 = t3 - 2 * t2 + t, h01 = -2 * t3 + 3 * t2, h11 = t3 - t2;
+      const cx = h00 * a.x + h10 * ta.x + h01 * b.x + h11 * tb.x;
+      const cz = h00 * a.z + h10 * ta.z + h01 * b.z + h11 * tb.z;
+      const yaw = a.yaw + dyaw * t;
+      const rx = Math.cos(yaw), rz = -Math.sin(yaw);
+      const half = right(i);
+      const pts = [...half.map(([x, py]) => [-x, py]), [0, half[half.length - 1][1] + 0.02], ...[...half].reverse()];
+      for (const [x, py] of pts) {
+        positions[k++] = cx + rx * x;
+        positions[k++] = y + py;
+        positions[k++] = cz + rz * x;
+      }
+    }
+    geometry.attributes.position.needsUpdate = true;
+    geometry.computeVertexNormals();
+  };
+  return { mesh, update };
+}
+
+/**
  * Destination sign panels for the bus's sign texture (route badge + destination): above the windshield, on the curb
  * side by the front door, and the route badge alone above the rear window. Same object space as the bus body.
  */
 function buildBusSignGeometry(s = BUS_SPEC) {
   const panels = [];
-  const yF = 2.55;
-  const front = new THREE.PlaneGeometry(1.9, 0.27);
-  front.rotateX(-Math.atan2(s.rake * 1.3 * 0.62, 1.75));
-  front.translate(0, yF, s.zFront - busRake(yF, s.zFront, s) + 0.012);
-  panels.push(front);
-  const side = new THREE.PlaneGeometry(1.15, 0.2).rotateY(-Math.PI / 2);
-  const sideZ = s.zFront - 1.88;
-  side.translate(-(carBodyHalfWidthAt(s, sideZ, 2.58) + 0.006), 2.58, sideZ);
-  panels.push(side);
-  const rear = new THREE.PlaneGeometry(0.52, 0.2);
-  const uv = rear.attributes.uv;
-  for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * 0.29);
-  rear.rotateY(Math.PI).translate(0, 2.55, s.zRear - 0.012);
-  panels.push(rear);
-  return mergeGeometries(panels);
+  const yF = s.metro ? 2.68 : 2.55;
+  if (s.cab !== false) {
+    const front = new THREE.PlaneGeometry(1.9, 0.27);
+    front.rotateX(-Math.atan2(s.rake * 1.3 * 0.62, 1.75));
+    front.translate(0, yF, s.zFront - busRake(yF, s.zFront, s) + 0.012);
+    panels.push(front);
+    const side = new THREE.PlaneGeometry(1.15, 0.2).rotateY(-Math.PI / 2);
+    const sideZ = s.zFront - 1.88;
+    side.translate(-(carBodyHalfWidthAt(s, sideZ, 2.58) + 0.006), 2.58, sideZ);
+    panels.push(side);
+  }
+  if (s.tailFace !== false) {
+    const rear = new THREE.PlaneGeometry(0.52, 0.2);
+    const uv = rear.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * 0.29);
+    rear.rotateY(Math.PI).translate(0, 2.55, s.zRear - 0.012);
+    panels.push(rear);
+  }
+  return panels.length ? mergeGeometries(panels) : null;
 }
 
 // Bus wheel: tall tyre with a deep steel disc, 10 lug nuts and a hub cap on both outer and inner faces (spins about x, centred on the origin)
@@ -1535,9 +1631,10 @@ function createBusDestinationTexture(route) {
   ctx.fillStyle = route === '5C' ? '#a2dded' : '#ffad35';
   ctx.font = 'bold 30px "Arial Narrow", Arial, sans-serif';
   ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillText(route, 8, 33);
+  // the Plusbus shows a plus badge (its line number is not modelled)
+  ctx.fillText(route === 'PLUS' ? '+' : route, 8, 33);
   ctx.font = 'bold 23px "Arial Narrow", Arial, sans-serif';
-  ctx.fillText(route === '5C' ? 'HUSUM TORV' : 'NØRREPORT', 70, 33, 180);
+  ctx.fillText(route === 'PLUS' ? 'PLUSBUS · CENTRUM' : route === '5C' ? 'HUSUM TORV' : 'NØRREPORT', 70, 33, 180);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   _busDestinationTextures.set(route, tex);
@@ -1555,30 +1652,38 @@ const _busLoftedMats = new Map();
  * - Headlamps, turn signals (per-instance `busState`: brake, left (+x), right (-x)), tail / brake light columns,
  *   plates; black trims & light-grey roof pods
  */
-function createLoftedBusMaterial(s = BUS_SPEC) {
-  if (_busLoftedMats.has(s.name)) return _busLoftedMats.get(s.name);
+function createLoftedBusMaterial(s = BUS_SPEC, { player = false } = {}) {
+  // the player's bus reads its state from a uniform (mat.userData.busState) instead of the instanced attribute; w = doors open (0..1)
+  const key = player ? `${s.name}:player` : s.name;
+  if (_busLoftedMats.has(key)) return _busLoftedMats.get(key);
   const p = attribute('position', 'vec3');
   const n = attribute('normal', 'vec3');
   const partId = attribute('partId', 'float');
-  const state = attribute('busState', 'vec4');
+  const stateUniform = player ? uniform(new THREE.Vector4(0, 0, 0, 0)) : null;
+  const state = player ? stateUniform : attribute('busState', 'vec4');
   const isBody = step(abs(partId.sub(BUS_PARTS.BODY)), 0.25);
   const isTrim = step(abs(partId.sub(BUS_PARTS.TRIM)), 0.25);
   const isPod = step(abs(partId.sub(BUS_PARTS.POD)), 0.25);
   const isBellows = step(abs(partId.sub(BUS_PARTS.BELLOWS)), 0.25);
   const isSign = step(abs(partId.sub(BUS_PARTS.SIGN)), 0.25);
-  const signColor = texture(createBusDestinationTexture(s.aLine ? '6A' : '5C'), attribute('uv', 'vec2')).rgb;
+  const signColor = texture(createBusDestinationTexture(s.route || (s.aLine ? '6A' : '5C')), attribute('uv', 'vec2')).rgb;
   const ax = abs(p.x);
   const one = float(1.0);
 
-  const front = smoothstep(0.1, 0.35, n.z).mul(step(s.zFront - 0.9, p.z)).mul(isBody);
-  const rear = smoothstep(0.1, 0.35, n.z.negate()).mul(step(p.z, s.zRear + 0.9)).mul(isBody);
+  // a module of an articulated bus: only the cab end is a front, only the tail end a rear; joint faces are black rubber frames
+  const frontFace = smoothstep(0.1, 0.35, n.z).mul(step(s.zFront - 0.9, p.z)).mul(isBody);
+  const rearFace = smoothstep(0.1, 0.35, n.z.negate()).mul(step(p.z, s.zRear + 0.9)).mul(isBody);
+  const front = s.cab === false ? float(0) : frontFace;
+  const rear = s.tailFace === false ? float(0) : rearFace;
+  const jointFace = max(s.cab === false ? frontFace : float(0), s.tailFace === false ? rearFace : float(0));
   const side = smoothstep(0.5, 0.75, abs(n.x)).mul(isBody);
   const curb = step(p.x, 0.0);
 
-  // Windshield (wrapping round the corners), sign band, gasket; rear window & engine louvres
-  const frontGlass = roundedRect(vec2(p.x, p.y.sub(1.82)), vec2(1.2, 0.58), 0.14).mul(smoothstep(0.012, 0.024, ax)).mul(front);
-  const frontSeal = roundedRect(vec2(p.x, p.y.sub(1.82)), vec2(1.24, 0.62), 0.16).mul(front);
-  const signBand = roundedRect(vec2(p.x, p.y.sub(2.55)), vec2(1.02, 0.16), 0.04).mul(front);
+  // Windshield (wrapping round the corners; the MetroStyle one runs from the lamps to the sign), sign band, gasket; rear window & louvres
+  const [gy, gw, gh] = s.metro ? [1.97, 1.22, 0.72] : [1.82, 1.2, 0.58];
+  const frontGlass = roundedRect(vec2(p.x, p.y.sub(gy)), vec2(gw, gh), 0.14).mul(smoothstep(0.012, 0.024, ax)).mul(front);
+  const frontSeal = roundedRect(vec2(p.x, p.y.sub(gy)), vec2(gw + 0.04, gh + 0.04), 0.16).mul(front);
+  const signBand = roundedRect(vec2(p.x, p.y.sub(s.metro ? 2.68 : 2.55)), vec2(1.02, 0.16), 0.04).mul(front);
   const rearGlass = roundedRect(vec2(p.x, p.y.sub(2.06)), vec2(0.92, 0.36), 0.08).mul(rear);
   const rearSeal = roundedRect(vec2(p.x, p.y.sub(2.06)), vec2(0.96, 0.4), 0.1).mul(rear);
   const louvres = roundedRect(vec2(p.x, p.y.sub(0.98)), vec2(0.78, 0.34), 0.05).mul(rear);
@@ -1588,23 +1693,31 @@ function createLoftedBusMaterial(s = BUS_SPEC) {
   const [wy0, wy1] = s.window;
   const winMid = (wy0 + wy1) / 2;
   const winHalf = (wy1 - wy0) / 2;
-  const sideBand = roundedRect(vec2(p.z.add(0.5), p.y.sub(winMid)), vec2(s.length / 2 - 0.96, winHalf), 0.08).mul(side);
+  const [wz0, wz1] = s.windowSpan || [s.zRear + 0.46, s.zFront - 1.46];
+  const winZ = (wz0 + wz1) / 2;
+  const winLen = (wz1 - wz0) / 2;
+  const sideBand = roundedRect(vec2(p.z.sub(winZ), p.y.sub(winMid)), vec2(winLen, winHalf), 0.08).mul(side);
   const mullion = smoothstep(0.03, 0.045, abs(fract(p.z.mul(0.8).add(0.35)).sub(0.5).mul(1.25)));
-  const sideSeal = roundedRect(vec2(p.z.add(0.5), p.y.sub(winMid)), vec2(s.length / 2 - 0.92, winHalf + 0.04), 0.1).mul(side);
-  const driverWin = roundedRect(vec2(p.z.sub(s.zFront - 0.92), p.y.sub(winMid + 0.04)), vec2(0.5, winHalf + 0.04), 0.1).mul(side).mul(one.sub(curb));
+  const sideSeal = roundedRect(vec2(p.z.sub(winZ), p.y.sub(winMid)), vec2(winLen + 0.04, winHalf + 0.04), 0.1).mul(side);
+  const driverWin = s.cab === false ? float(0)
+    : roundedRect(vec2(p.z.sub(s.zFront - 0.92), p.y.sub(winMid + 0.04)), vec2(0.5, winHalf + 0.04), 0.1).mul(side).mul(one.sub(curb));
+  // a door's leaves swing out and aside as state.w goes to 1: the opening shows the lit interior
+  const doorOpen = state.w;
   const door = (z0, z1) => {
     const zc = (z0 + z1) / 2;
     const hw = (z1 - z0) / 2;
     const frame = roundedRect(vec2(p.z.sub(zc), p.y.sub(1.44)), vec2(hw, 1.0), 0.05);
     const leaves = roundedRect(vec2(abs(p.z.sub(zc)).sub(hw * 0.5), p.y.sub(1.5)), vec2(hw * 0.4, 0.84), 0.035);
-    return { frame: frame.mul(side).mul(curb), glass: leaves.mul(side).mul(curb) };
+    const opening = roundedRect(vec2(p.z.sub(zc), p.y.sub(1.4)), vec2(doorOpen.mul(hw * 0.92).add(0.001), 0.96), 0.03);
+    return { frame: frame.mul(side).mul(curb), glass: leaves.mul(side).mul(curb), open: opening.mul(side).mul(curb) };
   };
-  const d0 = door(s.frontDoor[0], s.frontDoor[1]);
-  const d1 = door(s.rearDoor[0], s.rearDoor[1]);
-  const d2 = s.thirdDoor ? door(...s.thirdDoor) : { frame: float(0), glass: float(0) };
-  const doorFrame = max(max(d0.frame, d1.frame), d2.frame);
-  const glass = clamp(max(max(frontGlass, rearGlass), max(max(sideBand.mul(mullion), driverWin), max(max(d0.glass, d1.glass), d2.glass))), 0.0, 1.0);
-  const seal = clamp(max(max(frontSeal, rearSeal), max(max(sideSeal, signBand), doorFrame)), 0.0, 1.0);
+  const doorList = s.doors || [s.frontDoor, s.rearDoor, ...(s.thirdDoor ? [s.thirdDoor] : [])];
+  const doors = doorList.map(([z0, z1]) => door(z0, z1));
+  const anyOf = (key) => doors.reduce((a, d) => max(a, d[key]), float(0));
+  const doorFrame = anyOf('frame');
+  const doorway = player ? anyOf('open').mul(step(0.01, doorOpen)) : float(0);
+  const glass = clamp(max(max(frontGlass, rearGlass), max(max(sideBand.mul(mullion), driverWin), anyOf('glass'))), 0.0, 1.0);
+  const seal = clamp(max(max(frontSeal, rearSeal), max(max(sideSeal, signBand), max(doorFrame, jointFace))), 0.0, 1.0);
 
   const shadeY = smoothstep(0.34, 1.2, p.y).mul(0.12).add(0.88);
   const glazingBand = smoothstep(1.19, 1.22, p.y).mul(one.sub(smoothstep(0.65, 0.95, n.y)));
@@ -1613,7 +1726,11 @@ function createLoftedBusMaterial(s = BUS_SPEC) {
     step(0.72, p.x).mul(step(p.z, s.zRear + 0.95))
   ) : float(0.0);
   const skirt = smoothstep(0.43, 0.4, p.y);
-  const livery = mix(mix(mix(color(0xf7c600), color(0xc91d2b), corner), color(0x14191d), glazingBand), color(0x1c2026), skirt).mul(shadeY);
+  const L = s.livery;
+  const paint = L
+    ? mix(color(L.base), color(L.accent), step(L.accentBand[0], p.y).mul(step(p.y, L.accentBand[1])).mul(side))
+    : mix(color(0xf7c600), color(0xc91d2b), corner);
+  const livery = mix(mix(paint, color(0x14191d), glazingBand), color(0x1c2026), skirt).mul(shadeY);
 
   // Lamps: twin round headlamps & amber turn signals in black pods; red tail / brake light columns, amber turn &
   // white reverse lamps at the rear corners; plates
@@ -1640,6 +1757,10 @@ function createLoftedBusMaterial(s = BUS_SPEC) {
   body = mix(body, texture(carPlateTexture(true), vec2(clamp(plateUV.x, 0.001, 0.999), clamp(plateUV.y, 0.005, 0.995).div(CAR_PLATE.variants))).rgb, plate);
   const glassTint = mix(color(0x0e1a26), color(0x1b3046), clamp(p.y.sub(1.3).mul(0.8), 0.0, 1.0));
   body = mix(body, glassTint, glass);
+  // the doorway: the floor and the shadowed saloon inside, a yellow grab pole in each leaf's opening
+  const pole = smoothstep(0.03, 0.015, abs(fract(p.z.mul(1.25)).sub(0.5))).mul(step(0.45, p.y));
+  const interior = mix(mix(color(0x3d3934), color(0x15161a), smoothstep(0.42, 1.1, p.y)), color(0xc9a227), pole);
+  body = mix(body, interior, doorway);
 
   const col = mix(mix(mix(body, color(0x1b1f24), isTrim), color(0xc9ced3), isPod), color(0x424549), isBellows);
 
@@ -1656,9 +1777,11 @@ function createLoftedBusMaterial(s = BUS_SPEC) {
     .mul(nightHeadlamp)
     .add(color(0xff9a14).mul(max(turnFront, turnRear).mul(blink).mul(2.0)))
     .add(color(0xff0a12).mul(tailLamp.mul(brake.mul(1.5).add(0.75))))
-    .add(signColor.mul(isSign));
+    .add(signColor.mul(isSign))
+    .add(color(0xffe2b0).mul(doorway.mul(smoothstep(2.4, 1.6, p.y)).mul(nightHeadlamp.mul(0.25).add(0.03))));
 
-  _busLoftedMats.set(s.name, mat);
+  if (player) mat.userData.busState = stateUniform;
+  _busLoftedMats.set(key, mat);
   return mat;
 }
 
@@ -1770,6 +1893,8 @@ export {
   carPlateTexture,
   BUS_SPEC,
   BUS_LONG_SPEC,
+  URBINO_24_SPECS,
+  createBusBellows,
   buildLoftedBusBodyGeometry,
   buildBusSignGeometry,
   buildBusWheelGeo,
