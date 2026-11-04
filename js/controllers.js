@@ -54,9 +54,10 @@ const BUS_DRIVE = {
   speed: 70 / 3.6, boostSpeed: 70 / 3.6, reverseSpeed: 2.8, acceleration: 1.6, boostAcceleration: 1.6,
   powerSpeed: 8.5, rolling: 0.12, drag: 0.0009, coast: 0.35, brake: 3.5
 };
-// Wheel angle, rad/s at the wheel, the comfort limit in m/s². With the trailing axles unsteered, a steady turn folds the first joint
-// to 38° at 26° of lock (35° at 24°, the second joint 28°), so the lock is 24°: the front axle then turns on a ~29 m circle.
-const BUS_STEER = { max: 24 * Math.PI / 180, rate: 0.9, lateral: 2.5 };
+// Wheel angle, rad/s at the wheel, the comfort limit in m/s². With the trailing axles unsteered, a steady circle folds the first joint
+// to 38° above 26° of lock, but at 24° the front axle needs a 29 m circle and cannot take the busway corner into the J.F. Kennedys
+// Plads terminal on line 2. The lock is 30° (a ~24 m circle, about the real bus's); in a tight corner the joint clamp holds 38°.
+const BUS_STEER = { max: 30 * Math.PI / 180, rate: 0.9, lateral: 2.5 };
 const BUS_DOORS = { dwell: 1.2, time: 1.0 }; // standing still this long opens the doors; they take this long to open or close
 
 function driveSpeed(speed, throttle, boost, dt, drive) {

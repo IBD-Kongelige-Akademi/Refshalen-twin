@@ -22,6 +22,8 @@ HW_CLASS = {
     "primary": "primary", "primary_link": "primary", "secondary": "secondary", "secondary_link": "secondary",
     "tertiary": "secondary", "tertiary_link": "secondary", "residential": "residential",
     "living_street": "residential", "unclassified": "residential", "service": "service",
+    # a bus-only road (Aalborg's Plusbus runs on dedicated busways): a carriageway the engine keeps ordinary traffic off (busOnly)
+    "busway": "service",
     "cycleway": "cycleway", "footway": "footway", "pedestrian": "footway", "path": "footway",
 }
 DEFAULT_WIDTH = {"primary": 14.0, "secondary": 10.0, "residential": 7.0, "service": 4.0, "cycleway": 2.2, "footway": 2.0}
@@ -208,7 +210,9 @@ def compile_roads(osm: dict, kk: dict, signal_pts_utm: list[tuple[float, float]]
                 else:
                     conf_fields["oneway"] = "observed"
             # width
-            width, wconf = DEFAULT_WIDTH[cls], "inferred"
+            bus_only = tags.get("highway") == "busway"
+            # a busway carries buses, not service traffic: a 3.5 m lane each way
+            width, wconf = (3.5 if ow else 7.0) if bus_only else DEFAULT_WIDTH[cls], "inferred"
             if _int(tags.get("width")) and cls in CARRIAGEWAY:
                 width, wconf = float(tags["width"].split(";")[0]), "observed"
                 src.append("osm:width")
@@ -279,6 +283,7 @@ def compile_roads(osm: dict, kk: dict, signal_pts_utm: list[tuple[float, float]]
                 "speedKmh": speed, "cycleTrack": cyc,
                 "carDir": b["carDir"], "bike": {k: v for k, v in b.items() if not k.startswith("_") and k not in ("carDir", "explicit", "inferred")},
                 "src": src, "conf": "observed", "conf_fields": conf_fields,
+                **({"busOnly": True} if bus_only else {}),
             })
             ways_for_graph.append((len(roads) - 1, coords))
     for k, v in ways_seen.items():
@@ -333,7 +338,7 @@ def build_road_graph(roads, ways_for_graph, names, signal_pts_utm, tol=0.5):
     for wi, a, b in segs:
         r = roads[ways_for_graph[wi][0]]
         links.append([a, b, r["lanesFwd"], r["lanesBack"], r["width"], r["speedKmh"],
-                      names.index(r["name"]), class_idx[r["class"]], sigf(a), sigf(b)])
+                      names.index(r["name"]), class_idx[r["class"]], sigf(a), sigf(b), 1 if r.get("busOnly") else 0])
     flat_nodes = []
     for x, z in nodes:
         flat_nodes += [round(x, 2), round(z, 2)]

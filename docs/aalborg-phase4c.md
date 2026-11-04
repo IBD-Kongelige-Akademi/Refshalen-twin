@@ -28,7 +28,8 @@ body per module from the city-bus loft:
 - a light-blue roof line, roof and roof pods;
 - silver bellows.
 
-The destination sign reads `+ PLUSBUS · CENTRUM`; no line number is shown. Shot: `docs/phase4c/plusbus-livery.jpg`.
+The destination sign reads `2 HOSPITALSBYEN` (the AI buses heading the other way show `2 VÆDDELØBSBANEN`). Shot:
+`docs/phase4c/plusbus-livery.jpg`.
 
 ## Driving
 
@@ -36,10 +37,12 @@ The destination sign reads `+ PLUSBUS · CENTRUM`; no line number is shown. Shot
   reverse is 2.8 m/s. There is no boost.
 - **Steering.**
   - The front module is a bicycle model on the 5.9 m first wheelbase, steered at the front axle.
-  - The lock is 24°, rate-limited at the wheel and narrowed with speed (2.5 m/s² sideways).
-  - **Why 24° and not more.** The trailing axles are unsteered, so a steady turn folds the first joint to 38° at 26° of lock. At
-    24° the joints reach 35° and 28°.
-  - The front axle turns on a circle of about 29 m.
+  - The lock is 30°, rate-limited at the wheel and narrowed with speed (2.5 m/s² sideways). The front axle turns on a circle of
+    about 24 m, close to the real bus.
+  - **Why 30°.** The trailing axles are unsteered, so above 26° of lock a steady circle folds the first joint to the 38° clamp. The
+    first build used 24° to stay under it, but then the front axle needs a 29 m circle and the bus could not take line 2's busway
+    corner into the J.F. Kennedys Plads terminal. At 30° a tight 90° corner brings the first joint to the clamp for a moment
+    (the trailer scrubs sideways); no axle swings outside the front axle's circle.
 - **Trailers.** Each trailing module turns about the hitch behind the module ahead and follows its path. Its joint is clamped to 38°.
 - **Collisions.**
   - The front module collides like a car, a 10 m box.
@@ -60,19 +63,48 @@ The destination sign reads `+ PLUSBUS · CENTRUM`; no line number is shown. Shot
   - the layout;
   - the straight placement;
   - the clamp at 38° even past full lock;
-  - at full lock the joints stay under 38° unclamped and the trailers off-track inside the front axle;
+  - a steady circle under 26° of lock stays under 38° unclamped, the trailers off-tracking inside the front axle;
+  - a 90° corner at the 30° lock: a ~24 m front-axle circle, joints at most 38°, no trailing axle outside the front axle's circle;
   - the bus straightens out after a turn;
   - reversing is clamped;
   - save and restore undo a move exactly.
-- In the viewer, an automatic driver followed car routes from Budolfi and Boulevarden through the old town (Algade, Christiansgade).
-  - The joints peaked at 24°.
-  - No module entered a building.
-  - On the tight old-town corners the rear module's guard stopped the bus. A 24.7 m bus cannot make those turns, and the driver has
-    to back up and swing wide.
-  - The run along the car route to Jomfru Ane Gade (via Bispensgade) was cut short and is still to do.
-- The doors opened on all three modules at a stop. The chase camera kept every corner of the bus inside the frame (|NDC| ≤ 0.8)
-  while driving straight and in a full turn.
-- The livery shot is `docs/phase4c/plusbus-livery.jpg`. A shot of the open doors is still to take.
+- **Driving line 2 in the viewer.** A test driver (front axle tracking the line's path in the curb lane, braking for the curvature
+  ahead) drove the player's bus along line 2 towards Hospitalsbyen:
+  - Kastetvej's busway, Borgergade and the Jomfru Ane Gade stop, to Nytorv (s 120–1107). Joints at most 38° (the clamp, in the
+    80° corner at Nytorv), no module inside a building, the front axle within 1.2 m of its lane. The run stopped behind a jam of AI
+    traffic queued round the bus.
+  - Boulevarden through the J.F. Kennedys Plads terminal (under its canopy) and on to the edge of the district at Hospitalsbyen's
+    side (s 1700–1890 and 1960–3330). Joints at most 30.5°, no module inside a building, no stalls.
+  - **Not passed:** the 130° hairpin loop inside the terminal (s 1880–1900). It is tighter than the bus's 24 m circle on the OSM
+    path; the driver runs wide into a lamp post and a tree. Whether the real bus takes that loop on this line is not known.
+  - The other direction (towards Væddeløbsbanen) was not driven.
+  - An earlier run on the *car* route to Jomfru Ane Gade (through Bispensgade) is not a fair test: that corner is not on line 2.
+- **Doors.** The doors open on all three modules at a stop, and the chase camera keeps every corner of the bus inside the frame
+  (|NDC| ≤ 0.8) driving straight and in a full turn. Shots:
+  - `docs/phase4c/plusbus-doors.jpg`: the player's bus at a stop with the curb-side doors open, and a regular AI bus in the NT colours;
+  - `docs/phase4c/plusbus-terminal.jpg`: just out of the terminal canopy;
+  - `docs/phase4c/plusbus-livery.jpg`.
+
+### Fixed on the way
+
+The drive found three data problems on line 2's route:
+
+- **The bus terminal was a wall.** GeoDanmark registers the J.F. Kennedys Plads terminal roof (a canopy on pillars) as a 5.4 m
+  building standing on the busway.
+  - `tools/geodata/canopies.py` (build stage `canopies`, after lod2) marks a building as an open canopy when it has no BBR record,
+    is at least half under an OSM `building=roof` and is at least 3.5 m tall. Its `base` is set 0.8 m under the eave.
+  - The engine starts its walls and its collider there, draws it without its LoD2 record, and leaves it out of the walk-space
+    footprints.
+  - 4 canopies in the district: the terminal underside is at 4.4 m, 4.8 m over the road. The pillars are not modelled.
+- **The Plusbus's own road was missing.** OSM maps Kastetvej's dedicated Plusbus road (and the terminal lanes) as `highway=busway`,
+  a class `roads.py` dropped.
+  - Busways are now service-class roads with `busOnly` (7 m wide two-way, 3.5 m one-way). It reaches the road graph as an 11th link
+    field and the network edges as `chain.busOnly`.
+  - Cars and the regular buses never route onto a busway or spawn on one; the Plusbuses do.
+  - 30 road pieces and 63 graph links.
+- **Trees in the carriageway.** Without a carriageway there, the Phase 6 crown detection put inferred trees on the busway.
+  Inferred crowns are now dropped within half a road's width of a car-road centreline: 77 of them, branches reaching over a street
+  from the pavement. Registered trees are unchanged.
 
 ## AI Plusbuses on line 2
 
@@ -112,13 +144,19 @@ The Plusbus runs only on NT line 2. OSM maps it as two route relations, "Bybus 2
 
 `tools/geodata/tests/test_bus_lines.py` checks the way chaining, gaps and clipping.
 
-**In the viewer**, AI Plusbuses spawned on Boulevarden and drove the route in both directions. A stop with the doors open was not
-seen there: the page ran at about 1 fps while the window was in the background.
+**In the viewer**, AI Plusbuses spawned on Boulevarden and drove the route in both directions. An AI bus standing at a stop was not
+watched there (the stop is covered by the unit test; the player's bus at a stop is in `plusbus-doors.jpg`).
 
 ## Not done
 
-- **Perf.** The perf target "0.5 ms extra with four AI Plusbuses" was not measured; the browser pane's frame rate is not reliable
-  enough for it.
+- **Perf: the target is not met.** The plan asks for at most 0.5 ms extra with four AI Plusbuses. `traffic.update` was timed in the
+  viewer (about 10 fps there, so noisy) with the four buses on Boulevarden and with them removed, in two pairs of 12–15 s windows:
+  - median 13.9 vs 11.3 ms, then 11.6 vs 10.6 ms: **+1.0 to +2.6 ms**;
+  - the means disagree in sign between the pairs.
+
+  The route code is not where it goes: projecting the four buses onto line 2 is 0.03 ms a frame. Likely suspects are the collision
+  stage (four 28 t boxes) and traffic queued behind 24.7 m vehicles. A profiler run is needed.
+- **The terminal hairpin.** See the acceptance above.
 - **Bellows.** The AI buses' bellows are straight sleeves, so the outside of a tight bend shows a gap.
 - **Network swaps.** A streamed network swap retires the AI Plusbuses with the rest of the traffic, and they are placed again out of
   sight.

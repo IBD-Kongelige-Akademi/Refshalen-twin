@@ -79,8 +79,10 @@ function ringIndex(rings) {
 
 export function createWalkSpace(geo, lakes = null) {
   // the footprints can change under it (streamed tiles): addBuildings / removeBuildings
+  // an open canopy (a roof on pillars, `base` set: tools/geodata/canopies.py) is no wall at ground level
+  const closed = (buildings) => buildings.filter((b) => !Number.isFinite(b.base)).map((b) => b.ring);
   const inBuilding = createRingIndex();
-  inBuilding.add('all', (geo.buildings || []).map((b) => b.ring));
+  inBuilding.add('all', closed(geo.buildings || []));
   const inLake = ringIndex([...(lakes?.lakes || []), ...(lakes?.ponds || [])].map((l) => l.ring));
   const onBridge = ringIndex((lakes?.bridges || []).map((b) => b.ring));
   const inWater = (x, z) => inLake(x, z) && !onBridge(x, z);
@@ -89,7 +91,7 @@ export function createWalkSpace(geo, lakes = null) {
   const block = { id: 'copenhagen', poly: [] };
   return {
     inBuilding,
-    addBuildings: (tag, buildings) => inBuilding.add(tag, buildings.map((b) => b.ring)),
+    addBuildings: (tag, buildings) => inBuilding.add(tag, closed(buildings)),
     removeBuildings: (tag) => inBuilding.remove(tag),
     inWater,
     walkable: (minX, maxX, minZ, maxZ) => !blocked(minX, minZ) && !blocked(maxX, maxZ) && !blocked(minX, maxZ)

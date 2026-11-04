@@ -772,7 +772,8 @@ function cphCentrelines(rg) {
     add(l[1], { id, l, from: l[1], to: l[0], along: l[3], against: l[2] });
   }
   // lanes in a link's own direction of travel `along` and against it
-  const same = (p, q) => p.l[6] === q.l[6] && p.l[7] === q.l[7] && Math.abs(p.l[4] - q.l[4]) < 1.5;
+  // l[10]: a bus-only link (tools/geodata/roads.py busOnly): a chain never mixes bus-only and general links
+  const same = (p, q) => p.l[6] === q.l[6] && p.l[7] === q.l[7] && Math.abs(p.l[4] - q.l[4]) < 1.5 && !p.l[10] === !q.l[10];
   const through = (n, p) => {
     const here = at.get(n);
     if (!here || here.length !== 2) return null;
@@ -803,7 +804,7 @@ function cphCentrelines(rg) {
     }
     const w = first.l[4];
     const cls = rg.classes[first.l[7]];
-    out.push({ a: first.from, b: cur.to, ni: first.l[6], w, along: first.along, against: first.against, inner, cls, chain: { id: chainId++, links: members.length, measured: rg.layout === 'cph-streets/1' } });
+    out.push({ a: first.from, b: cur.to, ni: first.l[6], w, along: first.along, against: first.against, inner, cls, chain: { id: chainId++, links: members.length, measured: rg.layout === 'cph-streets/1', busOnly: !!first.l[10] } });
   }
   // start every chain at a vertex that is not a through vertex, then close up whatever rings remain
   for (const [n, recs] of at) {

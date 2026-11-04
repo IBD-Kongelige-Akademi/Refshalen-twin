@@ -798,7 +798,7 @@ def stage_index(a, tiles, cells) -> None:
     log(f"[index] {len(idx_tiles)} tiles, {total / 1e6:.1f} MB; meta.json {(CITY_DIR / 'meta.json').stat().st_size / 1e6:.2f} MB")
 
 
-STAGES = ["fetch", "fetch2", "buildings0", "geo", "cells", "surfaces", "furniture", "groundfloor", "streets", "entrances", "vegetation", "lod2", "index", "report"]
+STAGES = ["fetch", "fetch2", "buildings0", "geo", "cells", "surfaces", "furniture", "groundfloor", "streets", "entrances", "vegetation", "lod2", "canopies", "index", "report"]
 
 
 def main(argv=None):
@@ -849,6 +849,11 @@ def main(argv=None):
             import city_layers2
 
             getattr(city_layers2, f"stage_{s}")(a, tiles, cells)
+        elif s == "canopies":
+            import canopies
+
+            for tid, bid, base in canopies.apply(TILES_DIR, write=lambda path, txt: S.atomic_write(path, txt)):
+                log(f"[canopies] {tid} {bid}: underside at {base} m")
         elif s == "index":
             stage_index(a, tiles, cells)
         elif s == "report":

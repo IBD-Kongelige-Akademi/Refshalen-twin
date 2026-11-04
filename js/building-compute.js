@@ -119,7 +119,7 @@ export function* buildingSteps(job) {
       const low = lows ? lows.get?.(b.id) ?? lows[b.id] : undefined;
       const added = addBuilding(acc, b, {
         ...(lite ? { lite: true } : { ground }), ...(glassy ? { wallAcc: glassAcc } : {}),
-        ...(lod2Records.has(b.id) ? { lod2: lod2Records.get(b.id) } : {}), ...(quads ? { quads } : {}),
+        ...(lod2Records.has(b.id) && !Number.isFinite(b.base) ? { lod2: lod2Records.get(b.id) } : {}), ...(quads ? { quads } : {}),
         ...(observed ? {} : { observed: false }), ...(low !== undefined ? { low } : {})
       });
       if (added) triangles += added.wallTriangles + added.roofTriangles;

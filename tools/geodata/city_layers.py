@@ -125,7 +125,7 @@ def stage_furniture(a, tiles, cells) -> None:
         "licences": {FD.LIC_GDK: "Creative Commons Attribution 4.0", FD.LIC_OSM: "Open Database License 1.0"},
     }
     token = envsecret.require("DHM_TERRAIN_TOKEN", "GSEARCH_TOKEN")
-    doc["trees"], tree_stats = FD.build_trees(cells, bbox, bl["buildings"], rl["water"], token)
+    doc["trees"], tree_stats = FD.build_trees(cells, bbox, bl["buildings"], rl["water"], token, roads)
     doc["lamps"] = FD.build_lamps(roads, bbox, bl["buildings"])
     doc["parkingBays"] = FD.build_parking(bbox, bl["buildings"])
     doc.update(FD.build_osm_lists(roads, bl["buildings"]))

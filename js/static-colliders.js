@@ -79,7 +79,8 @@ function buildingCollider(building, groundHeight) {
     id: `building:${building.id ?? 'unknown'}`,
     type: 'building',
     ...bounds,
-    minY: groundHeight ? minTerrain - 0.25 : Math.min(minTerrain, 0) - 0.1,
+    // an open canopy (tools/geodata/canopies.py) is solid from the underside of its roof only: vehicles and people pass beneath
+    minY: Number.isFinite(building.base) ? building.base : groundHeight ? minTerrain - 0.25 : Math.min(minTerrain, 0) - 0.1,
     maxY,
     ring: Array.from(ring),
     holes: holes.map((hole) => Array.from(hole)),

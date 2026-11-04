@@ -156,7 +156,7 @@ def ndsm_grid(cells: dict, token: str):
 
 # --------------------------------------------------------------------------------------------------------------- trees
 
-def build_trees(cells, bbox, buildings, water, token):
+def build_trees(cells, bbox, buildings, water, token, roads=None):
     """Registered trees (GeoDanmark, then OSM) with measured heights and shared crowns, plus detected crowns where none is."""
     import numpy as np
     from rasterio.features import geometry_mask
@@ -231,11 +231,16 @@ def build_trees(cells, bbox, buildings, water, token):
     rows, cols = np.nonzero(peaks)
     order = np.argsort(-nd[rows, cols])
     taken = Grid()
-    n_det = 0
+    n_det = n_road = 0
     for k in order:
         r, c = int(rows[k]), int(cols[k])
         x, z = to_local(e0 + c + 0.5, n1 - r - 0.5)
         if have.near(x, z, DETECT_FAR_M) or taken.near(x, z, DETECT_SPACING):
+            continue
+        # a peak over a carriageway is a crown reaching over the street from the pavement, not a trunk in the road
+        nr = roads.nearest(x, z, 20.0) if roads else None
+        if nr and nr[0] < nr[5] / 2 + 0.3:
+            n_road += 1
             continue
         taken.add(x, z)
         trees.append([x, z, {"genus": "generic", "species": None, "name": None, "src": ["dhm:ndsm:crown"], "licence": LIC_GDK, "detected": True}])
@@ -274,7 +279,7 @@ def build_trees(cells, bbox, buildings, water, token):
         if rec.get("detected"):
             item["canopy_added"] = True
         out.append(item)
-    stats = {"geodanmark": sum(1 for t in out if t["src"][0].startswith("geodanmark")), "osm": n_osm, "detected": n_det,
+    stats = {"geodanmark": sum(1 for t in out if t["src"][0].startswith("geodanmark")), "osm": n_osm, "detected": n_det, "detected_over_road": n_road,
              "measured_height": sum(1 for t in out if t["conf_fields"].get("height") == "measured")}
     log(f"trees {len(out)}: {stats}")
     return out, stats

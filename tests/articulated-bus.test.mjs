@@ -53,7 +53,7 @@ test('placed straight, the modules line up nose to tail with the bellows gaps be
 });
 
 // js/controllers.js BUS_STEER.max
-const LOCK = 24 * DEG;
+const LOCK = 30 * DEG;
 
 test('the clamp holds every joint at 38° even when the front turns tighter than the trailers can follow', () => {
   const art = createArticulation();
@@ -64,25 +64,56 @@ test('the clamp holds every joint at 38° even when the front turns tighter than
   assert.ok(maxJoint <= 38 * DEG + 1e-9, `max joint ${(maxJoint / DEG).toFixed(2)}°`);
 });
 
-test('at full lock the joints stay under 38° unclamped and the trailers track inside the front (no corner cutting outward)', () => {
+test('in a steady circle under 26° of lock the joints stay under 38° unclamped and the trailers track inside the front', () => {
+  const steer = 24 * DEG;
   const art = createArticulation();
   art.place(0, 0, 0);
-  const trace = drive(art, 60 * 40, 3, LOCK);
+  const trace = drive(art, 60 * 40, 3, steer);
   let maxJoint = 0;
   for (const t of trace) for (const j of t.joints) maxJoint = Math.max(maxJoint, Math.abs(j));
   assert.ok(maxJoint < 38 * DEG - 0.5 * DEG, `max joint ${(maxJoint / DEG).toFixed(2)}°`);
   assert.ok(maxJoint > 25 * DEG, 'the bus does articulate');
   // in the steady turn every axle runs on a circle about the same centre; trailing axles run on smaller ones (off-tracking)
   const last = trace[trace.length - 1].axles;
-  const R2 = URBINO_24.wheelbase / Math.tan(LOCK);
+  const R2 = URBINO_24.wheelbase / Math.tan(steer);
   const h = art.state.headings[0];
   // the heading grows, so the centre lies along d(forward)/dh = (cos h, -sin h)
   const cx = last[1].x + Math.cos(h) * R2, cz = last[1].z - Math.sin(h) * R2;
   const radii = last.map((a) => Math.hypot(a.x - cx, a.z - cz));
   assert.ok(Math.abs(radii[1] - R2) < 1e-6);
   assert.ok(radii[0] > radii[1] && radii[2] < radii[1] && radii[3] < radii[2], radii.map((r) => r.toFixed(2)).join(' '));
-  // the turning circle of the front axle: a wide one, from the 5.9 m first wheelbase
-  assert.ok(radii[0] * 2 > 26 && radii[0] * 2 < 32, `front axle circle ${(radii[0] * 2).toFixed(1)} m`);
+});
+
+test('a 90° corner at full lock: about a 24 m front-axle circle, joints held at 38°, no axle swinging outside the front one', () => {
+  const art = createArticulation();
+  art.place(0, 0, 0);
+  const s = art.state;
+  drive(art, 60 * 3, 3, 0);
+  // the corner's centre, from the reference axle as the turn begins
+  const R2 = URBINO_24.wheelbase / Math.tan(LOCK);
+  const R0 = URBINO_24.wheelbase / Math.sin(LOCK);
+  const h = s.headings[0];
+  const c = { x: art.axle(1).x + Math.cos(h) * R2, z: art.axle(1).z - Math.sin(h) * R2 };
+  // inside the corner's sector (from the radius through the front axle as the turn starts to the one a quarter turn on) no
+  // trailing axle is further from the centre than the front axle runs; before it, they are still on the approach straight
+  const angle = (p) => Math.atan2(p.x - c.x, p.z - c.z);
+  const a0 = angle(art.axle(0));
+  const inSector = (p) => { const d = Math.atan2(Math.sin(angle(p) - a0), Math.cos(angle(p) - a0)); return d >= 0 && d <= Math.PI / 2; };
+  let maxJoint = 0, outside = 0, checked = 0;
+  for (let i = 0; i < 60 * 60 && s.headings[0] < h + 90 * DEG; i++) {
+    const t = drive(art, 1, 3, LOCK)[0];
+    for (const j of t.joints) maxJoint = Math.max(maxJoint, Math.abs(j));
+    for (const k of [2, 3]) {
+      if (!inSector(t.axles[k])) continue;
+      checked++;
+      if (Math.hypot(t.axles[k].x - c.x, t.axles[k].z - c.z) > R0 + 1e-6) outside++;
+    }
+  }
+  assert.ok(checked > 30, `${checked} samples in the corner`);
+  assert.ok(s.headings[0] >= h + 90 * DEG - 1e-9, 'the corner is made');
+  assert.ok(maxJoint <= 38 * DEG + 1e-9, `max joint ${(maxJoint / DEG).toFixed(2)}°`);
+  assert.equal(outside, 0, 'no trailing axle outside the front axle circle');
+  assert.ok(2 * R0 > 22 && 2 * R0 < 26, `front axle circle ${(2 * R0).toFixed(1)} m`);
 });
 
 test('after a turn the bus straightens out and the trailers run in the front module tracks', () => {

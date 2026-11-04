@@ -103,3 +103,19 @@ test('Plusbuses spawn on their route only, in the curb lane, and use the Urbino 
   assert.equal(curbLane({ lanes: [-1.6, 1.6, 4.8] }), 2);
   assert.match(source, /createVehicle\(true, URBINO_24\.length \/ 2 \+ 0\.2/);
 });
+
+test('ordinary traffic never turns onto a busway; a Plusbus does', () => {
+  const context = lineContext();
+  context.weights = [];
+  context.nearestLane = () => 0;
+  const chooseMove = trafficFunction('chooseMove', context);
+  const busway = edge(0, 120, 0, 1, 60);
+  busway.chain = { busOnly: true };
+  const street = edge(0, 120, 1, 0, 60);
+  const e = edge(0, 40, 0, 1, 70);
+  e.moves = [{ to: busway, turn: 'S', out: [0] }, { to: street, turn: 'R', out: [0] }];
+  for (let i = 0; i < 50; i++) assert.equal(chooseMove({ edge: e, lane: 0, s: 30, bus: false }, false), e.moves[1]);
+  e.moves = [{ to: busway, turn: 'S', out: [0] }];
+  assert.equal(chooseMove({ edge: e, lane: 0, s: 30, bus: true }, false), null, 'only the busway ahead: it leaves the map here');
+  assert.equal(chooseMove({ plus: true, line: 0, edge: e, lane: 0, s: 30, offRoute: false }, false), e.moves[0]);
+});

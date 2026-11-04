@@ -26,6 +26,8 @@ uv run tools/geodata/build_city.py --osm-source api --stage fetch2 --stage furni
   in it for their crown radii (at most 9 m and 0.55 × the height). Trees without canopy keep an inferred height and crown.
 - **Detected crowns** (`dhm:ndsm:crown`, `conf: inferred`, `canopy_added`) are canopy peaks above 4 m, 4 m apart, more than 3.5 m
   from a registered tree: mostly park and courtyard trees, which GeoDanmark (solitary trees only) does not register.
+  Since phase 4c, a peak within half a road's width of a car-road centreline is dropped (77 of them): it is a crown reaching over
+  the street from the pavement, not a trunk in the road. 2,593 detected crowns remain; 7,997 trees in all.
 - **Genus.** No species register: OSM's `genus` / `species` where a tree is tagged, else `generic`, which js/tree-species.js turns
   into its context mix. With the point cloud (a Datafordeler key) the detected crowns could take class-5 shapes instead.
 - **Lamps.** GeoDanmark masts are untyped; a mast near a carriageway that no OSM lamp or signal stands at is taken as a lighting

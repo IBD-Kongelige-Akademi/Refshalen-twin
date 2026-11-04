@@ -255,6 +255,8 @@ function addBuilding(acc, b, opts = {}) {
     for (const ring of [outerPts, ...holePts]) for (const p of ring) low = Math.min(low, opts.terrain.heightAt(p[0], p[1]));
     bottom = low - 0.25;
   }
+  // an open canopy: the roof deck only, from its underside (tools/geodata/canopies.py; the pillars are not modelled)
+  if (Number.isFinite(b.base)) bottom = b.base;
   const f = b.facade || {};
   const groundH = f.ground_floor_h || f.floor_h || 3;
   // Fit a whole number of storeys between the ground floor and the eave (the BBR storey count and the DSM height

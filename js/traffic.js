@@ -905,6 +905,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       const m = e.moves[k];
       let w = m.turn === 'S' ? (v.bus ? 8 : 3) : 1;
       if (v.bus && m.turn !== 'S' && m.to.lanes.length < 2) w *= 0.05;
+      if (m.to.chain?.busOnly) w = 0; // a busway: only the Plusbuses (above) drive on it
       if (fromLane) {
         if (m.out[v.lane] < 0) w = 0;
       } else if (Math.abs(nearestLane(m, v.lane) - v.lane) * 22 > e.len - v.s) {
@@ -923,7 +924,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     }
     // No move from this lane (a lane the road graph couldn't lead anywhere): take any move, changing lanes for it
     if (!pick && fromLane) return chooseMove(v, false);
-    return pick || e.moves[0] || null;
+    return pick || e.moves.find((m) => v.plus || !m.to.chain?.busOnly) || null; // none: it leaves the map here (retired)
   }
 
   // Could the vehicle of lane entry o, approaching the end of edge a, still stop easily before its line? Vehicles
@@ -1616,7 +1617,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     if (v.plus) return spawnPlus(v, rMin, rMax, protectView);
     for (let attempt = 0; attempt < 12; attempt++) {
       const e = nearEdges[Math.floor(Math.random() * nearEdges.length)];
-      if (!e || (v.bus && e.axis !== 'ave') || e.len < 2 * v.half + 10) continue;
+      if (!e || e.chain?.busOnly || (v.bus && e.axis !== 'ave') || e.len < 2 * v.half + 10) continue;
       const lane = Math.floor(Math.random() * e.lanes.length);
       const along = (focusX - e.sx) * e.dx + (focusZ - e.sz) * e.dz;
       const minS = Math.max(v.half + 5, along - rMax);
