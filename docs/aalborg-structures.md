@@ -42,8 +42,10 @@ over the railway).
 - **Geometry.** A deck has its top, a soffit and fascia where it stands clear, and concrete parapets on road and rail decks (railings on
   foot bridges) where it stands more than 0.8 m up. Piers stand every 24 m under the axes where the deck is more than 3 m up.
 - **Ground model.** It stands on the decks (`withDecks`), and `levelAt(x, z, y)` picks the deck or the ground under it from where
-  something is now. The player (`getGroundHeight` with the current height) and the traffic (each vehicle's `gy`) use it: what drives
-  onto a bridge stays on, what passes under stays under.
+  something is now. The player (`getGroundHeight` with the current height), the traffic (each vehicle's `gy`) and the AI pedestrians
+  and cyclists (`agentLevel`: each one's last ground, reset by a jump of more than 5 m, a respawn) use it: what drives or walks onto a
+  bridge stays on, what passes under stays under. Near Østre Allé, 9 of 10 pedestrians seen in a raised deck's footprint walked under
+  it, and the cyclists on the cycle bridges rode on them.
 - **Road surfaces.** The road worker drops the draped surface triangles under a deck that stands clear of the terrain (the deck is drawn
   there). Where the terrain already carries a bridge (the fjord bridges: the compiled terrain runs across the water at deck height), it
   drops only the steep triangles, the kerb skirts that hung from the deck down to the water.
@@ -59,8 +61,6 @@ OSM `railway=rail` and disused tracks, not in tunnels: 69 tracks, 13.7 km (main,
 
 ## Not done
 
-- **People.** Pedestrians and cyclists (the AI ones) use the deck-aware ground without `levelAt`: one walking under a bridge is lifted
-  onto it there.
 - **Waterline fragments.** Small green ground pieces are left at the waterline along Limfjordsbroen, where the water's ground cut meets
   the bridge strip.
 - **Bridge shapes.** Every bridge has the same section: no bascule span on Limfjordsbroen, no truss on Jernbanebroen, no stairs or ramps
