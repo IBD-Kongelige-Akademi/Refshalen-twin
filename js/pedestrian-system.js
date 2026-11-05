@@ -186,6 +186,8 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
       p.restTime = clock + 25 + Math.random() * 45;
       p.socialTime = clock + 5 + Math.random() * 15;
       p.rig.placed = false; // stands afresh where it now is
+      // under a bridge or on it, by walking out from the end of its track that is off the decks
+      p.gy = groundHeight?.levelAlong ? groundHeight.levelAlong(track.ax, track.az, track.ux, track.uz, track.len, t, true) : NaN;
       p.placed = true;
       if (crosswalk) atCurb(p);
       return true;

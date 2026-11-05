@@ -52,8 +52,46 @@ const area2 = (r) => {
  * One deck: its outline (`ring`, `holes`, densified by the build) with the ground under every vertex (`ringG`, `holesG`), and its axes
  * (`pts` flat [x, z, deck y, ground y, ...]). Needs no terrain. Returns { arrays, stats }.
  */
+/**
+ * The ends of a deck's ways as { x, z, tx, tz } (tangent along the way). A ring edge across one is where the road comes onto the deck: no
+ * parapet across the road, and the abutment down to the ground under it.
+ */
+function axisEnds(deck) {
+  const out = [];
+  for (const a of deck.axes || []) {
+    const p = a.pts;
+    if (!p || p.length < 8) continue;
+    const m = p.length;
+    const end = (x, z, ox, oz) => {
+      const l = Math.hypot(x - ox, z - oz) || 1;
+      out.push({ x, z, tx: (x - ox) / l, tz: (z - oz) / l });
+    };
+    end(p[0], p[1], p[4], p[5]);
+    end(p[m - 4], p[m - 3], p[m - 8], p[m - 7]);
+  }
+  return out;
+}
+
+const TOP_DROP = 0.15; // m: the plain top lies this far under the deck's height, so the road lifted onto it always shows
+const TOP_EDGE = 5; // m: the longest edge of a triangle of the deck's top
+const END_ALONG = 4; // m along a way from its end that a ring edge counts as across it
+const END_ACROSS = 16; // m to the side
+
+function isEndEdge(ends, ax, az, bx, bz) {
+  const mx = (ax + bx) / 2, mz = (az + bz) / 2;
+  const dx = bx - ax, dz = bz - az;
+  const l = Math.hypot(dx, dz) || 1;
+  for (const e of ends) {
+    const along = (mx - e.x) * e.tx + (mz - e.z) * e.tz;
+    const across = Math.abs((mx - e.x) * e.tz - (mz - e.z) * e.tx);
+    if (Math.abs(along) <= END_ALONG && across <= END_ACROSS && Math.abs(dx * e.tx + dz * e.tz) / l < 0.7) return true;
+  }
+  return false;
+}
+
 export function buildDeckArrays(deck) {
   const A = new Arrays();
+  const ends = axisEnds(deck);
   const kind = deck.kind === 'rail' ? 'rail' : deck.kind === 'foot' ? 'foot' : 'road';
   const thick = DECK.thick[kind];
   const topKind = kind === 'rail' ? KIND.ballastDeck : kind === 'foot' ? KIND.foot : KIND.road;
@@ -74,7 +112,7 @@ export function buildDeckArrays(deck) {
   const gs = Float64Array.from(gs0);
   for (let i = 0; i < n; i++) {
     const y = deckHeight(deck, flat[2 * i], flat[2 * i + 1]);
-    ys[i] = (y === null ? gs[i] : Math.max(y, gs[i])) + DECK.lift;
+    ys[i] = (y === null ? gs[i] : y) + DECK.lift;
   }
   // the edge follows the nearest carried way, which can switch from one to the next along it: a median and a mean along each ring keep
   // the fascia and the parapet straight
@@ -89,15 +127,39 @@ export function buildDeckArrays(deck) {
       w.sort((a, b) => a - b);
       med[i] = w[2];
     }
-    for (let i = 0; i < m; i++) ys[o + i] = Math.max((med[(i - 1 + m) % m] + med[i] + med[(i + 1) % m]) / 3, gs[o + i] + DECK.lift);
+    for (let i = 0; i < m; i++) ys[o + i] = (med[(i - 1 + m) % m] + med[i] + med[(i + 1) % m]) / 3;
   }
   // the top faces up: with z south, a ring counter-clockwise from above has a negative area2 in (x, z)
   const flip = area2(rings[0]) > 0;
+  // the top is split into small triangles whose inner points follow the deck's height (js/road-compute.js lifts the road onto the same
+  // height), so the deck's middle does not bulge over the road or sag under it between the outline's vertices
   const base = A.position.length / 3;
-  for (let i = 0; i < n; i++) A.vert(flat[2 * i], ys[i], flat[2 * i + 1], 0, 1, 0, topKind, 0);
+  for (let i = 0; i < n; i++) A.vert(flat[2 * i], ys[i] - TOP_DROP, flat[2 * i + 1], 0, 1, 0, topKind, 0);
+  const mids = new Map();
+  const px = Array.from({ length: n }, (_, i) => flat[2 * i]), pz = Array.from({ length: n }, (_, i) => flat[2 * i + 1]);
+  const midOf = (a, b) => {
+    const k = a < b ? a * 1e7 + b : b * 1e7 + a;
+    if (mids.has(k)) return mids.get(k);
+    const x = (px[a] + px[b]) / 2, z = (pz[a] + pz[b]) / 2;
+    const y = deckHeight(deck, x, z);
+    const m = px.length;
+    px.push(x); pz.push(z);
+    A.vert(x, (y === null ? (ysOf(a) + ysOf(b)) / 2 : y + DECK.lift - TOP_DROP), z, 0, 1, 0, topKind, 0);
+    mids.set(k, m);
+    return m;
+  };
+  const ysOf = (a) => A.position[(base + a) * 3 + 1];
+  const emit = (a, b, c, depth) => {
+    const ab = Math.hypot(px[a] - px[b], pz[a] - pz[b]), bc = Math.hypot(px[b] - px[c], pz[b] - pz[c]), ca = Math.hypot(px[c] - px[a], pz[c] - pz[a]);
+    const longest = Math.max(ab, bc, ca);
+    if (longest <= TOP_EDGE || depth >= 10) { A.index.push(base + a, base + b, base + c); return; }
+    if (longest === ab) { const m = midOf(a, b); emit(a, m, c, depth + 1); emit(m, b, c, depth + 1); }
+    else if (longest === bc) { const m = midOf(b, c); emit(a, b, m, depth + 1); emit(a, m, c, depth + 1); }
+    else { const m = midOf(c, a); emit(a, b, m, depth + 1); emit(m, b, c, depth + 1); }
+  };
   for (let t = 0; t < tri.length; t += 3) {
     const [a, b, c] = flip ? [tri[t], tri[t + 2], tri[t + 1]] : [tri[t], tri[t + 1], tri[t + 2]];
-    A.index.push(base + a, base + b, base + c);
+    emit(a, b, c, 0);
   }
   const sb = A.position.length / 3;
   for (let i = 0; i < n; i++) A.vert(flat[2 * i], ys[i] - thick, flat[2 * i + 1], 0, -1, 0, KIND.concrete, 0);
@@ -122,11 +184,14 @@ export function buildDeckArrays(deck) {
       const dx = bx - ax, dz = bz - az;
       const l = Math.hypot(dx, dz) || 1;
       const nx = (dz / l) * outSign, nz = (-dx / l) * outSign; // outward normal
+      const endEdge = isEndEdge(ends, ax, az, bx, bz);
       if (ca > 0.15 || cb > 0.15) {
-        const ba = Math.max(ya - thick, gs[offset + i]), bb = Math.max(yb - thick, gs[offset + j]);
+        // at the road's end of the deck the wall runs down to the ground: the abutment
+        const ba = endEdge ? Math.min(ya, gs[offset + i]) : Math.max(ya - thick, gs[offset + i]);
+        const bb = endEdge ? Math.min(yb, gs[offset + j]) : Math.max(yb - thick, gs[offset + j]);
         A.quad([ax, ba, az], [bx, bb, bz], [bx, yb, bz], [ax, ya, az], [nx, 0, nz], KIND.concrete);
       }
-      if (ca > DECK.parapetMinClear && cb > DECK.parapetMinClear) {
+      if (!endEdge && ca > DECK.parapetMinClear && cb > DECK.parapetMinClear) {
         const h = DECK.parapet[kind];
         const w = kind === 'foot' ? 0.06 : DECK.parapetW;
         const ix = -nx * w, iz = -nz * w;

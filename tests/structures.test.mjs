@@ -56,7 +56,7 @@ test('a deck has a top, a soffit and fascia where it stands clear, parapets over
   // the top faces up
   const ys = [];
   for (let i = 0; i < arrays.kind.length; i++) if (arrays.kind[i] === KIND.road) ys.push(arrays.position[3 * i + 1]);
-  assert.ok(Math.min(...ys) > 4.9 && Math.max(...ys) < 5.2);
+  assert.ok(Math.min(...ys) > 4.8 && Math.max(...ys) < 5.2);
   const foot = buildDeckArrays({ ...deck, kind: 'foot' });
   assert.ok(new Set(foot.arrays.kind).has(KIND.metal), 'a foot bridge has railings');
 });
@@ -123,4 +123,63 @@ test('furniture under a deck stands on the ground under it, on the deck it stand
   assert.equal(fg.heightAt(20, 1), 0, 'the lamp under the bridge');
   assert.equal(fg.heightAt(10, 3), 5, 'the lamp on the bridge');
   assert.equal(furnitureGround({ lamps: [{ x: 10, z: 3 }] }, g), g, 'nothing under a deck: the ground model as it was');
+});
+
+test('levelAt keeps to the ramp it is on beside a flat deck; levelAlong places things under or on a bridge by walking in from off it', () => {
+  // a flat deck at 8 m along z = 0, a ramp along z = 4 from 8 m down to 0 at x = 100; the ground is 0, and x > 100 is off the deck
+  const ramp = [], flat = [];
+  for (let x = 0; x <= 100; x += 2) { flat.push(x, 0, 8, 0); ramp.push(x, 4, 8 * (1 - x / 100), 0); }
+  const d = { id: 'd', kind: 'road', ring: [0, -8, 100, -8, 100, 8, 0, 8], holes: [], axes: [{ way: 'flat', kind: 'road', pts: flat }, { way: 'ramp', kind: 'road', pts: ramp }], clear: 8 };
+  const f = createDeckField();
+  f.add('t', [d]);
+  const g = withDecks(f, { heightAt: () => 0, terrainAt: () => 0 });
+  assert.ok(Math.abs(g.levelAt(50, 2.5, 4) - 4) < 0.2, 'on the ramp, not snapped to the flat deck nearer by');
+  assert.equal(g.levelAt(50, 1, 8), 8, 'on the flat deck');
+  assert.equal(g.levelAlong(50, 40, 0, -1, 80, 40), 0, 'a road crossing under: from its end off the deck, under the deck');
+  const up = g.levelAlong(101, 4, -1, 0, 101, 51);
+  assert.ok(Math.abs(up - 4) < 0.2, `on the ramp half way up: ${up}`);
+  assert.equal(g.levelAlong(20, 0, 1, 0, 40, 20), 8, 'wholly on the deck: on it');
+});
+
+test('a deck ends in an abutment where a road comes on: no parapet across the road, the wall down to the ground', () => {
+  const ring = [];
+  for (let x = 0; x <= 40; x += 4) ring.push(x, -4);
+  for (let z = -2; z <= 2; z += 2) ring.push(40, z);
+  for (let x = 40; x >= 0; x -= 4) ring.push(x, 4);
+  for (let z = 2; z >= -2; z -= 2) ring.push(0, z);
+  const axis = [];
+  for (let x = 0; x <= 40; x += 2) axis.push(x, 0, 6, 0);
+  const d = { id: 'e', kind: 'road', ring, ringG: new Array(ring.length / 2).fill(0), holes: [], holesG: [], axes: [{ way: 'w', kind: 'road', pts: axis }], clear: 6 };
+  const { arrays, stats } = buildDeckArrays(d);
+  assert.ok(Math.abs(stats.parapetM - 80) <= 8, `parapets along the two sides only: ${stats.parapetM} m`);
+  let lowest = Infinity;
+  for (let i = 0; i < arrays.position.length; i += 3) if (Math.abs(arrays.position[i]) < 1e-6 && Math.abs(arrays.position[i + 2]) < 2.5) lowest = Math.min(lowest, arrays.position[i + 1]);
+  assert.ok(lowest <= 0.01, `the abutment reaches the ground: ${lowest}`);
+});
+
+test('something on a deck that runs just past its edge stays on it; farther off, or at another height, it does not', () => {
+  const f = createDeckField();
+  f.add('t', [deck]); // 40 x 8 m at 5 m over the ground at -1
+  const g = withDecks(f, { heightAt: () => -1, terrainAt: () => -1 });
+  assert.equal(g.levelAt(20, 5, 5), 5, 'a metre past the edge, at the deck height');
+  assert.equal(g.levelAt(20, 9, 5), -1, 'well past it');
+  assert.equal(g.levelAt(20, 5, -1), -1, 'on the ground beside the deck');
+});
+
+test('a way with both ends under decks is placed from the part of it between them', () => {
+  const box = (id, x0, x1) => ({ id, kind: 'road', ring: [x0, -10, x1, -10, x1, 10, x0, 10], holes: [], axes: [{ way: id, kind: 'road', pts: [x0, -10, 6, 0, x0, 10, 6, 0] }], clear: 6 });
+  const f = createDeckField();
+  f.add('t', [box('a', -10, 10), box('b', 40, 60)]);
+  const g = withDecks(f, { heightAt: () => 0, terrainAt: () => 0 });
+  assert.equal(g.levelAlong(0, 0, 1, 0, 50, 5), 0, 'under the first deck, seen from the gap');
+  assert.equal(g.levelAlong(0, 0, 1, 0, 50, 45), 0, 'under the second');
+});
+
+test('the road that joins a deck end lies on the deck where it enters the footprint', async () => {
+  const { settleOnDecks } = await import('../js/road-compute.js');
+  const d = { ...deck, axes: [{ way: 'w', kind: 'road', pts: axis.map((v, i) => (i % 4 === 3 ? 0 : v)) }] };
+  const geo = { roads: [{ id: 'w', pts: [0, 0, 40, 0], width: 8 }, { id: 'approach', pts: [-30, 0, 0, 0], width: 8 }], cycleTracks: [] };
+  const quad = { position: new Float32Array([1, 0.02, -1, 3, 0.02, -1, 3, 0.02, 1, 1, 0.02, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), owner: new Int32Array(4), owners: ['approach'] };
+  settleOnDecks([quad], [d], { heightAt: () => 0 }, geo);
+  assert.ok(Math.abs(quad.position[1] - 5.08) < 0.01, `on the deck: ${quad.position[1]}`);
 });

@@ -1528,7 +1528,9 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     v.dl = v.dlv = 0;
     v.vx = v.vz = v.yawOffset = v.yawVel = v.pitch = v.pitchVel = v.roll = v.rollVel = 0;
     locate(v);
-    v.gy = levelAt(v.x, v.z, NaN);
+    // on a road under a bridge it stands under it, on the bridge on it: walked out from the edge's end that is off the decks
+    const seed = options.groundHeight?.levelAlong ? options.groundHeight.levelAlong(e.sx, e.sz, e.dx, e.dz, e.len, s) : NaN;
+    v.gy = levelAt(v.x, v.z, seed);
     v.prevX = v.x;
     v.prevZ = v.z;
     v.yaw = Math.atan2(v.tx, v.tz);

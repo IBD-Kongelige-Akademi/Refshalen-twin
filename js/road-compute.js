@@ -49,6 +49,7 @@ export function makeRoadJob(ctx, { near, terrain, decks = null }) {
 const DECK_CLEAR = 0.4; // m: where a deck stands this far over the ground the road surfaces there are sorted onto or under it
 const SKIRT_REACH = 3.0; // m round a steep triangle that a deck is looked for
 const ON_DECK_LIFT = 0.06; // m: a surface lifted onto a deck lies this much over the deck's measured top (the deck top is drawn 0.03 up)
+const JOIN_REACH = 1.5; // m between a road's end and a deck way's end that make it one road
 const MIXED_STEP = 0.6; // m: a triangle part on a deck, part off it, that spans more height than this is dropped
 const OWN_REACH = 6.0; // m past its half width that a deck's own way claims the surfaces (its pavements, kerbs and cycle lanes)
 
@@ -96,6 +97,21 @@ export function settleOnDecks(meshes, decks, terrain, geo = {}) {
   field.add('job', decks);
   const own = new Map(decks.map((d) => [d.id, new Set((d.axes || []).map((a) => a.way))]));
   const lines = centrelines(geo);
+  // a road that ends where a way of the deck ends comes onto the deck: its last metres in the footprint lie on it, not on the ground under it
+  for (const d of decks) {
+    const mine = own.get(d.id);
+    const ends = [];
+    for (const a of d.axes || []) {
+      if (a.kind === 'foot' || !a.pts || a.pts.length < 8) continue;
+      ends.push([a.pts[0], a.pts[1]], [a.pts[a.pts.length - 4], a.pts[a.pts.length - 3]]);
+    }
+    for (const l of lines) {
+      const p = l.pts, n = p.length;
+      for (const [x, z] of ends) {
+        if (Math.hypot(p[0] - x, p[1] - z) < JOIN_REACH || Math.hypot(p[n - 2] - x, p[n - 1] - z) < JOIN_REACH) { mine.add(l.id); break; }
+      }
+    }
+  }
   const ground = (x, z) => (terrain ? terrain.heightAt(x, z) : 0);
   const OUT = 0, ON = 1, UNDER = 2;
   /** { cls, y }: the vertex's class and, on a deck, its height there; `way` = the way the vertex was drawn for, when known */
@@ -103,10 +119,11 @@ export function settleOnDecks(meshes, decks, terrain, geo = {}) {
     const info = field.deckInfo(x, z);
     if (!info) return { cls: OUT, y };
     const g = ground(x, z);
-    if (info.y - g <= DECK_CLEAR) return { cls: OUT, y };
+    const low = info.y - g <= DECK_CLEAR; // the deck barely over the ground here: what is not the deck's stays where it is
     const mine = own.get(info.deck.id);
-    const lift = { cls: ON, y: info.y + ON_DECK_LIFT + Math.max(0, y - g) };
-    if (way !== null) return mine.has(way) ? lift : { cls: UNDER, y };
+    // (the deck's own way always lies on it: draped on ground just under the deck it would hide under the deck's top)
+    const lift = { cls: ON, y: Math.max(info.y, g) + ON_DECK_LIFT + Math.max(0, y - g) };
+    if (way !== null) return mine.has(way) ? lift : low ? { cls: OUT, y } : { cls: UNDER, y };
     let best = Infinity, bestOwn = false;
     for (const l of lines) {
       const b = l.box;
@@ -115,7 +132,8 @@ export function settleOnDecks(meshes, decks, terrain, geo = {}) {
       if (d < best - 1e-6 || (Math.abs(d - best) <= 1e-6 && mine.has(l.id))) { best = d; bestOwn = mine.has(l.id); }
     }
     // no way near (a fjord bridge's register surfaces): the deck's
-    if (bestOwn ? best <= OWN_REACH : best > OWN_REACH) return lift;
+    if (bestOwn ? best <= OWN_REACH : !low && best > OWN_REACH) return lift;
+    if (low) return { cls: OUT, y };
     return { cls: UNDER, y };
   };
   const overWater = (x, z) => {

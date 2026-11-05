@@ -23,8 +23,10 @@ def test_a_deck_across_a_cutting_lowers_the_terrain_to_the_cutting():
     d = {"_g": Polygon([(20, 45), (80, 45), (80, 55), (20, 55)]), "axes": [{"pts": [20, 50, 6, 6, 80, 50, 6, 6]}]}
     changed = CS.terrain_under_decks([d], H)
     assert changed > 0
-    inside = H.dtm.grid[23:27, 11:39]  # cells whose centres lie in the deck
+    inside = H.dtm.grid[23:27, 16:34]  # the cells in the deck's middle, past the fades to its ends
     assert float(inside.max()) < 0.5, inside.max()  # down to the cutting's floor
+    # towards the ends the ground rises back: the road meets the deck, and the mesh does not dip beside the joint
+    assert float(H.dtm.grid[25, 11]) > 3.0, H.dtm.grid[25, 11]
     assert float(H.dtm.grid[22:28, :8].min()) == 6.0, "outside the deck the ridge stays"
     # only ever lowered
     assert (H.dtm.grid <= H.orig + 1e-6).all()
@@ -83,3 +85,84 @@ def test_the_terrain_under_the_sea_goes_to_the_bed_and_a_stream_keeps_its_ground
     assert float(H.dtm.grid[50, 25]) == np.float32(-3.85 - CS.SINK_M), "the ridge in the sea is cut to the bed"
     assert float(H.dtm.grid[50, 75]) == 6.0, "the ridge over the stream stays"
     assert float(H.dtm.grid[10, 25]) == np.float32(-4.8), "the sea floor within 0.3 m of the bed stays"
+
+
+def _settle_h():
+    H = types.SimpleNamespace(wtree=None, levels=[])
+    H.ndsm = lambda x, z: np.full(np.shape(x), 5.0)
+    H.terrain = lambda x, z: np.zeros(np.shape(np.atleast_1d(x)))
+    return H
+
+
+def _axis(y, way="osm:way/1", kind="road", z=0.0):
+    return {"way": way, "kind": kind, "pts": [v for i, h in enumerate(y) for v in (i * 2.0, z, float(h), 0.0)]}
+
+
+def _ground_way(pts, nodes):
+    from shapely.geometry import LineString
+    return {"id": "osm:way/9", "tags": {}, "nodes": nodes, "pts": pts, "line": LineString(pts), "kind": "road", "width": 8.0, "layer": 0, "name": "", "tunnel": False}
+
+
+def test_a_deck_ends_at_the_road_height_and_climbs_no_steeper_than_the_grade():
+    H = _settle_h()
+    H.terrain = lambda x, z: np.full(np.shape(np.atleast_1d(x)), 1.0)  # the road off the deck at 1 m
+    a = _axis([6.0] * 41)  # 80 m at 6 m on a road at 1 m at both ends: a step of 5 m as measured
+    d = {"id": "d", "kind": "road", "axes": [a]}
+    roads = [_ground_way([(0, 0), (-20, 0)], [1, 2]), _ground_way([(80, 0), (100, 0)], [3, 4])]
+    CS.settle_deck_heights([d], {"osm:way/1": [1, 3]}, roads, H)
+    y = a["pts"][2::4]
+    assert abs(y[0] - 1.0) < 0.05 and abs(y[-1] - 1.0) < 0.05, (y[0], y[-1])
+    assert max(abs(y[i + 1] - y[i]) for i in range(40)) / 2.0 <= CS.DECK_GRADE["road"] + 0.02
+    assert max(y) > 2.0, "it still climbs"
+
+
+def test_a_height_read_from_a_roof_is_replaced_by_the_readings_beside_it():
+    H = _settle_h()
+    building = Polygon([(37, -5), (43, -5), (43, 5), (37, 5)])
+    a = _axis([6.0] * 19 + [20.0] * 3 + [6.0] * 19)
+    CS.settle_deck_heights([{"id": "d", "kind": "road", "axes": [a]}], {}, [], H, [building])
+    assert max(a["pts"][2::4]) < 6.5, max(a["pts"][2::4])
+
+
+def test_a_footway_on_a_road_deck_takes_the_road_height():
+    H = _settle_h()
+    road = _axis([6.0] * 21)
+    foot = _axis([4.5] * 21, way="osm:way/2", kind="foot", z=5.0)
+    CS.settle_deck_heights([{"id": "d", "kind": "road", "axes": [road, foot]}], {}, [], H)
+    assert abs(foot["pts"][2 + 4 * 10] - road["pts"][2 + 4 * 10]) < 0.1
+
+
+def test_no_terrain_stands_through_a_deck():
+    grid = np.full((50, 50), 6.0, np.float32)  # the ground as high as the deck, as at a deck's end
+    H = types.SimpleNamespace(dtm=types.SimpleNamespace(grid=grid, x0=0.0, z0=0.0, cell=2.0))
+    d = {"_g": Polygon([(20, 40), (80, 40), (80, 60), (20, 60)]), "axes": [{"pts": [20, 50, 6, 0, 80, 50, 6, 0]}]}
+    assert CS.terrain_below_decks([d], H) > 0
+    assert float(grid[25, 25]) == 6.0 - CS.UNDER_DECK_M
+    assert float(grid[25, 2]) == 6.0, "outside the deck the ground stays"
+
+
+def test_a_footway_tied_to_low_ground_at_the_deck_end_does_not_pull_the_road_edge_down():
+    H = _settle_h()
+    H.terrain = lambda x, z: np.where(np.atleast_1d(z) > 2, 0.5, 3.0)  # the road's ground at 3 m, the ground beside it at 0.5 m
+    road = _axis([6.0] * 31)
+    foot = _axis([5.5] * 31, way="osm:way/2", kind="foot", z=5.0)
+    d = {"id": "d", "kind": "road", "axes": [road, foot]}
+    roads = [_ground_way([(0, 0), (-20, 0)], [1, 2])]
+    side = {**_ground_way([(0, 5), (-20, 5)], [5, 6]), "kind": "foot"}
+    CS.settle_deck_heights([d], {"osm:way/1": [1, 3], "osm:way/2": [5, 7]}, roads + [side], H)
+    assert abs(road["pts"][2] - 3.0) < 0.05
+    assert abs(foot["pts"][2] - road["pts"][2]) < 0.05, (foot["pts"][2], road["pts"][2])
+
+
+def test_the_road_before_a_deck_stands_on_an_embankment_across_its_width():
+    grid = np.zeros((60, 60), np.float32)
+    grid[:, 24:26] = 3.0  # the compiled ridge: 4 m wide, at x 48..52, under a road 12 m wide
+    H = types.SimpleNamespace(dtm=types.SimpleNamespace(grid=grid, x0=0.0, z0=0.0, cell=2.0), raw=[], levels=[])
+    H.terrain = lambda x, z: np.full(np.shape(np.atleast_1d(x)), 3.0)
+    d = {"id": "d", "kind": "road", "_g": Polygon([(40, 60), (60, 60), (60, 90), (40, 90)]), "axes": [{"way": "osm:way/1", "kind": "road", "pts": [50, 60, 3, 0, 50, 90, 3, 0]}]}
+    road = _ground_way([(50, 60), (50, 0)], [1, 2])
+    road["width"] = 12.0
+    assert CS.approach_embankments([d], {"osm:way/1": [1, 5]}, [road], H) > 0
+    assert float(grid[25, 21]) == 3.0, "the road's edge at x 43: raised to the centreline"
+    assert float(grid[5, 21]) == 0.0, "past the embankment the ground stays"
+    assert float(grid[35, 21]) == 0.0, "in the deck's footprint the ground stays"

@@ -80,6 +80,24 @@ CHAIN_TURN_DEG = 50.0  # a ramp runs on along the way's continuation where it tu
 TUNNEL_MAX_M = 80.0  # a tunnel way this short under a road or railway that is not tagged a bridge is an underpass: the road gets a deck
 TUNNEL_FEASIBLE = 0.8  # a tunnel deck is kept where its tunnel can be lowered to this share of its clearance
 TUNNEL_DECK_PAD_M = {"road": 4.0, "rail": 1.0, "foot": 1.0}  # a tunnel deck is this much wider than the way it carries (the pavements)
+# ---- the deck profile: smooth, one surface across a deck, tied to the road at its ends
+DECK_GRADE = {"road": 0.08, "rail": 0.03, "foot": 0.10}  # the steepest a carried way climbs
+TIE_M = 4.0  # the road a deck connects to is read this far past the deck's end
+TIE_BLEND_MIN_M = 24.0  # a tie is blended in over at least this length of the way
+SMOOTH_M = 12.0  # the running mean along a way, either side
+SAME_DECK_M = 14.0  # stations this close, this close in height, are one surface
+SAME_DECK_DY_M = 2.5
+FOOT_FOLLOWS_DY_M = 3.5  # a footway beside a road this close in height is on the road's deck, not a ramp of its own
+INVALID_OVER_WATER_M = 1.0  # a deck reading this little over the water has no reading of the bridge
+UNDER_DECK_M = 0.5  # the ground under a deck lies at least this far under its top
+EMBANK_M = 25.0  # the road before a deck that stands on an embankment
+EMBANK_MARGIN_M = 4.0  # past the mapped half width: the drawn carriageway and its kerbs can reach this far
+EMBANK_BANK_M = 4.0  # how far its 1:1 bank reaches past the road's edge
+END_KEEP_M = 6.0  # the underpass cuts keep this far from where a road comes onto a deck
+END_FADE_M = 10.0  # the terrain cut under a deck fades to nothing over this length towards the end of a road or rail way it carries
+DECK_GROW_M = 1.5  # a road deck is this much wider than its outline
+CARRIED_LANES_M = 8.0  # either side of a carried way: its lanes, which can run past the outline
+APPROACH_M = 60.0  # the road this far past a deck's end is its approach, kept out of the underpass cuts
 FOOT = ("footway", "cycleway", "path", "steps", "pedestrian", "bridleway", "track", "corridor")
 WATER_REACH_M = 3.0  # a deck point this close to the water stands over the water  # a DSM sample this far over the terrain is not a deck (a crane, a building edge)
 
@@ -268,9 +286,20 @@ def terrain_under_decks(decks, H) -> int:
                 g = min(g, bed) if math.isfinite(g) else bed
         return g
 
+    def wet_cell(x, z):
+        return H.wtree is not None and len(H.wtree.query(shapely.points(x, z), predicate="within")) > 0
+
     changed = 0
     for d in decks:
         g = d["_g"]
+        # the ends where a road or a track comes onto the deck (what meets another way inside the outline is no end)
+        ends = []
+        for a in d["axes"]:
+            if a.get("kind") == "foot" or len(a["pts"]) < 8:
+                continue
+            for ex, ez in ((a["pts"][0], a["pts"][1]), (a["pts"][-4], a["pts"][-3])):
+                if g.boundary.distance(shapely.points(ex, ez)) < 8.0:
+                    ends.append((ex, ez))
         segs = []
         for a in d["axes"]:
             p = a["pts"]
@@ -317,9 +346,40 @@ def terrain_under_decks(decks, H) -> int:
                 else:
                     under = samples[0][1]
                 if math.isfinite(orig[j, i]) and orig[j, i] - under > UNDER_MIN_DROP_M:
+                    # towards a road's end of the deck the ground rises back to the road, or the mesh would dip beside the joint
+                    if ends and not wet_cell(cx, cz):
+                        fade = min(1.0, min(math.hypot(cx - ex, cz - ez) for ex, ez in ends) / END_FADE_M)
+                        under = orig[j, i] - (orig[j, i] - under) * fade
                     grid[j, i] = under
                     changed += 1
     return changed
+
+
+def terrain_below_decks(decks, H) -> int:
+    """No terrain cell in a deck's footprint stands higher than UNDER_DECK_M under the deck there (the height of its nearest station): the
+    ground near a deck's end is at about the deck's height, and would poke through its top and the road on it. Returns the cells lowered."""
+    grid = H.dtm.grid
+    x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
+    n = 0
+    for d in decks:
+        st = np.array([a["pts"][m:m + 3] for a in d["axes"] for m in range(0, len(a["pts"]), 4)], float)
+        if not len(st):
+            continue
+        bx0, bz0, bx1, bz1 = d["_g"].bounds
+        # one cell past the outline as well: the ground mesh runs between the cell centres
+        i0, i1 = max(0, int(math.floor((bx0 - x0) / cell)) - 1), min(grid.shape[1] - 1, int(math.ceil((bx1 - x0) / cell)) + 1)
+        j0, j1 = max(0, int(math.floor((bz0 - z0) / cell)) - 1), min(grid.shape[0] - 1, int(math.ceil((bz1 - z0) / cell)) + 1)
+        if i1 < i0 or j1 < j0:
+            continue
+        ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1))
+        cx, cz = x0 + (ii + 0.5) * cell, z0 + (jj + 0.5) * cell
+        inside = shapely.contains_xy(d["_g"], cx, cz)
+        for j, i, x, z in zip(jj[inside], ii[inside], cx[inside], cz[inside]):
+            y = st[np.argmin((st[:, 0] - x) ** 2 + (st[:, 1] - z) ** 2), 2]
+            if math.isfinite(grid[j, i]) and grid[j, i] > y - UNDER_DECK_M:
+                grid[j, i] = y - UNDER_DECK_M
+                n += 1
+    return n
 
 
 def regrounded(d, H):
@@ -448,6 +508,275 @@ def write_terrain(tiles_dir: Path, H, ids) -> int:
         out["chunk"] = {**c, "data": base64.b64encode(cm.tobytes()).decode("ascii")}
         path.write_text(json.dumps(out, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
         n += 1
+    return n
+
+
+def profile_station_s(p):
+    """Metres along an axis's stations (pts flat [x, z, y, g, ...])."""
+    x, z = np.array(p[0::4], float), np.array(p[1::4], float)
+    return np.concatenate([[0.0], np.cumsum(np.hypot(np.diff(x), np.diff(z)))])
+
+
+def graded(y, s, grade):
+    """y with no step steeper than `grade`: limited forward, then backward."""
+    y = np.array(y, float)
+    for i in range(1, len(y)):
+        y[i] = np.clip(y[i], y[i - 1] - grade * (s[i] - s[i - 1]), y[i - 1] + grade * (s[i] - s[i - 1]))
+    for i in range(len(y) - 2, -1, -1):
+        y[i] = np.clip(y[i], y[i + 1] - grade * (s[i + 1] - s[i]), y[i + 1] + grade * (s[i + 1] - s[i]))
+    return y
+
+
+def running_mean(y, s, reach):
+    """The mean of y over +- reach m of each station (shrunk at the ends, so an end stays where it is)."""
+    out = np.array(y, float)
+    for i in range(len(y)):
+        r = min(reach, s[i], s[-1] - s[i])
+        out[i] = y[(s >= s[i] - r) & (s <= s[i] + r)].mean()
+    return out
+
+
+def valid_stations(p, H, building_tree):
+    """Which stations of an axis have a reading of the bridge: not under a building (the surface model reads the roof), not off the
+    surface model, not at the water's surface."""
+    x, z, y = np.array(p[0::4], float), np.array(p[1::4], float), np.array(p[2::4], float)
+    ok = np.isfinite(H.ndsm(x, z))
+    pts = shapely.points(x, z)
+    if building_tree is not None:
+        ok[building_tree.query(pts, predicate="within")[0]] = False
+    if H.wtree is not None:
+        hit = H.wtree.query(pts, predicate="within")
+        for i, j in zip(hit[0], hit[1]):
+            if y[i] < H.levels[j] + INVALID_OVER_WATER_M:
+                ok[i] = False
+    return ok
+
+
+def tie(y, s, end, target, grade):
+    """y blended to `target` at its first (end 0) or last station."""
+    delta = target - (y[0] if end == 0 else y[-1])
+    length = max(TIE_BLEND_MIN_M, abs(delta) / grade)
+    from_end = s if end == 0 else s[-1] - s
+    return y + delta * np.clip(1.0 - from_end / length, 0.0, 1.0)
+
+
+def settle_deck_heights(decks, way_nodes, gways, H, buildings=()) -> dict:
+    """Every deck's heights become one smooth surface tied to the road at its ends (on the terrain as compiled, so before any cut):
+      - stations with no reading of the bridge (valid_stations) take the neighbouring readings;
+      - each way is smoothed and limited to DECK_GRADE;
+      - a way's end where a road carries on off the deck takes that road's height (TIE_M past the node), and ways that meet take one height;
+      - stations of a deck close together in plan and height take one height: the footway and the road beside it are one deck.
+    Returns { ends: the ends tied to a road, invalid: the stations without a reading }."""
+    by_node = {}
+    for j, w in enumerate(gways):
+        for nid in (w["nodes"][0], w["nodes"][-1]):
+            by_node.setdefault(nid, []).append(j)
+    btree = STRtree(list(buildings)) if len(buildings) else None
+    stats = {"ends": 0, "invalid": 0}
+    for d in decks:
+        recs = []
+        for a in d["axes"]:
+            p = a["pts"]
+            if len(p) < 8:
+                continue
+            s = profile_station_s(p)
+            y = np.array(p[2::4], float)
+            ok = valid_stations(p, H, btree)
+            stats["invalid"] += int((~ok).sum())
+            if ok.any() and not ok.all():
+                y = np.interp(s, s[ok], y[ok])
+            # (a tunnel deck's axes are pieces of their ways: their ends are not the ways' nodes)
+            recs.append({"a": a, "s": s, "y": running_mean(y, s, SMOOTH_M), "grade": DECK_GRADE.get(a["kind"], 0.08), "blank": not ok.any(),
+                         "nodes": None if d.get("tunnel") else way_nodes.get(a["way"])})
+        if not recs:
+            continue
+        # a way with no reading at all (the bridge running off the surface model) holds the height of the ways it meets
+        for _ in range(len(recs)):
+            for r in recs:
+                if not r["blank"] or not r["nodes"]:
+                    continue
+                ends = {r["nodes"][0], r["nodes"][-1]}
+                vals = [o["y"][0 if o["nodes"][0] in ends else -1] for o in recs if o is not r and not o["blank"] and o["nodes"] and (o["nodes"][0] in ends or o["nodes"][-1] in ends)]
+                if vals:
+                    r["y"] = np.full(len(r["y"]), float(np.mean(vals)))
+                    r["blank"] = False
+        # the targets at the ends: the road carrying on off the deck
+        targets = []  # (rec, end, target or None, key)
+        for r in recs:
+            p = r["a"]["pts"]
+            for end in (0, 1):
+                x, z = (p[0], p[1]) if end == 0 else (p[-4], p[-3])
+                target = None
+                nid = r["nodes"][0 if end == 0 else -1] if r["nodes"] else None
+                if d.get("tunnel"):
+                    v = float(np.ravel(H.terrain(x, z))[0])
+                    target = v if math.isfinite(v) else None
+                for j in by_node.get(nid, ()) if nid is not None else ():
+                    w = gways[j]
+                    if w["kind"] == "foot" and r["a"]["kind"] != "foot":
+                        continue
+                    pts = w["pts"] if w["nodes"][0] == nid else w["pts"][::-1]
+                    q = LineString(pts).interpolate(min(TIE_M, LineString(pts).length))
+                    v = float(np.ravel(H.terrain(q.x, q.y))[0])
+                    if math.isfinite(v) and not (H.wtree is not None and len(H.wtree.query(q, predicate="within"))):
+                        target = v
+                        break
+                targets.append((r, end, target, nid if nid is not None else (round(x, 1), round(z, 1))))
+        for _ in range(3):
+            # ways that meet take one height: the road's, where one carries on there
+            meet = {}
+            for r, end, target, key in targets:
+                meet.setdefault(key, []).append((r, end, target))
+            for group in meet.values():
+                fixed = [t for _, _, t in group if t is not None]
+                if len(group) < 2 and not fixed:
+                    continue
+                value = float(np.mean(fixed)) if fixed else float(np.mean([(r["y"][0] if e == 0 else r["y"][-1]) for r, e, _ in group]))
+                for r, end, _ in group:
+                    r["y"] = tie(r["y"], r["s"], end, value, r["grade"])
+            # one surface: the mean of the stations close by; the footways follow the road
+            xyz = []
+            for k, r in enumerate(recs):
+                p = r["a"]["pts"]
+                xyz += [(p[4 * i], p[4 * i + 1], r["y"][i], k, i) for i in range(len(r["y"]))]
+            arr = np.array(xyz)
+            road = np.array([recs[int(k)]["a"]["kind"] != "foot" for k in arr[:, 3]])
+            if len(arr) > 1 and len(recs) > 1:
+                new = arr[:, 2].copy()
+                for m in range(len(arr)):
+                    near = (np.abs(arr[:, 0] - arr[m, 0]) < SAME_DECK_M) & (np.abs(arr[:, 1] - arr[m, 1]) < SAME_DECK_M)
+                    near &= np.hypot(arr[:, 0] - arr[m, 0], arr[:, 1] - arr[m, 1]) < SAME_DECK_M
+                    near &= np.abs(arr[:, 2] - arr[m, 2]) < SAME_DECK_DY_M
+                    if near.any() and (near & road).any():
+                        near &= road
+                    if near.any():
+                        new[m] = arr[near, 2].mean()
+                for k, r in enumerate(recs):
+                    r["y"] = new[arr[:, 3] == k]
+            for r in recs:
+                r["y"] = graded(running_mean(r["y"], r["s"], SMOOTH_M / 2), r["s"], r["grade"])
+        # the last word at the ends is the road's
+        for r, end, target, _ in targets:
+            if target is not None:
+                r["y"] = tie(r["y"], r["s"], end, target, r["grade"])
+                stats["ends"] += 1
+        # the last word beside a road is the road's: a footway or cycleway on a road deck has its height, also at the end where its own tie
+        # to the ground beside the bridge would pull the edge of the road down with it (the deck's height is that of the nearest way)
+        rx = [(r["a"]["pts"][4 * i], r["a"]["pts"][4 * i + 1], r["y"][i]) for r in recs if r["a"]["kind"] != "foot" for i in range(len(r["y"]))]
+        if rx:
+            rx = np.array(rx)
+            for r in recs:
+                if r["a"]["kind"] != "foot":
+                    continue
+                p = r["a"]["pts"]
+                for i in range(len(r["y"])):
+                    dist = np.hypot(rx[:, 0] - p[4 * i], rx[:, 1] - p[4 * i + 1])
+                    k = int(np.argmin(dist))
+                    if dist[k] < SAME_DECK_M and abs(rx[k, 2] - r["y"][i]) < FOOT_FOLLOWS_DY_M:
+                        r["y"][i] = rx[k, 2]
+        for r in recs:
+            r["a"]["pts"][2::4] = [round(float(v), 2) for v in r["y"]]
+    return stats
+
+
+def approach_strips(decks, way_nodes, gways):
+    """The roads and tracks carrying on off the decks' ends, APPROACH_M of them, and the carried ways' own lanes where they run past the
+    outline: one (multi)polygon, without the decks' footprints. The underpass cuts keep off it, or they would dig away the road that leads
+    onto the bridge."""
+    by_node = {}
+    for j, w in enumerate(gways):
+        for nid in (w["nodes"][0], w["nodes"][-1]):
+            by_node.setdefault(nid, []).append(j)
+    strips = []
+    for d in decks:
+        for a in d["axes"]:
+            if a["kind"] != "foot" and len(a["pts"]) >= 8:
+                strips.append(LineString(list(zip(a["pts"][0::4], a["pts"][1::4]))).buffer(CARRIED_LANES_M))
+            nodes = way_nodes.get(a["way"])
+            # (a tunnel deck's way runs on along the terrain: what meets it there may be the road through the tunnel)
+            if a["kind"] == "foot" or not nodes or d.get("tunnel"):
+                continue
+            for nid in (nodes[0], nodes[-1]):
+                for j in by_node.get(nid, ()):
+                    w = gways[j]
+                    if w["kind"] == "foot" or w["tunnel"]:
+                        continue
+                    pts = w["pts"] if w["nodes"][0] == nid else w["pts"][::-1]
+                    line = LineString(pts)
+                    part = shapely.ops.substring(line, 0.0, min(APPROACH_M, line.length))
+                    strips.append(part.buffer(w["width"] / 2 + 1.0))
+    if not strips:
+        return None
+    keep = unary_union(strips).difference(unary_union([d["_g"] for d in decks]))
+    # and the deck's ends themselves: a hole under the end of a deck is a hole in front of the road
+    ends = []
+    for d in decks:
+        for a in d["axes"]:
+            if a["kind"] == "foot" or len(a["pts"]) < 8:
+                continue
+            for x, z in ((a["pts"][0], a["pts"][1]), (a["pts"][-4], a["pts"][-3])):
+                if d["_g"].boundary.distance(shapely.points(x, z)) < 4.0:
+                    ends.append(shapely.points(x, z).buffer(END_KEEP_M))
+    return unary_union([keep] + ends) if ends else keep
+
+
+def approach_embankments(decks, way_nodes, gways, H) -> int:
+    """The last EMBANK_M of a road or track before a deck stands on an embankment: across its full width the ground is at its centreline's
+    height, with a 1:1 bank beyond. The compiled terrain carries only a narrow ridge there, and a road's edge on lower ground pulls its whole
+    surface down. Only ever raised, never in the water or a deck's footprint. Works on H.dtm.grid; returns the cells raised."""
+    grid = H.dtm.grid
+    x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
+    by_node = {}
+    for j, w in enumerate(gways):
+        for nid in (w["nodes"][0], w["nodes"][-1]):
+            by_node.setdefault(nid, []).append(j)
+    decks_g = unary_union([d["_g"] for d in decks])
+    wet = unary_union(H.raw) if getattr(H, "raw", None) else None
+    n = 0
+    seen = set()
+    for d in decks:
+        if d.get("tunnel"):
+            continue
+        for a in d["axes"]:
+            nodes = way_nodes.get(a["way"])
+            if a["kind"] == "foot" or not nodes:
+                continue
+            for nid in (nodes[0], nodes[-1]):
+                for j in by_node.get(nid, ()):
+                    w = gways[j]
+                    if w["kind"] == "foot" or w["tunnel"] or (j, nid) in seen:
+                        continue
+                    seen.add((j, nid))
+                    pts = w["pts"] if w["nodes"][0] == nid else w["pts"][::-1]
+                    line = LineString(pts)
+                    part = shapely.ops.substring(line, 0.0, min(EMBANK_M, line.length))
+                    if part.length < 1.0:
+                        continue
+                    s = np.linspace(0.0, part.length, max(2, int(math.ceil(part.length)) + 1))
+                    st = shapely.line_interpolate_point(part, s)
+                    centre = np.ravel(H.terrain(shapely.get_x(st), shapely.get_y(st)))
+                    if not np.isfinite(centre).all():
+                        continue
+                    half = w["width"] / 2 + EMBANK_MARGIN_M
+                    bx0, bz0, bx1, bz1 = part.buffer(half + EMBANK_BANK_M).bounds
+                    i0, i1 = max(0, int(math.floor((bx0 - x0) / cell))), min(grid.shape[1] - 1, int(math.ceil((bx1 - x0) / cell)))
+                    j0, j1 = max(0, int(math.floor((bz0 - z0) / cell))), min(grid.shape[0] - 1, int(math.ceil((bz1 - z0) / cell)))
+                    if i1 < i0 or j1 < j0:
+                        continue
+                    ii, jj = np.meshgrid(np.arange(i0, i1 + 1), np.arange(j0, j1 + 1))
+                    cx, cz = (x0 + (ii + 0.5) * cell).ravel(), (z0 + (jj + 0.5) * cell).ravel()
+                    pp = shapely.points(cx, cz)
+                    dist = shapely.distance(part, pp)
+                    along = shapely.line_locate_point(part, pp)
+                    v = np.interp(along, s, centre) - np.maximum(0.0, dist - half)
+                    sub = grid[j0:j1 + 1, i0:i1 + 1].ravel().copy()
+                    hit = (dist <= half + EMBANK_BANK_M) & np.isfinite(sub) & (v > sub + 0.02) & ~shapely.contains_xy(decks_g, cx, cz)
+                    if wet is not None:
+                        hit &= ~shapely.contains_xy(wet, cx, cz)
+                    if hit.any():
+                        sub[hit] = v[hit]
+                        grid[j0:j1 + 1, i0:i1 + 1] = sub.reshape(ii.shape)
+                        n += int(hit.sum())
     return n
 
 
@@ -591,12 +920,13 @@ def tunnel_decks(gways, buildings, H, first_id):
     return decks, [gways[k]["id"] for k in tunnels]
 
 
-def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False):
+def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False, keep=None):
     """Under every deck, the ways that pass under it (not the ways it carries) get their ground lowered to the deck's soffit less
     UNDER_CLEAR_M, ramped back up to the terrain at UNDER_GRADE along the way and its continuations, with 1:1 banks at the sides; never
     more than UNDER_MAX_DROP_M, never under the sea, only ever lowered. A way counts as passing under where the deck stands
     UNDER_MIN_CLEAR_M over it (or it is one of `tunnel_ids`, a tunnel under a tunnel deck). Works on H.dtm.grid in place (not when
-    `dry`); returns (cells lowered, report rows (deck id, deck name, way id, way name, kind, clearance before, after, depth))."""
+    `dry`); `keep` (approach_strips) is ground that is not lowered; returns (cells lowered, report rows (deck id, deck name, way id, way
+    name, kind, clearance before, after, depth))."""
     grid = H.dtm.grid
     x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
     floor = -frame.ORIGIN[2] + UNDER_FLOOR_M
@@ -608,7 +938,7 @@ def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False):
             by_node.setdefault(nid, []).append(j)
     changed, rows = 0, []
     for d in decks:
-        g = d["_g"]
+        g = d.get("_g0", d["_g"])
         carried = {a["way"] for a in d["axes"]}
         thick = DECK_THICK_M[d["kind"]]
         axpts = np.array([a["pts"][m:m + 3] for a in d["axes"] for m in range(0, len(a["pts"]), 4)], float)
@@ -677,6 +1007,8 @@ def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False):
             v = pv + np.maximum(0.0, dist - half) * BANK_SLOPE
             sub = grid[j0:j1 + 1, i0:i1 + 1].ravel()
             hit = (dist <= pad) & np.isfinite(sub) & (v < sub - 0.02)
+            if keep is not None:
+                hit &= ~shapely.contains_xy(keep, cx.ravel(), cz.ravel())
             if hit.any():
                 sub = sub.copy()
                 sub[hit] = v[hit]
@@ -769,6 +1101,10 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
         names += [ways[j]["name"] for j in members if ways[j]["name"]]
         kinds = {ways[j]["kind"] for j in members}
         kind = "rail" if kinds == {"rail"} else "road" if "road" in kinds or "rail" in kinds else "foot"
+        g0 = g  # what passes under is judged on the outline as mapped: a road along the widened edge does not
+        if kind == "road":  # the OSM outlines can be narrower than the lanes drawn on them
+            g = g.buffer(DECK_GROW_M, join_style="mitre", mitre_limit=2.0)
+            g = max(g.geoms, key=lambda q: q.area) if hasattr(g, "geoms") else g
         g = g.simplify(0.25, preserve_topology=True)
         ext, ext_g = ring_with_ground(list(g.exterior.coords)[:-1], H)
         holes, holes_g = [], []
@@ -777,7 +1113,7 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
             holes.append(hr)
             holes_g.append(hg)
         decks.append({"id": f"deck:{len(decks)}", "name": names[0] if names else "", "kind": kind, "ring": ext, "ringG": ext_g, "holes": holes,
-                      "holesG": holes_g, "axes": axes, "clear": round(clear, 2), "_g": g})
+                      "holesG": holes_g, "axes": axes, "clear": round(clear, 2), "_g": g, "_g0": g0})
     # ---- underpasses: short tunnels under a road that is not tagged a bridge get a deck; then every way under a deck is lowered
     gways = ground_ways(els, tr, area)
     buildings = []
@@ -794,11 +1130,18 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
         d["id"] = f"deck:{len(decks) + k}"
     tdecks = kept
     decks += tdecks
+    # the profiles, on the terrain as compiled: smooth, one surface, tied to the road at the ends
+    way_nodes = {f"osm:way/{i}": w["nodes"] for (t, i), w in els.items() if t == "way" and "nodes" in w}
+    settled = settle_deck_heights(decks, way_nodes, gways, H, buildings)
+    log(f"deck profiles: {settled['ends']} ends tied to their road, {settled['invalid']} stations without a reading of the bridge")
+    keep = approach_strips(decks, way_nodes, gways)
     changed = terrain_under_decks(decks, H)
     gaps = water_gaps(decks, H)
     wet = terrain_in_water(H, gaps)
+    log(f"terrain: {terrain_below_decks(decks, H)} cells brought under their decks")
     log(f"water: the terrain cut to the bed under the sea and the rivers in {wet} cells")
-    lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids)
+    lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids, keep=keep)
+    log(f"terrain: {approach_embankments(decks, way_nodes, gways, H)} cells raised for the approaches' embankments")
     for r in rows:
         log("  under", *r)
     for d in decks:
@@ -864,7 +1207,7 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
                 if q.geom_type == "Polygon" and q.area > 1.0:
                     ra.append([round(v, 2) for c in list(q.exterior.coords)[:-1] for v in c])
         if ds or rs or ra:
-            out[tid] = {"tile": tid, "railAreas": ra, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
+            out[tid] = {"tile": tid, "railAreas": ra, "decks": [{k: v for k, v in d.items() if not k.startswith("_")} for d in sorted(ds, key=lambda d: d["id"])],
                         "rails": [{k: v for k, v in r.items() if k != "_g"} for r in sorted(rs, key=lambda r: r["id"])]}
     terrain_tiles = write_terrain(tiles_dir, H, ids)
     log(f"water: {write_water_gaps(tiles_dir, gaps):.0f} m2 added under the decks over the water")

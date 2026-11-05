@@ -161,6 +161,7 @@ function populationContext() {
     place: (v, e, lane, s) => Object.assign(v, { edge: e, lane, s })
   };
   context.nearView = trafficFunction('nearView', context);
+  context.groundHeight = null; context.pedRoutes = context.pedRoutes || { pathsNear: () => [] };
   return context;
 }
 

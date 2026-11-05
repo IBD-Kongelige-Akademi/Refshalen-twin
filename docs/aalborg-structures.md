@@ -40,6 +40,43 @@ furniture stage caches.
 - The ground under a deck is the water where the deck is over water, else the terrain. The build stores it with every outline vertex
   and axis station, so the engine needs no terrain to draw a deck that spans tiles.
 
+**One smooth surface, tied to the road.** The surface model alone gives a rough deck: it reads a roof over a way, has no data at the far end
+of Limfjordsbroen (the deck sank to the water there), and measures each way on a deck apart. `settle_deck_heights` fixes the profiles on the
+terrain as compiled, before any cut:
+- Stations under a building, off the surface model or at the water's surface take the readings beside them (681 stations). A way with no reading
+  holds the height of the ways it meets.
+- Each way is smoothed (a running mean over 12 m either side) and limited to a grade: 8 % road, 3 % rail, 10 % foot.
+- Where a road carries on off the deck, the way's end takes that road's height, 4 m past the node, blended in over at least 24 m. Ways that
+  meet take one height.
+- Stations within 14 m and 2.5 m in height are one surface, and a footway beside a road follows the road.
+
+Road decks are 1.5 m wider than the OSM outline, whose edge can fall inside the lanes. What passes under is still judged on the outline as mapped.
+
+**The joint.**
+- A deck's end edge has no parapet across the road; its wall runs down to the ground as an abutment.
+- The terrain cut fades to nothing over 10 m towards a road's end of the deck. The underpass cuts keep off the approach (60 m of the road
+  carrying on, 8 m either side of a carried way, 6 m round a road's end of the deck), or they would dig away the road leading onto the bridge.
+- The last 25 m of the road before a deck stands on an embankment: across its full width (4 m past the mapped half width) the ground is at
+  the centreline's height, with a 1:1 bank. The compiled terrain carries only a narrow ridge there, and a road's edge on lower ground pulls
+  its whole surface down.
+- No terrain cell in a deck's footprint stands within 0.5 m of its top.
+- The deck's plain top is split into triangles of at most 5 m that follow the same height the road is lifted to, and lies 15 cm under it.
+- A road that ends where a deck's way ends counts as the deck's own (`settleOnDecks`): its last metres in the footprint lie on the deck.
+- A footway or cycleway beside a road on a road deck has the road's height, even at its end, where its own tie to the lower ground beside
+  the bridge would pull the road's edge down.
+
+**How the joints are tested.** Two checks, both run in the viewer's data:
+- At Limfjordsbroen's south end, rays cast straight down find the asphalt on top across the joint, climbing evenly 2.97, 3.00, 3.03, 3.06,
+  3.07, 3.08, 3.12 m, where it had dropped to 0.07 m.
+- Of the 30 road ends leaving a deck, none is more than 1 m off its road 6 m on (4 were, up to 8.4 m); 3 are over 0.3 m, on tunnel decks
+  on steep streets.
+- A drive test samples the AI cars' height against distance. Around Limfjordsbroen and Vesterbro, 99 % or more of the samples climb under
+  8 %, and the worst single step is 1 m.
+
+**Levels in the engine.** A car or person placed on a road is walked in from the end that is off the decks (`levelAlong`), so one placed under
+a bridge stands under it. Something at a known height takes the nearby way closest to that height (`deckHeightNear`), so a ramp beside a flat
+deck stays the ramp. A car on a deck that runs just past the edge stays on it. Getting onto a deck takes being within 0.8 m of its top.
+
 **The terrain under a deck.** The compiled terrain carried many bridges: a ridge across the fjord along Limfjordsbroen, a mound
 over the railway at Vesterbro. Under every deck, the terrain is now set to the ground beside the bridge. Each cell takes a value between
 the two points 2.5 m outside the deck's edge, across the nearest carried way, so a railway cutting or a road runs on under the bridge.
@@ -150,6 +187,8 @@ path that runs along a carriageway is left out. About 14 % of pedestrians were o
 
 ## Not done
 
+- **Østre Allé and Hjulmagervej.** The drive test still finds steps here: about 5 % of samples climb over 8 %, with single jumps of 3 to 5 m
+  near (-377, 915), (-40, 835), (-194, 957) and (-66, 968). Ramps run close beside the flat deck, and one deck outline covers them all.
 - **Underpass walls.** A lowered underpass has earth banks, not retaining walls, and a junction beside it is lowered only along the way
   that passes under (a side street meets the ramp at a step down its bank).
 - **Low underpasses near the sea.** Strandvejen under Limfjordsbroen gets 3.1 m, not 4.2 m. The car-park ramps by Nytorv and
@@ -162,6 +201,6 @@ path that runs along a carriageway is left out. About 14 % of pedestrians were o
 - **Watercourse levels.** They are a stand-in (the terrain percentile), not a surveyed water level.
 
 Shots: `docs/structures/limfjordsbroen.jpg` (the deck on its piers over the fjord, traffic and Plusbuses on it),
-`docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro), `docs/structures/gravel-paths.jpg` (gravel paths in a park),
+`docs/structures/limfjordsbroen-joint.jpg` (the road onto the bridge at its south end), `docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro), `docs/structures/gravel-paths.jpg` (gravel paths in a park),
 `docs/structures/strandvejen-under.jpg` (Strandvejen under Limfjordsbroen, the bridge with its lane markings),
 `docs/structures/railway.jpg` (two tracks by the harbour). `?debug=nostructures` switches the layer off.

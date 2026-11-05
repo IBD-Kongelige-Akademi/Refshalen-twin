@@ -10,8 +10,10 @@
 //                       it at most), else the ground under the deck, so what drives onto a bridge stays on it and what passes under
 //                       stays under
 
-export const DECK_REACH = 1.6; // m: something this far under a deck top (or higher) is on the deck
+export const DECK_REACH = 0.8; // m: something this far under a deck top (or higher) is on the deck: a deck end is tied to its road
 const CELL = 32;
+const EDGE_PROBES = [[2.5, 0], [-2.5, 0], [0, 2.5], [0, -2.5], [1.8, 1.8], [-1.8, 1.8], [1.8, -1.8], [-1.8, -1.8]]; // m round a point just off a deck
+const LEVEL_STEP = 2; // m between the points levelAlong walks through
 
 export function pointInRings(x, z, ring, holes = []) {
   let inside = false;
@@ -61,6 +63,31 @@ export function deckGround(d, x, z) {
     }
   }
   return g;
+}
+
+const LEVEL_REACH = 5; // m: ways this much further off than the nearest may be the one something at a known height is on
+
+/** The deck top of d at (x, z) for something at height y: of the ways nearby, the one closest to y (a ramp beside the flat deck stays the ramp). */
+export function deckHeightNear(d, x, z, y) {
+  let bestAll = Infinity;
+  const found = [];
+  for (const a of d.axes || []) {
+    const p = a.pts;
+    let best = Infinity, h = null;
+    for (let i = 4; i < p.length; i += 4) {
+      const ax = p[i - 4], az = p[i - 3], dx = p[i] - ax, dz = p[i + 1] - az;
+      const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz || 1e-9)));
+      const dd = (ax + dx * t - x) ** 2 + (az + dz * t - z) ** 2;
+      if (dd < best) { best = dd; h = p[i - 2] + (p[i + 2] - p[i - 2]) * t; }
+    }
+    if (h === null) continue;
+    best = Math.sqrt(best);
+    bestAll = Math.min(bestAll, best);
+    found.push([best, h]);
+  }
+  let out = null;
+  for (const [dist, h] of found) if (dist <= bestAll + LEVEL_REACH && (out === null || Math.abs(h - y) < Math.abs(out - y))) out = h;
+  return out;
 }
 
 export function createDeckField() {
@@ -140,10 +167,26 @@ export function createDeckField() {
     return null;
   }
 
+  /** The deck top over (x, z) for something at height y (deckHeightNear), or null off every deck. */
+  function deckAtLevel(x, z, y) {
+    const s = grid.get(key(Math.floor(x / CELL), Math.floor(z / CELL)));
+    if (!s) return null;
+    let out = null;
+    for (const id of s) {
+      const rec = decks.get(id);
+      const b = rec.bbox;
+      if (x < b[0] || x > b[2] || z < b[1] || z > b[3] || !pointInRings(x, z, rec.deck.ring, rec.deck.holes)) continue;
+      const h = deckHeightNear(rec.deck, x, z, y);
+      if (h !== null && (out === null || Math.abs(h - y) < Math.abs(out - y))) out = h;
+    }
+    return out;
+  }
+
   return {
     add,
     remove,
     deckInfo,
+    deckAtLevel,
     deckAt: (x, z) => deckInfo(x, z)?.y ?? null,
     has: (id) => decks.has(id),
     get size() { return decks.size; },
@@ -172,9 +215,36 @@ export function withDecks(field, ground) {
     terrainAt: (x, z) => onDeck(terrain(x, z), x, z),
     levelAt(x, z, y, walk = false) {
       const base = walk ? ground.heightAt(x, z) : terrain(x, z);
-      const d = field.deckAt(x, z);
+      const d = Number.isFinite(y) && field.deckAtLevel ? field.deckAtLevel(x, z, y) : field.deckAt(x, z);
+      if (d === null && Number.isFinite(y) && y - base > DECK_REACH && field.deckAtLevel) {
+        // on a deck and just past its edge (a lane wider than the outline): still on it, not down in what the deck spans
+        for (const [ox, oz] of EDGE_PROBES) {
+          const near = field.deckAtLevel(x + ox, z + oz, y);
+          if (near !== null && Math.abs(near - y) < DECK_REACH) return near;
+        }
+      }
       if (d === null || d <= base) return base;
       return !Number.isFinite(y) || y >= d - DECK_REACH ? d : base;
+    },
+    /**
+     * The level at distance s along a straight way (x0, z0) + (ux, uz) * s of length len, for something placed there: walked out from an
+     * end of the way that is off the decks, so a car or person placed on a road under a bridge is under it, one on the bridge on it.
+     */
+    levelAlong(x0, z0, ux, uz, len, s, walk = false) {
+      const at = (d) => [x0 + ux * d, z0 + uz * d];
+      // from the point of the way nearest to s that is off the decks: its ends first, as a way usually leaves a deck there
+      let from = field.deckAt(...at(0)) === null ? 0 : field.deckAt(...at(len)) === null ? len : null;
+      if (from !== null || len > LEVEL_STEP) {
+        let best = from === null ? Infinity : Math.abs(s - from);
+        for (let d = LEVEL_STEP; d < len; d += LEVEL_STEP) {
+          if (Math.abs(s - d) < best && field.deckAt(...at(d)) === null) { from = d; best = Math.abs(s - d); }
+        }
+      }
+      if (from === null) return this.levelAt(...at(s), NaN, walk);
+      let y = this.levelAt(...at(from), NaN, walk);
+      const dist = Math.abs(s - from), step = Math.sign(s - from) * LEVEL_STEP;
+      for (let i = 1; i * LEVEL_STEP < dist; i++) y = this.levelAt(...at(from + step * i), y, walk);
+      return this.levelAt(...at(s), y, walk);
     }
   };
 }
