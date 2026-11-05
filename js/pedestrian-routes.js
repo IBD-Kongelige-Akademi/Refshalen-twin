@@ -8,8 +8,12 @@
 //    the crosswalk is the way over.
 const SERVICE_MOUTH = 8, CLIP = 2.5, END_SLACK = 6, RAIL_CROSS = 7, CORNER_REACH = 6;
 const PUSHES = [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6];
+// Paths in the green (`parkPaths`, js/walk-limits.js): straight tracks between the vertices of each footway, joined where they share a point.
+// A path's loose end within GATE_REACH m of a walking line is a gate: a short link to that point of the line, which people on
+// the line turn into with GATE_CHANCE as they pass it.
+const GATE_REACH = 12, GATE_CHANCE = 0.12, JOIN = 0.5;
 
-function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = null, roadAt = null, hazardAt = null }, blockAt) {
+function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = null, roadAt = null, hazardAt = null, parkPaths = null, edges = [] }, blockAt) {
   const sidewalks = new Map(), crossings = new Map(), junctions = new Map(), connections = new WeakMap();
   const point = (track, end) => ({ x: track.ax + track.ux * track.len * end, z: track.az + track.uz * track.len * end });
   const segment = (a, b, extra = {}) => {
@@ -192,6 +196,67 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     return true;
   }
 
+  // ---- paths in the green
+  let pathTracks = null;
+  let pathTries = 0;
+  function buildPaths() {
+    const nodes = new Map();
+    const nodeAt = (x, z) => {
+      const k = `${Math.round(x / JOIN)}:${Math.round(z / JOIN)}`;
+      if (!nodes.has(k)) nodes.set(k, { x, z, ends: [], gates: [] });
+      return nodes.get(k);
+    };
+    const tracks = [];
+    for (const path of parkPaths()) {
+      for (let i = 2; i < path.pts.length; i += 2) {
+        const a = { x: path.pts[i - 2], z: path.pts[i - 1] }, b = { x: path.pts[i], z: path.pts[i + 1] };
+        if (Math.hypot(b.x - a.x, b.z - a.z) < 0.3 || !clear(a, b) || !lawfulCorner(a, b, null)) continue;
+        const na = nodeAt(a.x, a.z), nb = nodeAt(b.x, b.z);
+        const t = segment(a, b, { path: true, from: na, to: nb });
+        na.ends.push({ track: t, end: 0 });
+        nb.ends.push({ track: t, end: 1 });
+        tracks.push(t);
+      }
+    }
+    for (const n of nodes.values()) {
+      if (n.ends.length !== 1) continue;
+      let best = null;
+      for (const e of edges) {
+        const s = Math.max(0, Math.min(e.len, (n.x - e.sx) * e.dx + (n.z - e.sz) * e.dz));
+        if (Math.hypot(e.sx + e.dx * s - n.x, e.sz + e.dz * s - n.z) > e.half + 10 + GATE_REACH) continue;
+        for (const line of along(e)) {
+          const t = Math.max(0, Math.min(line.len, (n.x - line.ax) * line.ux + (n.z - line.az) * line.uz));
+          const at = { x: line.ax + line.ux * t, z: line.az + line.uz * t };
+          const d = Math.hypot(at.x - n.x, at.z - n.z);
+          if (d <= GATE_REACH && (!best || d < best.d) && (d < 0.05 || (clear(n, at) && lawfulCorner(n, at, null)))) best = { d, line, t, at };
+        }
+      }
+      if (!best) continue;
+      const link = segment(n, best.d < 0.05 ? { x: n.x + 0.05, z: n.z } : best.at, { pathLink: true });
+      const gate = { t: best.t, link, port: n.ends[0] };
+      n.gates.push({ line: best.line, t: best.t, link });
+      (best.line.gates ||= []).push(gate);
+    }
+    return tracks;
+  }
+  /** The path tracks with a point within r of (x, z). */
+  function pathsNear(x, z, r) {
+    if (!parkPaths) return [];
+    if (!pathTracks && pathTries++ % 300 === 0) {
+      const built = buildPaths();
+      if (built.length) pathTracks = built;
+    }
+    if (!pathTracks) return [];
+    return pathTracks.filter((t) => Math.hypot(t.ax + t.ux * t.len / 2 - x, t.az + t.uz * t.len / 2 - z) <= r + t.len / 2);
+  }
+  /** Someone on a walking line who just passed from t0 to t1: the gate to turn into, or null. */
+  function gatePassed(track, t0, t1) {
+    for (const g of track.gates || []) {
+      if ((t0 - g.t) * (t1 - g.t) <= 0 && t0 !== g.t && Math.random() < GATE_CHANCE) return g;
+    }
+    return null;
+  }
+
   function links(track, dir) {
     let ends = connections.get(track);
     if (!ends) connections.set(track, ends = []);
@@ -200,6 +265,12 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     const result = ends[end] = [];
     const n = end ? track.to : track.from;
     if (!n) return result;
+    if (track.path) {
+      for (const port of n.ends) if (port.track !== track) result.push([{ track: port.track, dir: port.end ? -1 : 1 }]);
+      // out of the park: over the link, and either way along the line
+      for (const g of n.gates) for (const d of [1, -1]) result.push([{ track: g.link, dir: 1 }, { track: g.line, dir: d, at: g.t }]);
+      return result;
+    }
     const a = point(track, end), block = blockAt(a.x, a.z);
     if (!block) return result;
     for (const port of ports(n)) {
@@ -244,7 +315,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     return best;
   }
 
-  return { along, across, next };
+  return { along, across, next, pathsNear, gatePassed };
 }
 
 export { createPedestrianRoutes };

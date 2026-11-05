@@ -52,6 +52,7 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     peds.push({
       placed: false,
       crossesStreets: i % 6 === 0, // some start near crossings; everyone can use them along their route
+      parkWalker: i % 6 === 2, // some start on the paths in the green, where there are any nearby
       x: 0,
       z: 0,
       prevX: 0,
@@ -111,6 +112,11 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     return true;
   }
 
+  function pathTrack(route) {
+    Object.assign(track, route, { route });
+    return true;
+  }
+
   function crosswalkTrack(n) {
     const choices = pedRoutes.across(n);
     if (!choices.length) return false;
@@ -142,7 +148,10 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
   function spawnPed(p, rMin, rMax, protectView) {
     for (let attempt = 0; attempt < 10; attempt++) {
       const crosswalk = p.crossesStreets && nearSignals.length > 0 && attempt < 5;
-      const ok = crosswalk
+      const paths = p.parkWalker && attempt < 5 ? pedRoutes.pathsNear(focusX, focusZ, rMax) : null;
+      const ok = paths?.length
+        ? pathTrack(paths[Math.floor(Math.random() * paths.length)])
+        : crosswalk
         ? crosswalkTrack(nearSignals[Math.floor(Math.random() * nearSignals.length)])
         : nearEdges.length > 0 && sidewalkTrack(nearEdges[Math.floor(Math.random() * nearEdges.length)]);
       if (!ok) continue;
@@ -467,7 +476,7 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
         Object.assign(p, leg.track);
         p.route = leg.track;
         p.dir = leg.dir;
-        t = p.dir > 0 ? 0 : p.len;
+        t = leg.at ?? (p.dir > 0 ? 0 : p.len); // `at`: joining a walking line part way along, from a park path
         p.t = t;
         if (p.node) atCurb(p); // later arrivals this frame must see the newly occupied entrance
         if (p.nextLeg === p.nextRoute.length) p.nextRoute = null;
@@ -476,6 +485,16 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
         p.v = 0;
         p.pause = TURN_TIME;
       }
+    }
+    // passing a gate into a park (js/pedestrian-routes.js): over its link, then onto the path
+    const gate = !p.node && !avoiding && !p.nextRoute && p.route?.gates ? pedRoutes.gatePassed(p.route, p.t, t) : null;
+    if (gate) {
+      Object.assign(p, gate.link);
+      p.route = gate.link;
+      p.dir = -1;
+      t = p.len;
+      p.nextRoute = [{ track: gate.port.track, dir: gate.port.end ? -1 : 1 }];
+      p.nextLeg = 0;
     }
     p.t = t;
     p.x = p.ax + p.ux * t + p.contactX;

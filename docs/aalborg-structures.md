@@ -137,6 +137,17 @@ Where 340 pedestrians stand, in 20,400 samples at 6 spots over the district:
 
 The 5 % is mostly driveway mouths and the last metre of a line at a kerb. Every pedestrian still finds a place.
 
+## Paths in the green
+
+`tools/geodata/city_paths.py` (after `city_water.py`, then the index stage) turns the OSM footways, paths and pedestrian ways into gravel:
+each is buffered to its width, at least 1.8 m, and the part inside the green ground becomes a `gravel` polygon in the tile's surfaces
+layer: 150 polygons, 2.9 ha. They are marked `path: 1`, so a rerun replaces them and they do not repave a pavement they meet.
+
+Pedestrians walk them too. A footway with at least half its length in the green is a park path (`parkPaths` in `js/walk-limits.js`):
+straight tracks between its vertices, joined where they share a point. A path's loose end within 12 m of a walking line is a gate: 12 % of
+the people passing turn in, and those leaving join the line there. One pedestrian in six starts on a path where there are any nearby. A
+path that runs along a carriageway is left out. About 14 % of pedestrians were on a path in the last sample across the 6 spots.
+
 ## Not done
 
 - **Underpass walls.** A lowered underpass has earth banks, not retaining walls, and a junction beside it is lowered only along the way
@@ -145,14 +156,12 @@ The 5 % is mostly driveway mouths and the last metre of a line at a kerb. Every 
   Rendsburggade have no tunnel decks.
 - **Bridge shapes.** Every bridge has the same section: no bascule span on Limfjordsbroen, no truss on Jernbanebroen, no stairs or ramps
   modelled apart from the terrain.
-- **Paths in the green.** Pedestrians walk beside the road graph only: green areas are allowed, but nobody follows a park path that has no
-  road beside it.
 - **Yielding at unsignalled corners.** Cars do not yield to someone crossing a side street's mouth; they meet through the collision pass.
 - **Trains.** None run.
 - **Platforms.** `railway=platform` and the station are not modelled.
 - **Watercourse levels.** They are a stand-in (the terrain percentile), not a surveyed water level.
 
 Shots: `docs/structures/limfjordsbroen.jpg` (the deck on its piers over the fjord, traffic and Plusbuses on it),
-`docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro),
+`docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro), `docs/structures/gravel-paths.jpg` (gravel paths in a park),
 `docs/structures/strandvejen-under.jpg` (Strandvejen under Limfjordsbroen, the bridge with its lane markings),
 `docs/structures/railway.jpg` (two tracks by the harbour). `?debug=nostructures` switches the layer off.

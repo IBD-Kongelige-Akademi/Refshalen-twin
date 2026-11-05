@@ -790,7 +790,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
       add: (ctx, ring) => {
         walk.removeBuildings(ctx.id);
         walk.addBuildings(ctx.id, ring === 'near' ? overrideFootprints(ctx.ownBuildings, ctx.overrides) : ctx.ownBuildings);
-        if (!walkLimits.has(ctx.id)) walkLimits.add(ctx.id, { roads: ctx.geo.roads || [], rails: ctx.structures?.rails || [], railAreas: ctx.structures?.railAreas || [], water: ctx.water?.bodies || [] });
+        if (!walkLimits.has(ctx.id)) walkLimits.add(ctx.id, { roads: ctx.geo.roads || [], rails: ctx.structures?.rails || [], railAreas: ctx.structures?.railAreas || [], water: ctx.water?.bodies || [], footways: [...(ctx.geo.own?.roads || [])].filter((r) => r.class === 'footway'), green: ctx.water?.green || [] });
       },
       remove: (id) => { walk.removeBuildings(id); walkLimits.remove(id); }
     });
@@ -889,7 +889,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     const bikeLaneNear = (x, z, r) => !!laneIndex && laneIndex.near(x, z, r);
     const networkOptions = {
       walkable: walk.walkable, onSidewalk: walk.onSidewalk, blockAt: walk.blockAt,
-      roadAt: walkLimits.roadAt, hazardAt: walkLimits.hazardAt,
+      roadAt: walkLimits.roadAt, hazardAt: walkLimits.hazardAt, parkPaths: walkLimits.parkPaths,
       // walking lines step round the near tiles' furniture (bike racks, trees, benches)
       obstruction: (ax, az, bx, bz) => collisionStage.obstructedLength(ax, az, bx, bz),
       // pedestrians walk outside the cycle track beside a carriageway

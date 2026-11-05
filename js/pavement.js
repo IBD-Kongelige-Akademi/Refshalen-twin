@@ -227,7 +227,8 @@ export function tessellateFramed(ring, { holes, frame, y, seed, classOf, skip, m
  */
 export function buildPavementBuckets(geo, surfacesDoc, { roads, y, groundY, skip, nearCycle, extraPavement = [], terrain = null }) {
   const frame = createKerbFrame(roads);
-  const index = createSurfaceIndex(surfacesDoc?.surfaces);
+  // (a gravel park path, tools/geodata/city_paths.py, does not repave a pavement it meets)
+  const index = createSurfaceIndex((surfacesDoc?.surfaces || []).filter((s) => !s.path));
   const buckets = new Map();
   const maxEdge = (x, z) => (nearCycle && nearCycle(x, z) ? 2.5 : 6);
   const groundEdge = terrain && !terrain.flat ? 6 : 12; // register polygons follow the terrain: shorter edges

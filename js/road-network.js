@@ -738,6 +738,7 @@ function buildRoadNetwork(signalIntersections = [], options = {}) {
     obstruction: options.obstruction || null,
     roadAt: options.roadAt || null,
     hazardAt: options.hazardAt || null,
+    parkPaths: options.parkPaths || null,
     walkable: options.walkable,
     onSidewalk: options.onSidewalk,
     isRoadClear: () => true

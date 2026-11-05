@@ -71,3 +71,36 @@ test('walking lines keep off the carriageways, the water and the railway; corner
   assert.equal(corner(false), true, 'over the mouth');
   assert.equal(corner(true), false, 'at signals the crosswalk is the way over')
 });
+
+test('paths in the green are walked: joined at shared points, and gated to a walking line at their loose end', async () => {
+  const { createPedestrianRoutes } = await import('../js/pedestrian-routes.js');
+  const { createWalkLimits } = await import('../js/walk-limits.js');
+  const block = { id: 'b', poly: [] };
+  const from = { x: 0, z: 0, in: [], out: [], arms: [] }, to = { x: 100, z: 0, in: [], out: [], arms: [] };
+  const e = { from, to, half: 3, sx: 0, sz: 0, dx: 1, dz: 0, rx: 0, rz: 1, len: 100 };
+  from.out.push(e); to.in.push(e);
+  // a path from 8 m off the road's line into the park, with a bend; a second one on the far side that a road cuts through
+  const paths = [{ id: 'p', pts: [50, 12, 50, 40, 70, 60] }, { id: 'q', pts: [20, 200, 20, 260] }];
+  const r = createPedestrianRoutes({ walkable: () => true, parkPaths: () => paths, edges: [e],
+    roadAt: (x, z) => (Math.abs(z) < 3 || (z > 220 && z < 240) ? { class: 'secondary' } : null), hazardAt: () => false }, () => block);
+  const near = r.pathsNear(50, 30, 50);
+  assert.equal(near.length, 2, 'the two straight pieces of the path');
+  assert.equal(r.pathsNear(20, 230, 100).length, 0, 'a path through a carriageway is no path');
+  const inner = near.find((t) => t.az === 12);
+  assert.ok(r.next(inner, 1, 70, 60)[0].track === near.find((t) => t.az === 40), 'on along the bend');
+  const out = r.next(inner, -1, 0, 0);
+  assert.equal(out.length, 2, 'out at the loose end: the link, then the walking line');
+  assert.ok(out[1].track.edge === e && out[1].at > 49 && out[1].at < 51, 'joins the line beside the path');
+  // from the line: its gate turns into the path
+  const line = out[1].track;
+  let g = null;
+  for (let i = 0; i < 200 && !g; i++) g = r.gatePassed(line, 49, 51);
+  assert.ok(g && g.port.track === inner, 'the gate leads onto the path');
+  assert.equal(r.gatePassed(line, 10, 20), null, 'no gate there');
+
+  // which footways count as park paths: most of their length in the green
+  const limits = createWalkLimits();
+  limits.add('t', { green: [{ ring: [0, 0, 100, 0, 100, 100, 0, 100] }], footways: [
+    { id: 'in', pts: [10, 10, 90, 10] }, { id: 'mostly', pts: [80, 50, 120, 50] }, { id: 'out', pts: [200, 0, 300, 0] }] });
+  assert.deepEqual(limits.parkPaths().map((p) => p.id), ['in', 'mostly']);
+});
