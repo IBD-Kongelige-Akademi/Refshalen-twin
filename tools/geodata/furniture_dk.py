@@ -348,7 +348,7 @@ def mark_under_decks(doc, roads, keys) -> int:
                 _, _, y, g = min(pts, key=lambda q: (q[0] - x) ** 2 + (q[1] - z) ** 2)
                 if y - g <= UNDER_DECK_CLEAR_M:
                     continue
-                own = {a["way"] for a in d["axes"]}
+                own = {a["way"] for o in dl if o.get("family", o["id"]) == d.get("family", d["id"]) for a in o["axes"]}
                 best, best_own = float("inf"), False
                 for j in ltree.query(p.buffer(30.0)):
                     rid, line, half = lines[j]

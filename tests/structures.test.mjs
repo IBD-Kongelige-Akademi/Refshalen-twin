@@ -183,3 +183,18 @@ test('the road that joins a deck end lies on the deck where it enters the footpr
   settleOnDecks([quad], [d], { heightAt: () => 0 }, geo);
   assert.ok(Math.abs(quad.position[1] - 5.08) < 0.01, `on the deck: ${quad.position[1]}`);
 });
+
+test('parts of a split deck: no wall along a sibling at the same height; a road of the family lies on either part', async () => {
+  const ring = [0, -4, 40, -4, 40, 4, 0, 4];
+  const axis2 = [];
+  for (let x = 0; x <= 40; x += 2) axis2.push(x, 0, 6, 0);
+  const whole = { id: 'p', family: 'f', kind: 'road', ring, ringG: [0, 0, 0, 0], holes: [], holesG: [], axes: [{ way: 'w', kind: 'road', pts: axis2 }], clear: 6 };
+  const walled = buildDeckArrays(whole).stats.parapetM;
+  const open = buildDeckArrays({ ...whole, joined: [[1, 1, 0, 0]] }).stats.parapetM; // the long side at z = -4 runs along a sibling
+  assert.ok(open < walled, `no parapet along the sibling: ${open} < ${walled}`);
+  const { settleOnDecks } = await import('../js/road-compute.js');
+  const sibling = { id: 'q', family: 'f', ring, holes: [], axes: [{ way: 'w2', kind: 'road', pts: axis2 }] };
+  const quad = { position: new Float32Array([10, 0.02, -1, 12, 0.02, -1, 12, 0.02, 1, 10, 0.02, 1]), index: new Uint32Array([0, 1, 2, 0, 2, 3]), owner: new Int32Array(4), owners: ['w2'] };
+  settleOnDecks([quad], [{ ...whole }, sibling], { heightAt: () => 0 }, { roads: [], cycleTracks: [] });
+  assert.ok(quad.position[1] > 5.9, `the family's road lies on the deck: ${quad.position[1]}`);
+});

@@ -73,6 +73,12 @@ Road decks are 1.5 m wider than the OSM outline, whose edge can fall inside the 
 - A drive test samples the height the AI cars are drawn at against distance. Around Limfjordsbroen and Vesterbro, 99.1 % of 45,397 samples
   climb under 8 %; around Østre Allé and Hjulmagervej, 96.0 % of 59,387. Neither area has a sample steeper than 50 %.
 
+**One deck per level.** Where the ways of one outline stand at different levels (ramps beside a flat deck), the outline is shared out into one
+deck per level, by nearest station (`split_by_level`), each with its own top, fascia and parapets. Two ways are on separate levels if, within
+14 m of each other, they stand 1.2 m or more apart somewhere. A piece under 150 m² joins its neighbour. The parts keep the bridge's id as
+`family`, so a road of one part still lies on the deck where a lane strays into another, and no wall stands along a part at the same height
+(`joined`). Østre Allé's main deck becomes 8 parts, and Limfjordsbroen's 4; the 38 structures make 48 decks.
+
 **A road under a deck beats its approaches.** A road or track passing under a deck has its full width dug, plus 1 m a side, whatever
 protection lies there: at Østre Allé over Hjulmagervej the deck is only 14 m long, so the road runs right past its ends. Only the banks keep
 off the approaches, and the embankments keep off the road.
@@ -192,8 +198,7 @@ path that runs along a carriageway is left out. About 14 % of pedestrians were o
 
 ## Not done
 
-- **Østre Allé's main deck.** Its ramps and flat deck share one outline and one triangulated top, so the top's edge is uneven where a ramp
-  leaves the flat deck, around (-270, 905). A proper fix gives each ramp its own deck.
+- **Limfjordsbroen's far north.** Two footways fall to about 1 m at the district's edge, near z -1028, where the surface model gives little to go on.
 - **Levels at a few junctions.** Near Stenosvej, a car turning between the deck and the street below still changes level at a point
   (up to 5 m). It is drawn descending over about 17 m, so it passes through or above the ground there for a moment.
 - **Underpass walls.** A lowered underpass has earth banks, not retaining walls, and a junction beside it is lowered only along the way
@@ -209,6 +214,6 @@ path that runs along a carriageway is left out. About 14 % of pedestrians were o
 
 Shots: `docs/structures/limfjordsbroen.jpg` (the deck on its piers over the fjord, traffic and Plusbuses on it),
 `docs/structures/limfjordsbroen-joint.jpg` (the road onto the bridge at its south end), `docs/structures/oestre-alle.jpg` (Østre Allé onto
-its deck over Hjulmagervej), `docs/structures/hjulmagervej-underpass.jpg` (Hjulmagervej under it), `docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro), `docs/structures/gravel-paths.jpg` (gravel paths in a park),
+its deck over Hjulmagervej), `docs/structures/hjulmagervej-underpass.jpg` (Hjulmagervej under it), `docs/structures/oestre-alle-ramps.jpg` (the main deck and its ramps), `docs/structures/vesterbro-bridge.jpg` (the railway running under Vesterbro), `docs/structures/gravel-paths.jpg` (gravel paths in a park),
 `docs/structures/strandvejen-under.jpg` (Strandvejen under Limfjordsbroen, the bridge with its lane markings),
 `docs/structures/railway.jpg` (two tracks by the harbour). `?debug=nostructures` switches the layer off.

@@ -42,7 +42,7 @@ export function makeRoadJob(ctx, { near, terrain, decks = null }) {
     surfacesOwn: sf?.own ? { surfaces: indicesOf(sf.surfaces, sf.own.surfaces), markings: indicesOf(sf.markings, sf.own.markings) } : null,
     terrain: chunks.length ? { header: { width: terrain.header.width, height: terrain.header.height, cell: terrain.header.cell, bbox: terrain.header.bbox }, chunks } : null,
     // the bridge decks that stand clear of the ground: the road surfaces are sorted onto and under them (settleOnDecks)
-    decks: (decks || []).filter((d) => d.clear > DECK_CLEAR).map((d) => ({ id: d.id, ring: d.ring, holes: d.holes, axes: d.axes }))
+    decks: (decks || []).filter((d) => d.clear > DECK_CLEAR).map((d) => ({ id: d.id, family: d.family, ring: d.ring, holes: d.holes, axes: d.axes }))
   };
 }
 
@@ -95,7 +95,14 @@ export function settleOnDecks(meshes, decks, terrain, geo = {}) {
   if (!decks?.length) return { lifted: 0, dropped: 0 };
   const field = createDeckField();
   field.add('job', decks);
-  const own = new Map(decks.map((d) => [d.id, new Set((d.axes || []).map((a) => a.way))]));
+  // a deck split by level (`family`) shares its ways: a lane of a ramp can stray into the flat part where the two meet
+  const families = new Map();
+  for (const d of decks) {
+    const f = d.family || d.id;
+    if (!families.has(f)) families.set(f, new Set());
+    for (const a of d.axes || []) families.get(f).add(a.way);
+  }
+  const own = new Map(decks.map((d) => [d.id, families.get(d.family || d.id)]));
   const lines = centrelines(geo);
   // a road that ends where a way of the deck ends comes onto the deck: its last metres in the footprint lie on it, not on the ground under it
   for (const d of decks) {

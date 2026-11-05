@@ -188,3 +188,31 @@ def test_a_road_under_a_short_deck_is_dug_through_the_approaches_and_the_embankm
     road = _ground_way([(94, 100), (40, 100)], [1, 2])
     CS.approach_embankments([d], {"osm:way/1": [1, 3]}, [road], H, corridors)
     assert float(grid[50, 50]) < 5.0 - 3.0 and float(grid[60, 50]) == low, "the embankment does not fill the corridor"
+
+
+def _deck_with_ramp():
+    flat = _axis([8.0] * 41, way="osm:way/1")  # 80 m flat along z = 0 at 8 m
+    ramp = {"way": "osm:way/2", "kind": "road", "pts": [v for i in range(41) for v in (i * 2.0, 8.0, 8.0 - 0.1 * i * 2.0, 0.0)]}  # beside it, falling 10 %
+    d = {"id": "deck:1", "name": "", "kind": "road", "ring": [], "ringG": [], "holes": [], "holesG": [], "axes": [flat, ramp], "clear": 8.0, "_g": Polygon([(0, -6), (80, -6), (80, 14), (0, 14)])}
+    return d, flat, ramp
+
+
+def test_ways_at_different_levels_are_grouped_apart_and_parallel_ways_together():
+    d, flat, ramp = _deck_with_ramp()
+    assert sorted(map(sorted, CS.level_groups([flat, ramp]))) == [[0], [1]]
+    other = _axis([8.2] * 41, way="osm:way/3", z=4.0)
+    assert sorted(map(sorted, CS.level_groups([flat, other]))) == [[0, 1]]
+
+
+def test_a_deck_with_a_ramp_splits_by_level_covering_the_outline():
+    H = _settle_h()
+    H.ground = lambda x, z: np.zeros(np.shape(np.atleast_1d(x)))
+    d, flat, ramp = _deck_with_ramp()
+    parts = CS.split_by_level([d], H)
+    assert len(parts) == 2 and {p["family"] for p in parts} == {"deck:1"} and len({p["id"] for p in parts}) == 2
+    assert abs(sum(p["_g"].area for p in parts) - d["_g"].area) < 1.0, "the parts share out the outline"
+    assert {a["way"] for a in parts[0]["axes"]} != {a["way"] for a in parts[1]["axes"]}
+    # at the top, where the two meet at one height, the boundary is joined; at the foot it is not
+    near_top = [f for p in parts for ring, flags in zip([p["ring"]], p["joined"]) for x, f in zip(ring[0::2], flags) if x < 6 and 3.5 < 99]
+    assert any(near_top)
+    assert all(len(j) == len(p["ring"]) // 2 for p in parts for j in p["joined"][:1])

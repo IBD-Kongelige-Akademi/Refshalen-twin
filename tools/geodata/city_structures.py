@@ -88,6 +88,9 @@ TIE_BLEND_MIN_M = 24.0  # a tie is blended in over at least this length of the w
 SMOOTH_M = 12.0  # the running mean along a way, either side
 SAME_DECK_M = 14.0  # stations this close, this close in height, are one surface
 SAME_DECK_DY_M = 2.5
+FOOT_BESIDE_ROAD_M = 25.0  # a footway ending this close to a road on its deck stays with the road
+MIN_LEVEL_PART_M2 = 150.0  # a smaller piece of a level joins its neighbour
+LEVEL_APART_M = 1.2  # two ways on a deck this far apart in height, close together in plan, are on separate surfaces
 FOOT_FOLLOWS_DY_M = 3.5  # a footway beside a road this close in height is on the road's deck, not a ramp of its own
 INVALID_OVER_WATER_M = 1.0  # a deck reading this little over the water has no reading of the bridge
 UNDER_DECK_M = 0.5  # the ground under a deck lies at least this far under its top
@@ -267,6 +270,14 @@ def ring_with_ground(coords, H):
     return [round(v, 2) for p in pts for v in p], [round(float(v), 2) for v in g]
 
 
+def family_outlines(decks) -> dict:
+    """The whole outline of each bridge, over the parts split_by_level makes of it."""
+    parts = {}
+    for d in decks:
+        parts.setdefault(d.get("family", d.get("id")), []).append(d["_g"])
+    return {k: unary_union(v) if len(v) > 1 else v[0] for k, v in parts.items()}
+
+
 def terrain_under_decks(decks, H) -> int:
     """The compiled terrain carries many bridges (a ridge across the fjord, a mound over the railway): under every deck the terrain is
     set to the ground beside the bridge, what the deck spans. A cell's ground is interpolated between the two points UNDER_REACH_M
@@ -291,6 +302,7 @@ def terrain_under_decks(decks, H) -> int:
         return H.wtree is not None and len(H.wtree.query(shapely.points(x, z), predicate="within")) > 0
 
     changed = 0
+    outlines = family_outlines(decks)
     for d in decks:
         g = d["_g"]
         # the ends where a road or a track comes onto the deck (what meets another way inside the outline is no end)
@@ -299,7 +311,7 @@ def terrain_under_decks(decks, H) -> int:
             if a.get("kind") == "foot" or len(a["pts"]) < 8:
                 continue
             for ex, ez in ((a["pts"][0], a["pts"][1]), (a["pts"][-4], a["pts"][-3])):
-                if g.boundary.distance(shapely.points(ex, ez)) < 8.0:
+                if outlines[d.get("family", d.get("id"))].boundary.distance(shapely.points(ex, ez)) < 8.0:
                     ends.append((ex, ez))
         segs = []
         for a in d["axes"]:
@@ -609,6 +621,11 @@ def settle_deck_heights(decks, way_nodes, gways, H, buildings=()) -> dict:
                 x, z = (p[0], p[1]) if end == 0 else (p[-4], p[-3])
                 target = None
                 nid = r["nodes"][0 if end == 0 else -1] if r["nodes"] else None
+                # a footway ending beside a road stays with the road: its tie to the ground would tilt it off the deck
+                beside_road = r["a"]["kind"] == "foot" and any(
+                    o["a"]["kind"] != "foot" and np.min(np.hypot(np.array(o["a"]["pts"][0::4]) - x, np.array(o["a"]["pts"][1::4]) - z)) < FOOT_BESIDE_ROAD_M for o in recs)
+                if beside_road:
+                    nid = None
                 if d.get("tunnel"):
                     v = float(np.ravel(H.terrain(x, z))[0])
                     target = v if math.isfinite(v) else None
@@ -680,6 +697,126 @@ def settle_deck_heights(decks, way_nodes, gways, H, buildings=()) -> dict:
     return stats
 
 
+def level_groups(axes):
+    """The ways of a deck grouped by level: two ways are on one surface unless, somewhere within SAME_DECK_M of each other, they stand
+    LEVEL_APART_M or more apart (a ramp beside the flat deck). Returns lists of axis indices."""
+    st = [np.array([a["pts"][m:m + 3] for m in range(0, len(a["pts"]), 4)], float) for a in axes]
+    parent = list(range(len(axes)))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    apart = set()
+    close = []
+    for i in range(len(axes)):
+        for j in range(i + 1, len(axes)):
+            dx = st[i][:, 0, None] - st[j][:, 0]
+            dz = st[i][:, 1, None] - st[j][:, 1]
+            near = dx * dx + dz * dz < SAME_DECK_M * SAME_DECK_M
+            if not near.any():
+                continue
+            dy = np.abs(st[i][:, 2, None] - st[j][:, 2])
+            if float(dy[near].max()) >= LEVEL_APART_M:
+                apart.add((i, j))
+            else:
+                close.append((i, j))
+    # the closest first, and never joining two groups that hold ways standing apart
+    members = {i: {i} for i in range(len(axes))}
+    for i, j in close:
+        a, b = find(i), find(j)
+        if a == b or any((min(p, q), max(p, q)) in apart for p in members[a] for q in members[b]):
+            continue
+        parent[b] = a
+        members[a] |= members.pop(b)
+    return [sorted(v) for v in members.values()]
+
+
+def split_by_level(decks, H) -> list:
+    """A deck whose ways stand at different levels (ramps beside a flat deck, all inside one outline) becomes one deck per level, each with its
+    own top, fascia and parapets: the outline is shared out by the nearest station (a Voronoi diagram of the stations). The parts keep the
+    deck's id as `family`; `joined` marks, per ring, the vertices along a sibling at the same height, where no wall or parapet stands."""
+    out = []
+    for d in decks:
+        d["family"] = d["id"]
+        groups = level_groups(d["axes"]) if len(d["axes"]) > 1 else [[0]]
+        if len(groups) < 2:
+            out.append(d)
+            continue
+        xs, zs, tags = [], [], []
+        for k, g in enumerate(groups):
+            for i in g:
+                p = d["axes"][i]["pts"]
+                for m in range(0, len(p), 4):
+                    xs.append(p[m]); zs.append(p[m + 1]); tags.append(k)
+        pts = shapely.multipoints(np.column_stack([xs, zs]))
+        cells = shapely.voronoi_polygons(pts, extend_to=d["_g"].buffer(50.0))
+        tree = STRtree(shapely.points(xs, zs))
+        by_group = [[] for _ in groups]
+        for cell in cells.geoms:
+            hit = tree.query(cell, predicate="contains")
+            if len(hit):
+                by_group[tags[int(hit[0])]].append(cell)
+        pieces = []  # [polygon, group]
+        for k, g in enumerate(groups):
+            if by_group[k]:
+                area = unary_union(by_group[k]).intersection(d["_g"])
+                pieces += [[q, k] for q in getattr(area, "geoms", [area]) if q.geom_type == "Polygon" and q.area > 0.01]
+        # a scrap of a group goes to the piece it shares the longest edge with
+        for _ in range(len(pieces)):
+            pieces.sort(key=lambda r: r[0].area)
+            if len(pieces) < 2 or pieces[0][0].area >= MIN_LEVEL_PART_M2:
+                break
+            small = pieces.pop(0)
+            best = max(pieces, key=lambda r: r[0].buffer(0.05).intersection(small[0].boundary).length)
+            merged = unary_union([best[0], small[0].buffer(0.02)])
+            best[0] = max(merged.geoms, key=lambda q: q.area) if hasattr(merged, "geoms") else merged
+        parts = []
+        for q, k in sorted(pieces, key=lambda r: -r[0].area):
+            g = groups[k]
+            for _once in (0,):
+                area0 = q.intersection(d["_g0"]) if "_g0" in d else q
+                q = q.simplify(0.25, preserve_topology=True)
+                axes = [d["axes"][i] for i in g]
+                kinds = {a["kind"] for a in axes}
+                kind = "rail" if kinds == {"rail"} else "road" if "road" in kinds or "rail" in kinds else "foot"
+                ext, ext_g = ring_with_ground(list(q.exterior.coords)[:-1], H)
+                holes, holes_g = [], []
+                for h in q.interiors:
+                    hr, hg = ring_with_ground(list(h.coords)[:-1], H)
+                    holes.append(hr)
+                    holes_g.append(hg)
+                parts.append({**d, "id": d["id"] if not parts else f"{d['id']}.{len(parts)}", "family": d["id"], "kind": kind, "ring": ext, "ringG": ext_g,
+                              "holes": holes, "holesG": holes_g, "axes": axes, "_g": q, "_g0": area0.intersection(q.buffer(2.0))})
+        if not parts:
+            out.append(d)
+            continue
+
+        def height(part, x, z):
+            st = [(part_a["pts"][m], part_a["pts"][m + 1], part_a["pts"][m + 2]) for part_a in part["axes"] for m in range(0, len(part_a["pts"]), 4)]
+            return min(st, key=lambda v: (v[0] - x) ** 2 + (v[1] - z) ** 2)[2]
+
+        for part in parts:
+            joined = []
+            for ring in [part["ring"], *part["holes"]]:
+                flags = []
+                for m in range(0, len(ring), 2):
+                    x, z = ring[m], ring[m + 1]
+                    here = shapely.points(x, z)
+                    flag = 0
+                    for other in parts:
+                        if other is not part and other["_g"].distance(here) < 0.5 and abs(height(other, x, z) - height(part, x, z)) < LEVEL_APART_M:
+                            flag = 1
+                            break
+                    flags.append(flag)
+                joined.append(flags)
+            part["joined"] = joined
+        out += parts
+    return out
+
+
 def approach_strips(decks, way_nodes, gways):
     """The roads and tracks carrying on off the decks' ends, APPROACH_M of them, and the carried ways' own lanes where they run past the
     outline: one (multi)polygon, without the decks' footprints. The underpass cuts keep off it, or they would dig away the road that leads
@@ -711,12 +848,13 @@ def approach_strips(decks, way_nodes, gways):
     keep = unary_union(strips).difference(unary_union([d["_g"] for d in decks]))
     # and the deck's ends themselves: a hole under the end of a deck is a hole in front of the road
     ends = []
+    outlines = family_outlines(decks)
     for d in decks:
         for a in d["axes"]:
             if a["kind"] == "foot" or len(a["pts"]) < 8:
                 continue
             for x, z in ((a["pts"][0], a["pts"][1]), (a["pts"][-4], a["pts"][-3])):
-                if d["_g"].boundary.distance(shapely.points(x, z)) < 4.0:
+                if outlines[d.get("family", d["id"])].boundary.distance(shapely.points(x, z)) < 4.0:
                     ends.append(shapely.points(x, z).buffer(END_KEEP_M))
     return unary_union([keep] + ends) if ends else keep
 
@@ -1140,6 +1278,9 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
     way_nodes = {f"osm:way/{i}": w["nodes"] for (t, i), w in els.items() if t == "way" and "nodes" in w}
     settled = settle_deck_heights(decks, way_nodes, gways, H, buildings)
     log(f"deck profiles: {settled['ends']} ends tied to their road, {settled['invalid']} stations without a reading of the bridge")
+    n_before = len(decks)
+    decks = split_by_level(decks, H)
+    log(f"deck levels: {n_before} structures, {len(decks)} decks by level: " + ", ".join(sorted({d['family'] + ' ' + d['name'] for d in decks if '.' in d['id']})))
     keep = approach_strips(decks, way_nodes, gways)
     changed = terrain_under_decks(decks, H)
     gaps = water_gaps(decks, H)

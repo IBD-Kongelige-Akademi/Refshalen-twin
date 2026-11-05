@@ -185,6 +185,9 @@ export function buildDeckArrays(deck) {
       const l = Math.hypot(dx, dz) || 1;
       const nx = (dz / l) * outSign, nz = (-dx / l) * outSign; // outward normal
       const endEdge = isEndEdge(ends, ax, az, bx, bz);
+      // along a part of the same deck at the same height (js city_structures.py split_by_level) the surface runs on: no wall, no parapet
+      const flags = deck.joined?.[r];
+      if (flags && flags[i] && flags[j]) continue;
       if (ca > 0.15 || cb > 0.15) {
         // at the road's end of the deck the wall runs down to the ground: the abutment
         const ba = endEdge ? Math.min(ya, gs[offset + i]) : Math.max(ya - thick, gs[offset + i]);
