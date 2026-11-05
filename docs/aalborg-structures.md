@@ -70,7 +70,7 @@ Road decks are 1.5 m wider than the OSM outline, whose edge can fall inside the 
   3.07, 3.08, 3.12 m, where it had dropped to 0.07 m.
 - Of the 30 road ends leaving a deck, none is more than 1 m off its road 6 m on (4 were, up to 8.4 m); 3 are over 0.3 m, on tunnel decks
   on steep streets.
-- A drive test samples the AI cars' height against distance. Around Limfjordsbroen and Vesterbro, 99 % or more of the samples climb under
+- A drive test samples the AI cars' height against distance. Around Limfjordsbroen and Vesterbro, 98.5 % or more of the samples climb under
   8 %, and the worst single step is 1 m.
 
 **Levels in the engine.** A car or person placed on a road is walked in from the end that is off the decks (`levelAlong`), so one placed under
@@ -187,7 +187,7 @@ path that runs along a carriageway is left out. About 14 % of pedestrians were o
 
 ## Not done
 
-- **Østre Allé and Hjulmagervej.** The drive test still finds steps here: about 5 % of samples climb over 8 %, with single jumps of 3 to 5 m
+- **Østre Allé and Hjulmagervej.** The drive test still finds steps here: about 6 % of samples climb over 8 %, with single jumps of 3 to 5 m
   near (-377, 915), (-40, 835), (-194, 957) and (-66, 968). Ramps run close beside the flat deck, and one deck outline covers them all.
 - **Underpass walls.** A lowered underpass has earth banks, not retaining walls, and a junction beside it is lowered only along the way
   that passes under (a side street meets the ramp at a step down its bank).
