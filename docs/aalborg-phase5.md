@@ -7,16 +7,47 @@ Photo facades, measured windows, entrances, shopfronts, vegetation and square pa
 
 ```sh
 uv run tools/geodata/build_city.py --osm-source api --stage fetch2 --stage surfaces --stage groundfloor --stage entrances --stage vegetation
-APPEARANCE_WORK=data/raw/appearance-city uv run tools/geodata/appearance_city.py tones all --workers 3
-APPEARANCE_WORK=data/raw/appearance-city uv run tools/geodata/appearance_city_final.py calibrate
-APPEARANCE_WORK=data/raw/appearance-city uv run tools/geodata/appearance_city_final.py finalize --workers 4
-APPEARANCE_WORK=data/raw/appearance-city uv run tools/geodata/appearance_city_final.py register
-APPEARANCE_WORK=data/raw/appearance-city uv run tools/geodata/appearance_city_atlas.py atlas all --workers 3
+APPEARANCE_WORK=data/raw/appearance-2021 uv run tools/geodata/appearance_city.py tones all --workers 2
+APPEARANCE_WORK=data/raw/appearance-2021 uv run tools/geodata/appearance_city_final.py calibrate
+APPEARANCE_WORK=data/raw/appearance-2021 uv run tools/geodata/appearance_city_final.py finalize --workers 2
+APPEARANCE_WORK=data/raw/appearance-2021 uv run tools/geodata/appearance_city_final.py register
+APPEARANCE_WORK=data/raw/appearance-2021 uv run tools/geodata/appearance_city_atlas.py atlas all --workers 2
+uv run tools/geodata/far_lod.py
 uv run --with pillow --with numpy --with scipy python tools/geodata/facade_layout.py run all
 uv run tools/geodata/build_city.py --stage index --stage report
 ```
 
 `APPEARANCE_WORK` keeps the Skråfoto work files under the gitignored `data/raw/` (upstream's default is a folder in the author's home).
+`finalize` drops the atlas descriptors and `atlas` skips a building whose `data/tex-look/<id>.webp` exists, so empty that folder before redoing
+the atlases.
+
+## The 2021 flight
+
+The colours now come from the March 2021 Skråfoto flight alone. The 2025 flight is overexposed and its colours faded. The earlier run (2025 and
+2023) is kept in `data/city/work/appearance_2025/` and `data/city/work/tex-look_2025/`.
+
+| OKLab, median | 2025 + 2023 | 2021 |
+| --- | --- | --- |
+| Facade chroma | 0.014 | 0.032 |
+| Tegl roof chroma, as measured | 0.022 | 0.036 |
+| Tegl roof chroma, final | | 0.123 |
+| Tegl roof lightness, final | 0.713 | 0.454 |
+
+With one flight, fewer walls are seen: 20,626 against 21,970. Those fall back on their neighbours' tones. 2,244 buildings have photo atlases
+(2,247 before). The measured windows (`windows` layer) were not redone and still come from the 2025 and 2023 atlases.
+
+**Tegl roofs.** Even in 2021 a red tile roof is seen through haze, at a third of its chroma and too light. On a BBR `tegl` roof
+(`tegl_roof` in `appearance_calibrate.py`), the measured tone says where the roof lies in the range of red tile: lightness and chroma are mapped
+to 0.40-0.60 and 0.10-0.15, and the hue is drawn to terracotta (38°), so roofs stay different from each other. Not touched: black glazed tile (dark,
+no chroma), a clearly different colour, solar panels and green roofs. 742 of the 815 observed tegl roofs became `tile`.
+
+**Skylight cast on roofs.** Without tile's rule, shadowed views leave roofs plum. `roof_cast` cuts the chroma of hues 230° through 25° to 30 %,
+except on `tile`. This also damped up to 18 roofs of other materials that may be really red.
+
+**The tile pattern** (`js/roof-tile-material.js`). Pitched `tegl` and `betontagsten` roofs get courses (30 cm) and tiles (21 cm) in the plane of each
+roof face: the overlap's shadow, the curve across a tile, a tone per tile. Up close it shows as tile; further off it fades to its mean with a
+large-scale weathering, so distant roofs do not shimmer. It is a colour pattern only, with no bump in the lighting. The mark is the roof's
+roughness + 2 in the `roofMat` attribute, so it needs no new vertex data.
 `GSEARCH_TOKEN` (the Dataforsyningen token in `.env`) is needed by the Skråfoto, CIR and DHM steps; `--osm-source api` skips Overpass,
 which was still failing (502s, timeouts) on 2026-11-03.
 
@@ -24,8 +55,8 @@ which was still failing (502s, timeouts) on 2026-11-03.
 
 | Layer | Result |
 |---|---|
-| Photo tones (`appearance`) | all 3,340 buildings; 22,954 of 29,310 walls seen in a photo (513 Skråfoto views, 2025 + 2023) |
-| Photo atlases (`data/tex-look`) | 2,247 buildings (67 %), 29 MB WebP |
+| Photo tones (`appearance`) | all 3,340 buildings; 20,626 walls seen in a photo (the 2021 flight, 337 views calibrated) |
+| Photo atlases (`data/tex-look`) | 2,244 buildings (67 %), 34 MB WebP |
 | Measured windows (`windows`) | 3,031 walls on 1,342 buildings, 40,410 windows; `facade_layout_check.py regress`: 6 walls (0.2 %) |
 | Entrances | 3,611 on 2,014 of 2,755 buildings ≥ 20 m²; most DAR points lie inside the footprint, so 1,800 are `inferred` (door side guessed) |
 | Shopfronts (`groundfloor`) | 944 OSM venues |

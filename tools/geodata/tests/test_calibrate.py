@@ -102,3 +102,31 @@ def test_inferred_walls_follow_their_building_and_stats_shape():
     assert geo["appearance"]["calibration"]["version"] == "appearance-cal/1"
     s = summarise(geo, "tone_cal")
     assert s["all"]["n"] == 1 and s["sunlit"]["n"] == 1
+
+
+def test_hazy_tegl_comes_out_red_and_other_roofs_stay():
+    import appearance_calibrate as AC
+    # a hazy tile roof as the 2021 flight sees it
+    tone = AC.tegl_tone([0.62, 0.55, 0.52])
+    assert tone[0] > tone[1] * 1.3 and tone[1] > tone[2], f"red-orange: {tone}"
+    L, C, h = AC.lch(AC.srgb_to_oklab(np.array(tone)))
+    assert 0.40 <= L <= 0.60 and 0.09 <= C <= 0.16
+    # lighter measured, lighter tile: roofs stay different
+    assert sum(AC.tegl_tone([0.72, 0.65, 0.62])) > sum(AC.tegl_tone([0.52, 0.46, 0.43]))
+    assert AC.tegl_tone([0.13, 0.13, 0.14]) is None, "black glazed tile"
+    assert AC.tegl_tone([0.2, 0.5, 0.3]) is None, "a colour of its own"
+    # only a BBR tegl roof, and not solar panels
+    r = {"tone": [0.62, 0.55, 0.52], "type_hint": "fibre-cement"}
+    assert AC.tegl_roof(dict(r), "tegl")["type_hint"] == "tile"
+    assert AC.tegl_roof(dict(r), "metal")["tone"] == r["tone"]
+    assert AC.tegl_roof({**r, "type_hint": "solar"}, "tegl")["tone"] == r["tone"]
+
+
+def test_a_plum_roof_loses_its_cast_and_a_red_tile_or_grey_one_is_left():
+    import appearance_calibrate as AC
+    plum = AC.roof_cast({"tone": [0.42, 0.30, 0.40], "type_hint": "slate"})["tone"]
+    assert AC.lch(AC.srgb_to_oklab(np.array(plum)))[1] < 0.02, plum
+    tile = {"tone": [0.55, 0.25, 0.13], "type_hint": "tile"}
+    assert AC.roof_cast(dict(tile))["tone"] == tile["tone"]
+    olive = [0.45, 0.45, 0.30]
+    assert AC.roof_cast({"tone": list(olive), "type_hint": "other"})["tone"] == olive

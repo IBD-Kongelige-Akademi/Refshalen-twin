@@ -40,6 +40,9 @@ const ROOF_COLOURS = {
   'andet materiale': [0.32, 0.31, 0.3]
 };
 const ROOF_DEFAULT = [0.34, 0.33, 0.32];
+const TILE_MATERIALS = new Set(['tegl', 'betontagsten']);
+const NOT_TILE_HINTS = new Set(['solar', 'green', 'copper', 'metal']);
+const ROOF_TILE_FLAG = 2; // js/roof-tile-material.js, which needs three.js and so does not run here
 
 const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 
@@ -210,13 +213,15 @@ function roofColourFor(b, useObserved = true, pitched = false) {
   const summary = useObserved ? b.observed?.summary?.roof : null;
   let rgb = seen?.conf === 'observed' && Array.isArray(seen.tone) && seen.tone.length === 3 ? seen.tone : Array.isArray(summary) && summary.length === 3 ? summary : (ROOF_COLOURS[b.roof_material] || ROOF_DEFAULT);
   const { rough, metal, hint } = roofSurface(useObserved ? b : { ...b, observed: null });
+  // a pitched clay roof carries the tile pattern (js/roof-tile-material.js): marked on its roughness. What the photo says is not tile wins
+  const tiled = pitched && TILE_MATERIALS.has(b.roof_material) && !NOT_TILE_HINTS.has(hint);
   // Dark pitched roof photographs contain reflected sky; preserve hue and leave metals / flat decks alone.
   if (pitched && ['slate', 'fibre-cement', 'tagpap'].includes(hint)) {
     const luma = rgb[0] * 0.2126 + rgb[1] * 0.7152 + rgb[2] * 0.0722;
     const gain = Math.min(1, 0.26 / Math.max(luma, 0.001));
     rgb = rgb.map((v) => v * gain);
   }
-  return [...rgb.map(srgbToLinear), rough, metal];
+  return [...rgb.map(srgbToLinear), tiled ? rough + ROOF_TILE_FLAG : rough, metal];
 }
 
 /**

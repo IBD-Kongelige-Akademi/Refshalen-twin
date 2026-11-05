@@ -36,7 +36,7 @@ import appearance_calibrate as AC  # noqa: E402
 import appearance_city as C  # noqa: E402
 
 WORK = C.WORK
-GAIN_MIN_PX, GAIN_MIN_PAIRS, NEWEST = 150, 30, 2025
+GAIN_MIN_PX, GAIN_MIN_PAIRS, NEWEST = 150, 30, 2021  # the reference flight: other years are mapped onto it
 
 
 def cells_done(stage_file: str, cells: list[str] | None = None) -> list[str]:
@@ -86,7 +86,7 @@ def calibrate_all() -> dict:
         print(f"  ratios {c}", flush=True)
     gains = {y: np.median(r, axis=0) for y, r in ratios.items() if len(r) >= GAIN_MIN_PAIRS}
     out = {"cal": cal, "gains": gains, "views": len(views), "pairs": len(pairs), "cells": len(cells), "src": src,
-           "median_G": {str(y): float(np.median([v["G"] for vid, v in cal.items() if A.view_year(vid) == y])) for y in (2023, 2025)
+           "median_G": {str(y): float(np.median([v["G"] for vid, v in cal.items() if A.view_year(vid) == y])) for y in (2021, 2023, 2025)
                         if any(A.view_year(vid) == y for vid in cal)}}
     C.save_pkl(WORK / "calibration.pkl.gz", out)
     print("calibration:", json.dumps({k: v for k, v in out.items() if k not in ("cal", "gains")}),
@@ -332,6 +332,7 @@ def pass_d(cell: str) -> dict:
             t = tables.roof((cx, cz))
             roof = {"tone": [round(float(x), 3) for x in t] if t is not None else None, "conf": "inferred", "views": [], "px": 0,
                     "type_hint": None, "pitched": is_p, "ridge_rise_m": rr}
+        roof = AC.roof_cast(AC.tegl_roof(roof, b.get("roof_material")))
         stats["buildings"] += 1
         pseudo.append({"id": bid, "ring": b["ring"], "wall_material": b.get("wall_material"), "observed": {"walls": walls, "roof": roof}})
     cal_stats = AC.calibrate({"buildings": pseudo}, offsets=near, transfer=glob["transfer"])

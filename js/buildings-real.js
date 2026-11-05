@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { createPreWarBuildingMaterial, createCurtainWallMaterial } from './tsl-materials.js';
 import { attribute } from 'three/tsl';
+import { roofRoughness, roofTileFactor } from './roof-tile-material.js';
 import { createAccumulator, addBuilding, groundLow } from './building-geometry.js';
 import { buildingSteps, ringCentre, wallArrays as wallTyped, roofArrays as roofTyped } from './building-compute.js';
 import { describeAppearance, calibrationOn } from './appearance.js';
@@ -403,8 +404,10 @@ function createBuildingMaterials() {
   const roofMaterial = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.02 });
   roofMaterial.name = 'cph-roof';
   // Roughness / metalness by roof type hint (tagpap dark matte, tile, slate, metal, ...): per-vertex from the roof geometry
-  roofMaterial.roughnessNode = attribute('roofMat', 'vec2').x;
+  roofMaterial.roughnessNode = roofRoughness();
   roofMaterial.metalnessNode = attribute('roofMat', 'vec2').y;
+  // clay tile on the pitched tegl roofs (js/roof-tile-material.js)
+  roofMaterial.colorNode = attribute('color', 'vec3').mul(roofTileFactor());
   const doorMaterial = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.05 });
   doorMaterial.name = 'cph-entrance-doors';
   // the mid ring's walls: one tone per building, no facade shader (the roofs, LoD2 included, keep theirs)

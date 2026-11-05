@@ -10,7 +10,7 @@ slimmed to what the engine / far LOD read), plus rectified-and-processed facade 
 
 Pipeline (all resumable: every step writes a done marker under the work dir, `--force` redoes it)
 
-  tones <cell|all>   Stage 1, per 1 km cell (parallel, --workers): STAC search (2025, then 2023), view selection, windows read
+  tones <cell|all>   Stage 1, per 1 km cell (parallel, --workers): STAC search (2021), view selection, windows read
                      from the COG *overviews* (--factor 2 = the half resolution appearance.py has always sampled at), DSM blocks
                      (DHM WCS, cached), z-buffer of the cell's buildings PLUS a 100 m ring of neighbour buildings (occlusion across
                      cell borders), appearance.observe_view per view. Saves the raw per-surface observations + the same-surface
@@ -58,7 +58,7 @@ TILES = ROOT / "data" / "tiles"
 WORK = Path(os.environ.get("APPEARANCE_WORK", Path.home() / "conductor/cph-twin/data/appearance-city"))
 RING_M = 100.0  # neighbour buildings kept in the z-buffer around a cell
 DSM_RING_M = 250.0  # DSM kept around a cell (rays travel along the viewing direction)
-COLLECTIONS = ("skraafotos2025", "skraafotos2023")
+COLLECTIONS = ("skraafotos2021", "skraafotos2023", "skraafotos2025")  # 2021 first: the 2025 flight is overexposed and its colours faded
 MIN_FREE_GB = 6.0
 VERSION = "cph-appearance/1"
 
@@ -324,7 +324,7 @@ def main(argv=None) -> int:
     p = sub.add_parser("tones")
     p.add_argument("cells", nargs="+")
     p.add_argument("--factor", type=int, default=2)
-    p.add_argument("--years", default="2025,2023")
+    p.add_argument("--years", default="2021")
     p.add_argument("--workers", type=int, default=1)
     p.add_argument("--force", action="store_true")
     a = ap.parse_args(argv)

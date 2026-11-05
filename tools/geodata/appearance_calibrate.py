@@ -133,6 +133,59 @@ def finish(lab, mursten=False, sunlit=False):
     return clip_to_gamut(lab2), brick
 
 
+# Clay tile. Even the 2021 flight sees a red tile roof through haze from far off: chroma 0.03 to 0.06 where the tile has 0.10 to 0.15, and too
+# light. On a BBR `tegl` roof the measured tone is taken as where this roof lies in the range of red tile, so roofs stay different from one another:
+# lightness and chroma are mapped into that range and the hue drawn to terracotta. Measurements that are not red tile keep their tone: black glazed
+# tile (dark, no chroma), a clearly non-warm colour, solar panels, a green roof.
+TEGL_HUE = 38.0
+TEGL_L = (0.40, 0.60)
+TEGL_C = (0.10, 0.15)
+
+
+def tegl_tone(rgb):
+    """The tone of a BBR tegl roof measured as `rgb` (sRGB 0-1), or None where the measurement is not red tile."""
+    lab = srgb_to_oklab(np.array(rgb, float))
+    L, C, h = lch(lab)
+    L, C, h = float(L), float(C), float(h)
+    off = (h - TEGL_HUE + 180.0) % 360.0 - 180.0
+    if L < TEGL_L[0] and C < 0.03:
+        return None  # black glazed
+    if C >= 0.03 and abs(off) > 75.0:
+        return None  # a colour of its own
+    L2 = float(np.clip(0.44 + (L - 0.60) * 0.45, *TEGL_L))
+    C2 = float(np.clip(0.095 + C * 0.8, *TEGL_C))
+    h2 = TEGL_HUE + float(np.clip(off, -60.0, 60.0)) * 0.3 if C >= 0.015 else TEGL_HUE
+    return [round(float(v), 3) for v in clip_to_gamut(from_lch(L2, C2, h2))]
+
+
+def tegl_roof(roof: dict, material) -> dict:
+    """The roof entry of a building (in place): a BBR tegl roof gets its clay tone and the hint `tile`."""
+    if material != "tegl" or not roof or roof.get("tone") is None or roof.get("type_hint") in ("solar", "green"):
+        return roof
+    tone = tegl_tone(roof["tone"])
+    if tone is not None:
+        roof["tone"] = tone
+        roof["type_hint"] = "tile"
+    return roof
+
+
+# Blue to magenta on a roof is the skylight cast of a shadow view or the haze, not a roofing colour (plum roofs): its chroma is cut. The hues are
+# wider than the walls' COOL_HUES, as roofs see more sky. A roof clearly coloured in the photo (a painted or glazed one) keeps most of it.
+ROOF_CAST_HUES = (230.0, 25.0)  # through 0
+ROOF_CAST_KEEP = 0.3
+
+
+def roof_cast(roof: dict) -> dict:
+    """The roof entry (in place) with a skylight cast taken out of its tone. Tile (tegl_roof) has been drawn to terracotta already."""
+    if not roof or roof.get("tone") is None or roof.get("type_hint") == "tile":
+        return roof
+    lab = srgb_to_oklab(np.array(roof["tone"], float))
+    L, C, h = lch(lab)
+    if h >= ROOF_CAST_HUES[0] or h <= ROOF_CAST_HUES[1]:
+        roof["tone"] = [round(float(v), 3) for v in clip_to_gamut(from_lch(L, C * ROOF_CAST_KEEP, h))]
+    return roof
+
+
 def _centroid(ring):
     n = len(ring) // 2
     return sum(ring[0::2]) / n, sum(ring[1::2]) / n
