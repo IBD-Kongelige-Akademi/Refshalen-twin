@@ -209,6 +209,9 @@ test('the shell of a LoD2 building closes: bad records are refused, unmatched wa
   const low = createAccumulator({ lite: true });
   assert.equal(addBuilding(low, { ...b, eave: 0.6 }, { lite: true, lod2: record(scrap) }), null);
   assert.equal(low.wall.position.length + low.roof.position.length, 0);
+  // a low shed with a bad record stays: small
+  const shed = { id: 'gdk:2', ring: [0, 0, 5, 0, 5, 5, 0, 5], ground: 0, eave: 2.2, ridge: 2.4 };
+  assert.ok(addBuilding(createAccumulator({ lite: true }), shed, { lite: true, lod2: record([[[1, 2.2, 1], [1, 2.2, 2], [2, 2.2, 2]]]) }));
   // without a record a low building stays what it was
   assert.ok(addBuilding(createAccumulator({ lite: true }), { ...b, eave: 0.6 }, { lite: true }));
 
