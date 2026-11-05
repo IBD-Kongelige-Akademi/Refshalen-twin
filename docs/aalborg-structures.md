@@ -110,6 +110,33 @@ OSM `railway=rail` and disused tracks, not in tunnels: 69 tracks, 13.7 km (main,
 - Tracks lie at the terrain height (cut under the decks, so a track passes under a bridge), or on their deck where they are tagged a
   bridge. The build stores the heights every 4 m.
 
+## Where pedestrians walk
+
+AI pedestrians walk on lines beside the road graph. Those lines used to be tested only against buildings, so many lay on a carriageway the
+graph drew narrower than the road surface, on a road beside them, or along the tracks. `js/walk-limits.js` now holds the limits per tile
+(from the tile's roads, tracks, railway land and water), and `js/pedestrian-routes.js` lays the lines and corners by them:
+
+- **Water and railway.** A line never runs through water or along a track (2.5 m either side of the centreline) or OSM `landuse=railway`
+  (22 ha at the station). It may cross a track straight over, up to 7 m. A bridge deck is exempt: what is on it is over them.
+- **Roads.** A line moves out from its road, up to 6 m, until it is off the carriageway. If no position works, that side has no line. It
+  may cross a driveway's mouth (a service road, up to 8 m) and clip another carriageway by 2.5 m. Its ends stop at the kerb of the street
+  they meet.
+- **Intersections.** The crosswalks are the way over at signals. A corner may cross a carriageway only at the mouth of an intersection
+  without signals, within 6 m past its widest road.
+- **Green areas and pavements** have no limit: anything off these is allowed.
+
+Where 340 pedestrians stand, in 20,400 samples at 6 spots over the district:
+
+| | Before | After |
+| --- | --- | --- |
+| On a walking line, on a carriageway | 26.6 % | 5.0 % |
+| On a walking line, on a track | 2.7 % | 0.1 % |
+| In water | 0.05 % | 0 |
+| Crossing at a crosswalk, on the road | 10.1 % | 11.2 % |
+| On a corner, on a carriageway (at intersections) | counted with the lines | 10.3 % |
+
+The 5 % is mostly driveway mouths and the last metre of a line at a kerb. Every pedestrian still finds a place.
+
 ## Not done
 
 - **Underpass walls.** A lowered underpass has earth banks, not retaining walls, and a junction beside it is lowered only along the way
@@ -118,6 +145,9 @@ OSM `railway=rail` and disused tracks, not in tunnels: 69 tracks, 13.7 km (main,
   Rendsburggade have no tunnel decks.
 - **Bridge shapes.** Every bridge has the same section: no bascule span on Limfjordsbroen, no truss on Jernbanebroen, no stairs or ramps
   modelled apart from the terrain.
+- **Paths in the green.** Pedestrians walk beside the road graph only: green areas are allowed, but nobody follows a park path that has no
+  road beside it.
+- **Yielding at unsignalled corners.** Cars do not yield to someone crossing a side street's mouth; they meet through the collision pass.
 - **Trains.** None run.
 - **Platforms.** `railway=platform` and the station are not modelled.
 - **Watercourse levels.** They are a stand-in (the terrain percentile), not a surveyed water level.

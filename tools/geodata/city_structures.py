@@ -838,6 +838,17 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
                       "pts": [round(float(v), 2) for q, y in zip(st, ys) for v in (q.x, q.y, y)], "_g": line})
     log(f"rails: {len(rails)} tracks, {sum(r['_g'].length for r in rails) / 1000:.1f} km ({sum(1 for r in rails if r['bridge'])} on bridges)")
 
+    # ---- railway land (OSM landuse=railway): no one walks there
+    rail_areas = []
+    for (t, i), w in els.items():
+        if t == "way" and w.get("tags", {}).get("landuse") == "railway" and w["nodes"][0] == w["nodes"][-1]:
+            pts = to_local_line(w, els, tr)
+            if len(pts) >= 4:
+                g = Polygon(pts).buffer(0)
+                if g.intersects(area):
+                    rail_areas.append(g)
+    log(f"railway land: {len(rail_areas)} areas, {sum(g.area for g in rail_areas) / 1e4:.1f} ha")
+
     # ---- per tile
     out = {}
     dtree = STRtree([d["_g"] for d in decks]) if decks else None
@@ -846,8 +857,14 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
         b = tboxes[tid]
         ds = [decks[j] for j in dtree.query(b, predicate="intersects")] if dtree else []
         rs = [rails[j] for j in rtree.query(b, predicate="intersects")] if rtree else []
-        if ds or rs:
-            out[tid] = {"tile": tid, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
+        ra = []
+        for g in rail_areas:
+            part = g.intersection(b)
+            for q in getattr(part, "geoms", [part]):
+                if q.geom_type == "Polygon" and q.area > 1.0:
+                    ra.append([round(v, 2) for c in list(q.exterior.coords)[:-1] for v in c])
+        if ds or rs or ra:
+            out[tid] = {"tile": tid, "railAreas": ra, "decks": [{k: v for k, v in d.items() if k != "_g"} for d in sorted(ds, key=lambda d: d["id"])],
                         "rails": [{k: v for k, v in r.items() if k != "_g"} for r in sorted(rs, key=lambda r: r["id"])]}
     terrain_tiles = write_terrain(tiles_dir, H, ids)
     log(f"water: {write_water_gaps(tiles_dir, gaps):.0f} m2 added under the decks over the water")

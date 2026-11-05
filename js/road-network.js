@@ -736,6 +736,8 @@ function buildRoadNetwork(signalIntersections = [], options = {}) {
     nodes, edges, paintEdges, connector, curvePoint, stats,
     extraOffset: options.extraOffset || null,
     obstruction: options.obstruction || null,
+    roadAt: options.roadAt || null,
+    hazardAt: options.hazardAt || null,
     walkable: options.walkable,
     onSidewalk: options.onSidewalk,
     isRoadClear: () => true

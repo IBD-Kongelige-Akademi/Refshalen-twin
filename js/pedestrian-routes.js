@@ -1,6 +1,15 @@
 // Small, lazily connected sidewalk tracks. Junctions only connect points on the same curb island;
 // crossing the roadway is a separate, signal-controlled track owned by traffic.js.
-function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = null }, blockAt) {
+// `roadAt` / `hazardAt` (js/walk-limits.js) keep the lines and corners off the carriageways, the water and the railway:
+//  - a walking line moves out from its road until it is off the carriageway; it may cross a driveway's mouth (a service road, up to
+//    SERVICE_MOUTH m), and clip a carriageway by CLIP m or within END_SLACK m of its ends, at the intersection; else there is no line;
+//  - it may cross the railway only where a track passes straight across it (RAIL_CROSS m), and never runs through water;
+//  - a corner may cross a carriageway only at an intersection without signals (within CORNER_REACH m past its widest road); at signals
+//    the crosswalk is the way over.
+const SERVICE_MOUTH = 8, CLIP = 2.5, END_SLACK = 6, RAIL_CROSS = 7, CORNER_REACH = 6;
+const PUSHES = [0, 0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6];
+
+function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = null, roadAt = null, hazardAt = null }, blockAt) {
   const sidewalks = new Map(), crossings = new Map(), junctions = new Map(), connections = new WeakMap();
   const point = (track, end) => ({ x: track.ax + track.ux * track.len * end, z: track.az + track.uz * track.len * end });
   const segment = (a, b, extra = {}) => {
@@ -21,6 +30,57 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     return true;
   }
 
+  // Does the line a-b keep to where people may walk? (see the top of this file)
+  function lawfulLine(a, b) {
+    if (!roadAt && !hazardAt) return true;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    const steps = Math.max(1, Math.ceil(len));
+    let roadRun = 0, roadLimit = 0, hazardRun = 0;
+    for (let i = 0; i <= steps; i++) {
+      const s = len * i / steps;
+      const x = a.x + (b.x - a.x) * i / steps, z = a.z + (b.z - a.z) * i / steps;
+      if (hazardAt && hazardAt(x, z)) {
+        hazardRun += len / steps;
+        if (hazardRun > RAIL_CROSS) return false;
+      } else hazardRun = 0;
+      const road = roadAt ? roadAt(x, z) : null;
+      if (road && s > END_SLACK && s < len - END_SLACK) {
+        roadRun += len / steps;
+        roadLimit = road.class === 'service' ? SERVICE_MOUTH : CLIP;
+        if (roadRun > roadLimit) return false;
+      } else if (!road) roadRun = 0;
+    }
+    return true;
+  }
+
+  // The line a-b with its ends drawn back off a carriageway they lie on: it stops at the kerb of the street it meets
+  function trimmed(a, b) {
+    if (!roadAt) return [a, b];
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    const at = (s) => ({ x: a.x + (b.x - a.x) * s / len, z: a.z + (b.z - a.z) * s / len });
+    let s0 = 0, s1 = len;
+    while (s0 <= END_SLACK + SERVICE_MOUTH && s0 < len - 2 && roadAt(at(s0).x, at(s0).z)) s0 += 0.5;
+    while (len - s1 <= END_SLACK + SERVICE_MOUTH && s1 > s0 + 2 && roadAt(at(s1).x, at(s1).z)) s1 -= 0.5;
+    return [at(s0), at(s1)];
+  }
+
+  // A corner connector at node n: off the carriageways, but for the mouth of an intersection without signals
+  function lawfulCorner(a, b, n) {
+    if (!roadAt && !hazardAt) return true;
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
+    const reach = n && !n.signal ? Math.max(0, ...(n.arms || []).map((arm) => arm.half || 0)) + CORNER_REACH : 0;
+    let run = 0;
+    for (let i = 0; i <= steps; i++) {
+      const x = a.x + (b.x - a.x) * i / steps, z = a.z + (b.z - a.z) * i / steps;
+      if (hazardAt && hazardAt(x, z)) return false;
+      if (roadAt && roadAt(x, z)) {
+        run++;
+        if (run > CLIP && !(n && Math.hypot(x - n.x, z - n.z) <= reach)) return false;
+      } else run = 0;
+    }
+    return true;
+  }
+
   // A walking line that runs through street furniture (bike racks, trees, benches, parked cars: `obstruction(a, b)` is how many
   // metres of it the static colliders block) moves sideways to the clearest of these shifts, keeping LINE_SPACING to the other.
   const SHIFTS = [0, -0.5, 0.5, -1, 1];
@@ -31,13 +91,20 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     sidewalks.set(e, result);
     // Two walking lines on each side leave room for people to pass or stop together.
     for (const sign of [-1, 1]) {
-      const extra = extraOffset ? extraOffset(e, sign) : 0;
+      const ends = (off) => {
+        const a = { x: e.sx + e.rx * off, z: e.sz + e.rz * off };
+        return [a, { x: a.x + e.dx * e.len, z: a.z + e.dz * e.len }];
+      };
+      let extra = extraOffset ? extraOffset(e, sign) : 0;
+      // out from the road until the nearer line is off the carriageway (the road drawn wider than the graph says, a road beside it)
+      const push = PUSHES.find((p) => lawfulLine(...ends(sign * (e.half + 1.7 + extra + p))));
+      if (push === undefined) continue;
+      extra += push;
       const line = (inset) => {
         const off = sign * (e.half + inset + extra);
-        const a = { x: e.sx + e.rx * off, z: e.sz + e.rz * off };
-        const b = { x: a.x + e.dx * e.len, z: a.z + e.dz * e.len };
+        const [a, b] = ends(off);
         const block = blockAt(a.x, a.z);
-        if (!block || blockAt(b.x, b.z) !== block || !clear(a, b, block)) return null;
+        if (!block || blockAt(b.x, b.z) !== block || !clear(a, b, block) || !lawfulLine(a, b)) return null;
         return { inset, a, b, block, blocked: obstruction ? obstruction(a.x, a.z, b.x, b.z) : 0 };
       };
       const chosen = [];
@@ -54,7 +121,10 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
         if (best) chosen.push(best);
       }
       chosen.sort((p, q) => p.inset - q.inset);
-      for (const c of chosen) result.push(segment(c.a, c.b, { edge: e, from: e.from, to: e.to, block: c.block }));
+      for (const c of chosen) {
+        const [a, b] = trimmed(c.a, c.b);
+        result.push(segment(a, b, { edge: e, from: e.from, to: e.to, block: c.block }));
+      }
     }
     return result;
   }
@@ -105,8 +175,8 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   }
 
   // Stay in the sidewalk band even where angled building colliders are deliberately omitted from the road graph.
-  function cornerClear(a, b, block) {
-    if (!clear(a, b, block)) return false;
+  function cornerClear(a, b, block, n = null) {
+    if (!clear(a, b, block) || !lawfulCorner(a, b, n)) return false;
     if (!block.poly || !block.poly.length) return true; // Copenhagen: one block, bounded by the buildings clear() tests
     const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
     for (let i = 0; i <= steps; i++) {
@@ -139,7 +209,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
       if (distance > 32 || blockAt(b.x, b.z) !== block) continue;
       const path = [];
       if (distance > 0.01) {
-        if (cornerClear(a, b, block)) {
+        if (cornerClear(a, b, block, n)) {
           path.push({ track: segment(a, b), dir: 1 });
         } else {
           // Meeting the two offset sidewalk lines rounds the curb instead of cutting diagonally through a lot.
@@ -149,7 +219,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
           const t = ((b.x - a.x) * bz - (b.z - a.z) * bx) / cross;
           const c = { x: a.x + ax * t, z: a.z + az * t };
           if (t < 0 || t > 20 || (b.x - c.x) * bx + (b.z - c.z) * bz < 0 || Math.hypot(b.x - c.x, b.z - c.z) > 20) continue;
-          if (!cornerClear(a, c, block) || !cornerClear(c, b, block)) continue;
+          if (!cornerClear(a, c, block, n) || !cornerClear(c, b, block, n)) continue;
           if (t > 0.01) path.push({ track: segment(a, c), dir: 1 });
           if (Math.hypot(b.x - c.x, b.z - c.z) > 0.01) path.push({ track: segment(c, b), dir: 1 });
         }

@@ -8,6 +8,7 @@ import { createCyclistSystem } from './cyclists.js';
 import { buildDirectionOverlay } from './direction-overlay.js';
 import { buildSignalHeads } from './signal-heads.js';
 import { createWalkSpace } from './walk-space.js';
+import { createWalkLimits } from './walk-limits.js';
 import { buildLakes } from './water.js';
 import { setCalibration } from './appearance.js';
 import { applySurfaceCuts } from './lakes.js';
@@ -768,9 +769,11 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   }
   let roads = null;
   let walk = null;
+  let walkLimits = null; // the carriageways, the water and the railway, where people do not walk (js/walk-limits.js)
   if (!flags.has('noroads')) {
     roads = await createRoadSurfaceLayer(scene, { terrain: terrain.flat ? null : terrain, tiledHeight });
     walk = createWalkSpace(geo, waterDoc);
+    walkLimits = createWalkLimits({ deckAt: deckField.deckAt });
     layers.push({
       name: 'roads', rings: ['near', 'mid'], fidelity: true,
       add: async (ctx, ring) => {
@@ -784,8 +787,12 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     // overrideFootprints) takes its place in the near ring, where it is drawn; rebuilt when the tile changes ring
     layers.push({
       name: 'walk', rings: ['near', 'mid'], fidelity: true,
-      add: (ctx, ring) => { walk.removeBuildings(ctx.id); walk.addBuildings(ctx.id, ring === 'near' ? overrideFootprints(ctx.ownBuildings, ctx.overrides) : ctx.ownBuildings); },
-      remove: (id) => walk.removeBuildings(id)
+      add: (ctx, ring) => {
+        walk.removeBuildings(ctx.id);
+        walk.addBuildings(ctx.id, ring === 'near' ? overrideFootprints(ctx.ownBuildings, ctx.overrides) : ctx.ownBuildings);
+        if (!walkLimits.has(ctx.id)) walkLimits.add(ctx.id, { roads: ctx.geo.roads || [], rails: ctx.structures?.rails || [], railAreas: ctx.structures?.railAreas || [], water: ctx.water?.bodies || [] });
+      },
+      remove: (id) => { walk.removeBuildings(id); walkLimits.remove(id); }
     });
   }
 
@@ -882,6 +889,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     const bikeLaneNear = (x, z, r) => !!laneIndex && laneIndex.near(x, z, r);
     const networkOptions = {
       walkable: walk.walkable, onSidewalk: walk.onSidewalk, blockAt: walk.blockAt,
+      roadAt: walkLimits.roadAt, hazardAt: walkLimits.hazardAt,
       // walking lines step round the near tiles' furniture (bike racks, trees, benches)
       obstruction: (ax, az, bx, bz) => collisionStage.obstructedLength(ax, az, bx, bz),
       // pedestrians walk outside the cycle track beside a carriageway
