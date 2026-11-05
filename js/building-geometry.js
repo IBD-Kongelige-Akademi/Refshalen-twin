@@ -12,7 +12,7 @@
 // Frame (docs/cph-geodata-schema.md): x east, z south, y up. Rings are CCW seen from above (in x / -z), holes CW, so
 // the outward normal of the wall p0 -> p1 (direction d) is (-d.z, 0, d.x) and u grows along d.
 // With a LoD2 record (opts.lod2, js/lod2-geometry.js) the roof is the roofer mesh and each wall ends at its roofer eave.
-import { lod2EdgeTops, lod2RoofTriangles, lod2WallPieces } from './lod2-geometry.js';
+import { lod2EdgeTops, lod2RoofTriangles, lod2WallPieces, lod2ClosingWalls, lod2RoofCover, lod2RoofHasGaps, lod2Usable } from './lod2-geometry.js';
 import { mapObservedEdges, roofSurface, observedToneSrgb, buildingTone as observedBuildingTone } from './appearance.js';
 import { facadeStyle, windowStyle } from './facade-style.js';
 import { classifyWalls, doorSummary } from './groundfloor.js';
@@ -237,6 +237,10 @@ function groundLow(b, terrain) {
   return low;
 }
 
+const LOW_EAVE = 1.0; // m over the ground: a building reading this low with a refused record is below ground (a low shed is not: it stays an extrusion)
+const DECK_BELOW_COVER = 0.97; // a roof covering less of the footprint than this has gaps, wherever they are
+const DECK_UNDER_ROOF = 0.3; // m: the closing deck lies this far under the lowest of the roof and the wall tops
+
 function addBuilding(acc, b, opts = {}) {
   const wallAcc = opts.wallAcc || acc;
   const lite = !!opts.lite;
@@ -244,6 +248,10 @@ function addBuilding(acc, b, opts = {}) {
   if (!outerPts) return null;
   const holePts = (b.holes || []).map((h) => cleanRing(h, false)).filter(Boolean);
   const ground = b.ground;
+  // a record whose roof does not cover the footprint is refused (lod2Usable): the building is drawn as an extrusion. Where it also reads barely
+  // over the ground there is nothing standing there: an underground car park under a square (Budolfi Plads). It is not drawn
+  const refused = opts.lod2 && !lod2Usable(opts.lod2, b) ? opts.lod2 : null;
+  if (refused && b.eave - ground < LOW_EAVE) return null;
   const eave = Math.max(b.eave, ground + 0.5);
   // The wall stands on the terrain (js/terrain.js, the one ground model): its skirt reaches 0.25 m under the lowest
   // ground along the outline, so a sloping street never shows a gap. Without terrain: the flat plane at y = 0.
@@ -282,9 +290,9 @@ function addBuilding(acc, b, opts = {}) {
   // Ground-floor treatment per wall (street side + venue data, js/groundfloor.js); without a context the preset kind is used
   const wallKinds = lite ? null : opts.wallKinds || (opts.ground ? classifyWalls(b, rings, opts.ground) : null);
   const doors = !lite && opts.ground?.entrances?.has(b.id) ? placeDoors(b, rings, opts.ground.entrances.get(b.id)) : [];
-  const lod2 = opts.lod2 || null;
-  const lod = lod2 ? lod2EdgeTops(lod2, b, rings, eave, ground + 1.0) : null;
+  const lod2 = (!refused && opts.lod2) || null;
   const roofTriangles = lod2 ? lod2RoofTriangles(lod2) : [];
+  const lod = lod2 ? lod2EdgeTops(lod2, b, rings, eave, ground + 1.0, roofTriangles) : null;
   const pitched = lod2 ? roofTriangles.some(([a, c, d]) => {
     const ux = c[0] - a[0], uy = c[1] - a[1], uz = c[2] - a[2];
     const vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
@@ -363,7 +371,8 @@ function addBuilding(acc, b, opts = {}) {
     // Roofer outer walls above each edge's eave (gables, steps) and inner step walls, as plain masonry in the edge's frame
     const edgeFrames = [];
     rings.forEach((ring) => ring.forEach((p, i) => { const q = ring[(i + 1) % ring.length]; edgeFrames.push([p, q]); }));
-    for (const { edge, tri } of lod2WallPieces(lod2, lod)) {
+    const roofer = lod2WallPieces(lod2, lod);
+    for (const { edge, tri } of [...roofer, ...lod2ClosingWalls(lod, roofer, roofTriangles)]) {
       if (edge >= 0) quadOf[edge]?.pieces.push(tri); // the photo wall covers them too (js/appearance.js texturedWalls)
       const [e0, e1] = edge >= 0 ? edgeFrames[edge] : [null, null];
       let dxw, dzw;
@@ -405,6 +414,16 @@ function addBuilding(acc, b, opts = {}) {
       w.index.push(base, base + 1, base + 2);
     }
     addLod2Roof(acc.roof, lod2, roofColour, roofTriangles);
+    // under the roofer roof, a deck over the whole footprint: where the mesh leaves a gap at an eave you look onto it, not into the hollow shell
+    if (lod2RoofCover(b, roofTriangles) < DECK_BELOW_COVER || lod2RoofHasGaps(b, roofTriangles)) {
+      let lowest = Infinity;
+      for (const tri of roofTriangles) for (const q of tri) lowest = Math.min(lowest, q[1]);
+      const deckY = Math.max(ground + 0.5, Math.min(lowest, ...lod.tops.filter(Number.isFinite)) - DECK_UNDER_ROOF);
+      const tri = triangulate(outerPts.map(([x, z]) => [x, -z]), holePts.map((h) => h.map(([x, z]) => [x, -z])));
+      const deckBase = acc.roof.position.length / 3;
+      for (const [x, n] of tri.points) pushRoofVertex(acc.roof, x, deckY, -n, 0, 1, 0, roofColour);
+      for (const k of tri.indices) acc.roof.index.push(deckBase + k);
+    }
   } else {
     addRoof(acc.roof, b, outerPts, holePts, eave, roofColour, lite);
   }

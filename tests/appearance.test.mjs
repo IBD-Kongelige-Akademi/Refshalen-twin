@@ -103,14 +103,17 @@ test('LoD2 truncated walls: gable pieces take the tone of their own edge', () =>
     id: 'gdk:1', ring, ground: 0, eave: 4, ridge: 6, roof: 'flat', roof_material: 'tegl', facade: { tone: [0.5, 0.5, 0.5], floor_h: 3, ground_floor_h: 3 },
     observed: { walls: [wall(0, 0, RED), wall(0, 1, GREEN), wall(0, 2, BLUE), wall(0, 3, [0.9, 0.9, 0.2])] }
   };
-  const tris = [[['B', 'C', 'c'], 1, 1], [['B', 'c', 'r1'], 1, 1], [['B', 'r1', 'b'], 1, 1], [['a', 'b', 'r1'], 0, -1], [['a', 'r1', 'r0'], 0, -1]];
+  const tris = [[['B', 'C', 'c'], 1, 1], [['B', 'c', 'r1'], 1, 1], [['B', 'r1', 'b'], 1, 1], [['a', 'b', 'r1'], 0, -1], [['a', 'r1', 'r0'], 0, -1], [['c', 'd', 'r0'], 0, -1], [['c', 'r0', 'r1'], 0, -1]];
   const rec = parseLod2Record(pack(tris.map((t) => t[0]), tris.map((t) => t[1]), tris.map((t) => t[2])));
   const acc = createAccumulator();
   addBuilding(acc, b, { lod2: rec });
   const nv = acc.wall.position.length / 3;
   assert.ok(nv > 16, 'gable piece present');
   const t = acc.wall.facadeTone;
-  for (let k = 16; k < nv; k++) assert.deepEqual(r5([t[4 * k], t[4 * k + 1], t[4 * k + 2]]), r5(alb(GREEN)));
+  // (the far gable has no roofer wall in this record: the closing wall there takes that edge's own tone)
+  for (let k = 16; k < nv; k++) {
+    if (Math.abs(acc.wall.position[3 * k] - 10) < 1e-3) assert.deepEqual(r5([t[4 * k], t[4 * k + 1], t[4 * k + 2]]), r5(alb(GREEN)));
+  }
 });
 
 test('roof surface by type hint, observed tone feeds the roof colour', () => {

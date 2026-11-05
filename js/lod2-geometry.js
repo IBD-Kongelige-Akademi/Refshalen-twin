@@ -115,7 +115,7 @@ function distToSegment(px, pz, x0, z0, x1, z1) {
  * may cover several raw edges: its top is the lowest top among them (higher parts are filled by wall pieces above it).
  * Edges the roofer did not match keep `fallback` (the DSM eave).
  */
-function lod2EdgeTops(rec, b, cleanRings, fallback, minTop) {
+function lod2EdgeTops(rec, b, cleanRings, fallback, minTop, triangles = null) {
   const cleaned = [];
   for (const ring of cleanRings) {
     for (let i = 0; i < ring.length; i++) {
@@ -141,8 +141,164 @@ function lod2EdgeTops(rec, b, cleanRings, fallback, minTop) {
       tops[best] = Number.isFinite(tops[best]) ? Math.min(tops[best], rec.top[k]) : rec.top[k];
     }
   });
-  for (let i = 0; i < tops.length; i++) if (!Number.isFinite(tops[i])) tops[i] = fallback;
+  // an edge the roofer did not match ends at the lowest roof over it (lod2ClosingWalls goes on from there); the generic eave could stand
+  // above the roof, its back open to whoever looks across it, or end short of it
+  const read = triangles ? roofReader(triangles) : null;
+  for (let i = 0; i < tops.length; i++) {
+    if (Number.isFinite(tops[i])) continue;
+    tops[i] = fallback;
+    if (!read) continue;
+    const [x0, z0, x1, z1] = cleaned[i];
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    if (len < 0.05) continue;
+    const nx = -(z1 - z0) / len, nz = (x1 - x0) / len;
+    let low = Infinity;
+    for (let k = 0; k <= 4; k++) {
+      const f = 0.02 + 0.96 * k / 4;
+      const y = roofAboveWall(read, x0 + (x1 - x0) * f, z0 + (z1 - z0) * f, nx, nz);
+      if (y !== null) low = Math.min(low, y);
+    }
+    if (low < Infinity && low >= minTop) tops[i] = low;
+  }
   return { tops, rawToClean, cleaned };
+}
+
+const MIN_ROOF_COVER = 0.6; // of the footprint: a record whose roof covers less is no building's roof (the shell would stand open)
+const CLOSE_STEP = 3; // m between the points along a wall where the roof above it is read
+const GAP_GRID = 16; // points across a footprint where the roof is looked for
+const GAP_MIN_STEP = 1; // m
+const CLOSE_MIN = 0.05; // m: a gap this small between a wall and the roof is left
+
+function ringArea(r) {
+  let a = 0;
+  for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) a += r[j] * r[i + 1] - r[i] * r[j + 1];
+  return Math.abs(a / 2);
+}
+
+/** The share of the footprint a record's drawn roof covers in plan. */
+function lod2RoofCover(b, triangles) {
+  let roof = 0;
+  for (const [a, c, d] of triangles) roof += Math.abs((c[0] - a[0]) * (d[2] - a[2]) - (c[2] - a[2]) * (d[0] - a[0])) / 2;
+  const foot = ringArea(b.ring) - (b.holes || []).reduce((s, h) => s + ringArea(h), 0);
+  return foot > 0 ? roof / foot : 1;
+}
+
+/** Is this record's roof a roof for this footprint? A bad fit leaves a shell open to the sky, its walls culled from behind: it looks transparent. */
+function lod2Usable(rec, b, triangles = lod2RoofTriangles(rec)) {
+  return triangles.length > 0 && lod2RoofCover(b, triangles) >= MIN_ROOF_COVER;
+}
+
+/** Reads the height of a set of roof triangles [[x, y, z] x 3] under points; null where none is. */
+function roofReader(triangles) {
+  const items = [];
+  for (const tri of triangles) {
+    const [a, c, d] = tri;
+    const area = (c[0] - a[0]) * (d[2] - a[2]) - (c[2] - a[2]) * (d[0] - a[0]);
+    if (Math.abs(area) < 1e-6) continue;
+    items.push({ a, c, d, area, x0: Math.min(a[0], c[0], d[0]), x1: Math.max(a[0], c[0], d[0]), z0: Math.min(a[2], c[2], d[2]), z1: Math.max(a[2], c[2], d[2]) });
+  }
+  return (x, z) => {
+    let top = null;
+    for (const { a, c, d, area, x0, x1, z0, z1 } of items) {
+      if (x < x0 || x > x1 || z < z0 || z > z1) continue;
+      const u = ((c[0] - x) * (d[2] - z) - (c[2] - z) * (d[0] - x)) / area;
+      const v = ((d[0] - x) * (a[2] - z) - (d[2] - z) * (a[0] - x)) / area;
+      const w = 1 - u - v;
+      if (u < -1e-6 || v < -1e-6 || w < -1e-6) continue;
+      const y = u * a[1] + v * c[1] + w * d[1];
+      if (top === null || y > top) top = y;
+    }
+    return top;
+  };
+}
+
+/** Does the roof leave part of the footprint open? Read on a grid over the footprint (rings flat [x0, z0, ...]). */
+function lod2RoofHasGaps(b, triangles) {
+  const read = roofReader(triangles);
+  const inRing = (r, x, z) => {
+    let c = false;
+    for (let i = 0, j = r.length - 2; i < r.length; j = i, i += 2) if ((r[i + 1] > z) !== (r[j + 1] > z) && x < ((r[j] - r[i]) * (z - r[i + 1])) / (r[j + 1] - r[i + 1]) + r[i]) c = !c;
+    return c;
+  };
+  let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (let i = 0; i < b.ring.length; i += 2) { x0 = Math.min(x0, b.ring[i]); x1 = Math.max(x1, b.ring[i]); z0 = Math.min(z0, b.ring[i + 1]); z1 = Math.max(z1, b.ring[i + 1]); }
+  const step = Math.max(GAP_MIN_STEP, Math.max(x1 - x0, z1 - z0) / GAP_GRID);
+  for (let x = x0 + step / 2; x < x1; x += step) {
+    for (let z = z0 + step / 2; z < z1; z += step) {
+      if (inRing(b.ring, x, z) && !(b.holes || []).some((h) => inRing(h, x, z)) && read(x, z) === null) return true;
+    }
+  }
+  return false;
+}
+
+/** The roof over the wall at (x, z), looked for a little way in from the wall (`nx`, `nz` its outward normal). */
+function roofAboveWall(read, x, z, nx, nz) {
+  for (const inset of [0.15, 0.5, 1.0, 2.0]) {
+    const y = read(x - nx * inset, z - nz * inset);
+    if (y !== null) return y;
+  }
+  return null;
+}
+
+/**
+ * Closes the shell between the walls and a roofer roof: for each cleaned edge, wall above its eave (and above what the roofer's own wall
+ * pieces reach) up to the roof read over it, where a gap would leave the facade open. Returns [{ edge, tri }] as lod2WallPieces does.
+ */
+function lod2ClosingWalls(lod, pieces, triangles) {
+  const read = roofReader(triangles);
+  const byEdge = new Map();
+  for (const { edge, tri } of pieces) {
+    if (edge < 0) continue;
+    if (!byEdge.has(edge)) byEdge.set(edge, []);
+    byEdge.get(edge).push(tri);
+  }
+  const out = [];
+  lod.cleaned.forEach(([x0, z0, x1, z1], edge) => {
+    const dx = x1 - x0, dz = z1 - z0;
+    const len = Math.hypot(dx, dz);
+    if (len < 0.05) return;
+    const nx = -dz / len, nz = dx / len;
+    const own = byEdge.get(edge) || [];
+    const reach = (s) => { // the highest the wall stands at s metres along the edge
+      let y = lod.tops[edge];
+      for (const tri of own) {
+        const u = tri.map((q) => ((q[0] - x0) * dx + (q[2] - z0) * dz) / len);
+        for (let k = 0; k < 3; k++) {
+          const m = (k + 1) % 3;
+          const lo = Math.min(u[k], u[m]), hi = Math.max(u[k], u[m]);
+          if (s < lo - 1e-3 || s > hi + 1e-3) continue;
+          const f = hi - lo < 1e-6 ? 0 : (s - u[k]) / (u[m] - u[k]);
+          y = Math.max(y, tri[k][1] + (tri[m][1] - tri[k][1]) * f);
+        }
+      }
+      return y;
+    };
+    const n = Math.max(1, Math.ceil(len / CLOSE_STEP));
+    const st = [];
+    for (let k = 0; k <= n; k++) {
+      const s = Math.min(len - 0.02, Math.max(0.02, len * k / n));
+      const x = x0 + dx / len * s, z = z0 + dz / len * s;
+      const roof = roofAboveWall(read, x, z, nx, nz);
+      st.push({ x, z, roof, wall: reach(s) });
+    }
+    // stations in line with their neighbours are dropped: a straight eave under a straight roof edge is one quad, not one per CLOSE_STEP
+    const straight = (a, m, b, key) => {
+      const f = (m.x - a.x) / ((b.x - a.x) || 1e-9) || (m.z - a.z) / ((b.z - a.z) || 1e-9);
+      return Math.abs(a[key] + (b[key] - a[key]) * f - m[key]) < 0.02;
+    };
+    const kept = st.filter((m, k) => k === 0 || k === n || m.roof === null || st[k - 1].roof === null || st[k + 1].roof === null || !(straight(st[k - 1], m, st[k + 1], 'roof') && straight(st[k - 1], m, st[k + 1], 'wall')));
+    for (let k = 1; k < kept.length; k++) {
+      const a = kept[k - 1], b = kept[k];
+      if (a.roof === null || b.roof === null) continue;
+      const ga = a.roof - a.wall, gb = b.roof - b.wall;
+      if (ga < CLOSE_MIN && gb < CLOSE_MIN) continue;
+      // from the wall's top to the roof, counter-clockwise from outside (as the facade quads are)
+      const a0 = [a.x, a.wall, a.z], b0 = [b.x, b.wall, b.z], b1 = [b.x, Math.max(b.roof, b.wall), b.z], a1 = [a.x, Math.max(a.roof, a.wall), a.z];
+      if (gb >= CLOSE_MIN) out.push({ edge, tri: [a0, b0, b1] });
+      if (ga >= CLOSE_MIN) out.push({ edge, tri: [a0, b1, a1] });
+    }
+  });
+  return out;
 }
 
 const FRAGMENT_MIN_AREA = 2.0; // m2 of connected roof surface below which a piece is roofer debris
@@ -304,4 +460,4 @@ function lod2WallPieces(rec, lod) {
   return out;
 }
 
-export { LOD2_NO_TOP, ROOF, WALL, parseLod2Record, loadLod2, rawEdges, lod2EdgeTops, lod2RoofTriangles, roofHeightSampler, roofFragmentMask, lod2WallPieces, clipAbove };
+export { LOD2_NO_TOP, ROOF, WALL, MIN_ROOF_COVER, parseLod2Record, loadLod2, rawEdges, lod2EdgeTops, lod2RoofTriangles, roofHeightSampler, roofFragmentMask, lod2WallPieces, lod2ClosingWalls, lod2RoofCover, lod2RoofHasGaps, lod2Usable, clipAbove };

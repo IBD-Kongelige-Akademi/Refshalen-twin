@@ -171,3 +171,70 @@ test('photo walls cover the roofer gable above the eave with the same strip (v m
   assert.ok(Math.abs(Math.max(...old.position.filter((_, i) => i % 3 === 1)) - 10) < 1e-6);
   assert.ok(old.index.length > 6);
 });
+
+test('the shell of a LoD2 building closes: bad records are refused, unmatched walls reach the roof, a deck lies under gaps', async () => {
+  const { createAccumulator, addBuilding } = await import('../js/building-geometry.js');
+  const { lod2RoofCover, lod2Usable, lod2ClosingWalls } = await import('../js/lod2-geometry.js');
+  // a 20 x 20 m footprint, wound as the data is
+  const b = { id: 'gdk:1', ring: [0, 0, 20, 0, 20, 20, 0, 20], ground: 0, eave: 6, ridge: 8 };
+  const record = (roofs, walls = [], top = [NaN, NaN, NaN, NaN]) => {
+    const pos = [];
+    const idx = [], kind = [], edge = [];
+    for (const [k, list] of [[0, roofs], [1, walls]]) {
+      for (const tri of list) {
+        const at = pos.length / 3;
+        for (const q of tri.q ?? tri) pos.push(...q);
+        idx.push(at, at + 1, at + 2);
+        kind.push(k);
+        edge.push(tri.e ?? -1);
+      }
+    }
+    return { nV: pos.length / 3, nT: kind.length, nE: top.length, pos: new Float32Array(pos), idx: new Uint16Array(idx), kind: new Uint8Array(kind), edge: new Int16Array(edge), top: new Float32Array(top) };
+  };
+  // a flat roof at 10 m over all of it, faces up
+  const full = [[[0, 10, 0], [0, 10, 20], [20, 10, 20]], [[0, 10, 0], [20, 10, 20], [20, 10, 0]]];
+  // only 1 m2 of roof
+  const scrap = [[[9, 10, 9], [9, 10, 11], [10, 10, 11]]];
+  const yRange = (m) => { let lo = Infinity, hi = -Infinity; for (let i = 1; i < m.position.length; i += 3) { lo = Math.min(lo, m.position[i]); hi = Math.max(hi, m.position[i]); } return [lo, hi]; };
+
+  assert.ok(Math.abs(lod2RoofCover(b, full) - 1) < 1e-6);
+  assert.equal(lod2Usable(record(scrap), b), false, 'a scrap of roof is no roof');
+
+  // refused: an extrusion to the building's own eave, with a whole roof
+  const refused = createAccumulator({ lite: true });
+  addBuilding(refused, b, { lite: true, lod2: record(scrap) });
+  assert.equal(yRange(refused.wall)[1], 6);
+  assert.equal(yRange(refused.roof)[0], 6, 'a deck at the eave');
+  // refused, and barely over the ground: an underground car park under a square (Budolfi Plads) is not drawn at all
+  const low = createAccumulator({ lite: true });
+  assert.equal(addBuilding(low, { ...b, eave: 0.6 }, { lite: true, lod2: record(scrap) }), null);
+  assert.equal(low.wall.position.length + low.roof.position.length, 0);
+  // without a record a low building stays what it was
+  assert.ok(addBuilding(createAccumulator({ lite: true }), { ...b, eave: 0.6 }, { lite: true }));
+
+  // used: unmatched walls (no roofer eave) reach the roof, higher or lower than the generic eave
+  const up = createAccumulator({ lite: true });
+  addBuilding(up, b, { lite: true, lod2: record(full) });
+  assert.ok(Math.abs(yRange(up.wall)[1] - 10) < 1e-3, `the walls end at the roof, not at the eave of 6: ${yRange(up.wall)}`);
+  const under = createAccumulator({ lite: true });
+  addBuilding(under, { ...b, eave: 14 }, { lite: true, lod2: record(full) });
+  assert.ok(Math.abs(yRange(under.wall)[1] - 10) < 1e-3, 'no wall standing over the roof');
+
+  // a whole roof needs no deck under it; a roof with a gap gets one, 0.3 m under its lowest
+  assert.equal(under.roof.position.length / 3, 6, 'only the roof');
+  const partRoof = [[[0, 10, 0], [0, 10, 20], [20, 10, 20]], [[0, 10, 0], [10, 10, 10], [20, 10, 0]]]; // a corner of the plan is left open
+  const decked = createAccumulator({ lite: true });
+  addBuilding(decked, b, { lite: true, lod2: record(partRoof) });
+  assert.ok(decked.roof.position.filter((_, i) => i % 3 === 1).some((v) => Math.abs(v - 9.7) < 1e-3), 'a deck 0.3 m under the roof');
+
+  // a matched wall with an eave of 6 under a roof at 10, and no roofer wall above it: the gap is closed, faces outward
+  const lod = { tops: new Float32Array([6]), cleaned: [[20, 0, 0, 0]], rawToClean: new Int32Array([0]) }; // the z = 0 edge, the solid on its +z side
+  const closing = lod2ClosingWalls(lod, [], full);
+  assert.ok(closing.length >= 2);
+  for (const { tri: [a, c, d] } of closing) {
+    const nz = (c[0] - a[0]) * (d[1] - a[1]) - (c[1] - a[1]) * (d[0] - a[0]);
+    assert.ok(Math.max(a[1], c[1], d[1]) <= 10 + 1e-6 && Math.min(a[1], c[1], d[1]) >= 6 - 1e-6);
+    assert.ok(nz < 0, 'it faces out, away from the solid');
+  }
+  assert.equal(lod2ClosingWalls({ ...lod, tops: new Float32Array([10]) }, [], full).length, 0, 'nothing to close');
+});
