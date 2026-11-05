@@ -99,7 +99,15 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
   const groundAt = (x, z) => (options.groundHeight ? options.groundHeight.terrainAt(x, z) : 0);
   // a vehicle's ground from where it is now: on a bridge deck when it drove onto it, under it when it passes beneath (js/deck-field.js)
   const levelAt = (x, z, y) => (options.groundHeight?.levelAt ? options.groundHeight.levelAt(x, z, y) : groundAt(x, z));
-  const vehicleGround = (v) => (Number.isFinite(v.gy) ? v.gy : groundAt(v.x, v.z));
+  // what a vehicle is drawn on: `gy` (its level on the ground or a deck) followed at no more than SMOOTH_GRADE per metre driven, so a lump in
+  // the terrain or a step between levels is driven over, not popped through
+  const vehicleGround = (v) => (Number.isFinite(v.gs) ? v.gs : Number.isFinite(v.gy) ? v.gy : groundAt(v.x, v.z));
+  const SMOOTH_GRADE = 0.3;
+  const followLevel = (v, moved) => {
+    if (!Number.isFinite(v.gs)) { v.gs = v.gy; return; }
+    const room = SMOOTH_GRADE * moved;
+    v.gs += Math.max(-room, Math.min(room, v.gy - v.gs));
+  };
   let network = null;
   let nodes = [];
   let edges = [];
@@ -1531,6 +1539,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     // on a road under a bridge it stands under it, on the bridge on it: walked out from the edge's end that is off the decks
     const seed = options.groundHeight?.levelAlong ? options.groundHeight.levelAlong(e.sx, e.sz, e.dx, e.dz, e.len, s) : NaN;
     v.gy = levelAt(v.x, v.z, seed);
+    v.gs = v.gy;
     v.prevX = v.x;
     v.prevZ = v.z;
     v.yaw = Math.atan2(v.tx, v.tz);
@@ -2080,6 +2089,9 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       pose(v, dt);
       if (v.plus) posePlus(v);
       v.gy = levelAt(v.x, v.z, v.gy);
+      followLevel(v, Math.hypot(v.x - (v.groundX ?? v.x), v.z - (v.groundZ ?? v.z)));
+      v.groundX = v.x;
+      v.groundZ = v.z;
       lap(v.plus ? 'drivePlus' : 'drive');
     }
     lap('drive');

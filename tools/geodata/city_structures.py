@@ -54,6 +54,7 @@ TERRAIN_ORIG = ROOT / "data" / "city" / "work" / "terrain_orig"  # each tile's t
 UNDER_REACH_M = 2.5  # the ground beside a deck is sampled this far out from its edge
 CUT_KINDS = ("sea", "river")  # the water bodies the terrain is cut under (they have shore walls; streams and ponds lie on the ground)
 SINK_M = 1.0  # the ground under a bridge over water lies this far under the water level
+UNDER_MARGIN_M = 1.0  # a lowered way's flat bottom is this much wider than the way either side
 UNDER_MIN_DROP_M = 0.3  # a terrain cell under a deck is lowered when the ground beside it lies this much lower
 VERSION = "aalborg-structures/1"
 DECK_STEP_M = 2.0
@@ -720,17 +721,18 @@ def approach_strips(decks, way_nodes, gways):
     return unary_union([keep] + ends) if ends else keep
 
 
-def approach_embankments(decks, way_nodes, gways, H) -> int:
+def approach_embankments(decks, way_nodes, gways, H, corridors=()) -> int:
     """The last EMBANK_M of a road or track before a deck stands on an embankment: across its full width the ground is at its centreline's
     height, with a 1:1 bank beyond. The compiled terrain carries only a narrow ridge there, and a road's edge on lower ground pulls its whole
-    surface down. Only ever raised, never in the water or a deck's footprint. Works on H.dtm.grid; returns the cells raised."""
+    surface down. Only ever raised, never in the water, a deck's footprint or the corridor of a road passing under a deck. Works on
+    H.dtm.grid; returns the cells raised."""
     grid = H.dtm.grid
     x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
     by_node = {}
     for j, w in enumerate(gways):
         for nid in (w["nodes"][0], w["nodes"][-1]):
             by_node.setdefault(nid, []).append(j)
-    decks_g = unary_union([d["_g"] for d in decks])
+    decks_g = unary_union([d["_g"] for d in decks] + list(corridors))
     wet = unary_union(H.raw) if getattr(H, "raw", None) else None
     n = 0
     seen = set()
@@ -920,13 +922,14 @@ def tunnel_decks(gways, buildings, H, first_id):
     return decks, [gways[k]["id"] for k in tunnels]
 
 
-def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False, keep=None):
+def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False, keep=None, corridors=None):
     """Under every deck, the ways that pass under it (not the ways it carries) get their ground lowered to the deck's soffit less
     UNDER_CLEAR_M, ramped back up to the terrain at UNDER_GRADE along the way and its continuations, with 1:1 banks at the sides; never
     more than UNDER_MAX_DROP_M, never under the sea, only ever lowered. A way counts as passing under where the deck stands
     UNDER_MIN_CLEAR_M over it (or it is one of `tunnel_ids`, a tunnel under a tunnel deck). Works on H.dtm.grid in place (not when
-    `dry`); `keep` (approach_strips) is ground that is not lowered; returns (cells lowered, report rows (deck id, deck name, way id, way
-    name, kind, clearance before, after, depth))."""
+    `dry`); `keep` (approach_strips) is ground the banks do not lower: a road or track passing under has its own width whatever lies there
+    (a road under a short deck runs right past the deck's ends). `corridors`, a list, gets the lowered stretches' polygons. Returns (cells
+    lowered, report rows (deck id, deck name, way id, way name, kind, clearance before, after, depth))."""
     grid = H.dtm.grid
     x0, z0, cell = H.dtm.x0, H.dtm.z0, H.dtm.cell
     floor = -frame.ORIGIN[2] + UNDER_FLOOR_M
@@ -991,7 +994,7 @@ def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False, keep=None):
             k0, k1 = int(np.argmax(low)), int(len(low) - np.argmax(low[::-1]) - 1)
             part = shapely.ops.substring(line, s[k0], s[k1]) if k1 > k0 else line
             depth = float(np.nanmax(gr[low] - prof[low]))
-            half = w["width"] / 2
+            half = w["width"] / 2 + UNDER_MARGIN_M
             pad = half + depth / BANK_SLOPE + cell
             bx0, bz0, bx1, bz1 = part.buffer(pad).bounds
             i0, i1 = max(0, int(math.floor((bx0 - x0) / cell))), min(grid.shape[1] - 1, int(math.ceil((bx1 - x0) / cell)))
@@ -1008,7 +1011,10 @@ def lower_underpasses(decks, gways, H, tunnel_ids=(), dry=False, keep=None):
             sub = grid[j0:j1 + 1, i0:i1 + 1].ravel()
             hit = (dist <= pad) & np.isfinite(sub) & (v < sub - 0.02)
             if keep is not None:
-                hit &= ~shapely.contains_xy(keep, cx.ravel(), cz.ravel())
+                banks = (dist > half) if w["kind"] != "foot" else np.ones(len(dist), bool)
+                hit &= ~(banks & shapely.contains_xy(keep, cx.ravel(), cz.ravel()))
+            if corridors is not None and w["kind"] != "foot":
+                corridors.append(part.buffer(half + 1.0))
             if hit.any():
                 sub = sub.copy()
                 sub[hit] = v[hit]
@@ -1140,8 +1146,9 @@ def build(tiles_dir: Path, city_dir: Path) -> dict:
     wet = terrain_in_water(H, gaps)
     log(f"terrain: {terrain_below_decks(decks, H)} cells brought under their decks")
     log(f"water: the terrain cut to the bed under the sea and the rivers in {wet} cells")
-    lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids, keep=keep)
-    log(f"terrain: {approach_embankments(decks, way_nodes, gways, H)} cells raised for the approaches' embankments")
+    corridors = []
+    lowered, rows = lower_underpasses(decks, gways, H, tunnel_ids, keep=keep, corridors=corridors)
+    log(f"terrain: {approach_embankments(decks, way_nodes, gways, H, corridors)} cells raised for the approaches' embankments")
     for r in rows:
         log("  under", *r)
     for d in decks:

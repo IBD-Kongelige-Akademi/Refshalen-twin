@@ -166,3 +166,25 @@ def test_the_road_before_a_deck_stands_on_an_embankment_across_its_width():
     assert float(grid[25, 21]) == 3.0, "the road's edge at x 43: raised to the centreline"
     assert float(grid[5, 21]) == 0.0, "past the embankment the ground stays"
     assert float(grid[35, 21]) == 0.0, "in the deck's footprint the ground stays"
+
+
+def test_a_road_under_a_short_deck_is_dug_through_the_approaches_and_the_embankment_keeps_off_it():
+    from shapely.geometry import LineString
+    grid = np.full((100, 100), 5.0, np.float32)  # a broad embankment at 5 m
+    H = types.SimpleNamespace(dtm=types.SimpleNamespace(grid=grid, x0=0.0, z0=0.0, cell=2.0), orig=grid.copy(), wtree=None, levels=[], raw=[])
+    H.ground = lambda x, z: grid[np.clip((np.asarray(z) / 2).astype(int), 0, 99), np.clip((np.asarray(x) / 2).astype(int), 0, 99)].astype(float)
+    H.terrain = lambda x, z: np.ravel(H.ground(np.atleast_1d(x), np.atleast_1d(z)))
+    # a deck 12 m long at 10 m, with its approach on either side (kept), and a road across it right past the deck's ends
+    d = {"id": "d", "name": "", "kind": "road", "_g": Polygon([(94, 90), (106, 90), (106, 110), (94, 110)]), "axes": [{"way": "osm:way/1", "kind": "road", "pts": [94, 100, 7.0, 5.0, 106, 100, 7.0, 5.0]}]}
+    under = _ground_way([(100, 0), (100, 199)], [7, 8])
+    under["id"] = "osm:way/2"
+    keep = Polygon([(60, 90), (140, 90), (140, 110), (60, 110)]).difference(d["_g"])
+    corridors = []
+    CS.lower_underpasses([d], [under], H, keep=keep, corridors=corridors)
+    assert corridors, "the corridor is recorded"
+    assert float(grid[50, 50]) < 5.0 - 3.0, ("under the deck", float(grid[50, 50]))
+    assert float(grid[50, 35]) == 5.0, "the approach's ground beyond the corridor stays"
+    low = float(grid[60, 50])
+    road = _ground_way([(94, 100), (40, 100)], [1, 2])
+    CS.approach_embankments([d], {"osm:way/1": [1, 3]}, [road], H, corridors)
+    assert float(grid[50, 50]) < 5.0 - 3.0 and float(grid[60, 50]) == low, "the embankment does not fill the corridor"

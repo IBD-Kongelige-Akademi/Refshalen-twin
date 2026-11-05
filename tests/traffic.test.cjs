@@ -229,3 +229,21 @@ test('crossing pedestrians fall back to a sidewalk when nearby crosswalks are un
   assert.equal(ped.node, null);
   assert.equal(ped.z, 210);
 });
+
+test('a vehicle is drawn on its level followed at a limited grade: a step is driven over, not popped through', () => {
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '../js/traffic.js'), 'utf8');
+  const from = src.indexOf('const SMOOTH_GRADE');
+  const body = src.slice(from, src.indexOf('};', from) + 2);
+  const followLevel = new Function(`${body}
+return followLevel;`)();
+  const v = { gy: 0 };
+  followLevel(v, 1);
+  assert.equal(v.gs, 0, 'starts on its level');
+  v.gy = 5;
+  followLevel(v, 1);
+  assert.ok(Math.abs(v.gs - 0.3) < 1e-9, 'a 5 m step: 0.3 m per metre driven');
+  for (let i = 0; i < 20; i++) followLevel(v, 1);
+  assert.equal(v.gs, 5, 'and it arrives');
+  followLevel(v, 0);
+  assert.equal(v.gs, 5, 'standing still it stays');
+});
