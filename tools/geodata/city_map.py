@@ -60,6 +60,8 @@ def build(tiles_dir: Path, water_header: dict | None) -> dict:
         bp = d / "buildings.json"
         if bp.exists():
             for b in json.loads(bp.read_text(encoding="utf-8"))["buildings"]:
+                if b.get("below_ground"):
+                    continue
                 ring = b.get("ring") or []
                 if len(ring) < 6:
                     continue

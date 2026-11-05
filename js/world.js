@@ -650,7 +650,8 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   const terrain = terrainHeader && !flags.has('flat') ? createStreamTerrain(terrainHeader) : FLAT_TERRAIN;
   const lod2 = city.meta.lod2 && !flags.has('nolod2') ? createTileLod2(city.meta, store.fetchBin) : null;
   const streets = flags.has('nostreets') ? null : city.streets;
-  const data = createTileData({ index, meta: city.meta, streets, lakes: city.lakes, geo, terrain, lod2 });
+  // a footprint with nothing standing on it (tools/geodata/below_ground.py) is no building for anyone: not drawn, not in the way
+  const data = createTileData({ index, meta: city.meta, streets, lakes: city.lakes, geo, terrain, lod2, dropBuilding: (b) => !!b.below_ground });
   globalThis.CPH_TERRAIN = terrain;
 
   // Lakes with a level in the terrain header get the district's water (walls, coping, the shore field, reflections); they are global:

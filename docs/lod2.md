@@ -26,9 +26,12 @@ only: where the shell stands open you see the inside of the far walls culled awa
 `js/building-geometry.js addBuilding`:
 
 - **Refused records.** A record whose roof covers under 60 % of the footprint is not used (33 of 3,040; many fit 4 to 16 m off). The building is
-  drawn as an extrusion with a whole roof. If it is also over 100 m² and under 2.5 m high it is not drawn: nothing stands there (the footprint under
-  Budolfi Plads, 2,716 m², 4 % roofed, 2 m over the terrain, is most likely the underground car park). Height alone cannot tell these from
-  sheds, which are under 40 m².
+  drawn as an extrusion with a whole roof.
+- **Below ground.** A refused record on a footprint over 100 m² and under 2.5 m high means nothing stands there:
+  `tools/geodata/below_ground.py` (in the `canopies` stage) marks it `below_ground`. 3 buildings; the 2,716 m² under Budolfi Plads, 4 % roofed,
+  is most likely the underground car park. A marked building is dropped altogether (`dropBuilding` in `js/world.js`): not drawn, no collider,
+  no block to walkers, not in the far ring or the overview map, and trees and lamps may stand there. Sheds with a bad record are under 40 m²
+  and stay. Rerun the furniture stage after marking.
 - **Unmatched edges.** 1,161 buildings have edges the record has no eave for. Those walls used a generic eave, ending short of the roof or
   standing above it. They now end at the lowest roof over them.
 - **Closing walls.** Above each wall, up to the roof read over it, a wall piece closes any gap the record's own walls leave.

@@ -854,6 +854,10 @@ def main(argv=None):
 
             for tid, bid, base in canopies.apply(TILES_DIR, write=lambda path, txt: S.atomic_write(path, txt)):
                 log(f"[canopies] {tid} {bid}: underside at {base} m")
+            import below_ground
+
+            for tid, bid in below_ground.apply(TILES_DIR, write=lambda path, txt: S.atomic_write(path, txt)):
+                log(f"[below ground] {tid} {bid}")
         elif s == "index":
             stage_index(a, tiles, cells)
         elif s == "report":

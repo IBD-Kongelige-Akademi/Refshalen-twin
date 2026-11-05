@@ -237,22 +237,19 @@ function groundLow(b, terrain) {
   return low;
 }
 
-const LOW_EAVE = 2.5; // m over the ground (the engine's ground: the terrain under the building, not the file's)
-const LOW_MIN_AREA = 100; // m2: a refused record on a footprint this large and that low is below ground; real sheds in the data are under 40 m2
 const DECK_BELOW_COVER = 0.97; // a roof covering less of the footprint than this has gaps, wherever they are
 const DECK_UNDER_ROOF = 0.3; // m: the closing deck lies this far under the lowest of the roof and the wall tops
 
 function addBuilding(acc, b, opts = {}) {
+  if (b.below_ground) return null; // tools/geodata/below_ground.py: nothing stands there (the streamed city drops it before this)
   const wallAcc = opts.wallAcc || acc;
   const lite = !!opts.lite;
   const outerPts = cleanRing(b.ring, true);
   if (!outerPts) return null;
   const holePts = (b.holes || []).map((h) => cleanRing(h, false)).filter(Boolean);
   const ground = b.ground;
-  // a record whose roof does not cover the footprint is refused (lod2Usable): the building is drawn as an extrusion. A large footprint that also
-  // reads this low has nothing standing on it: an underground car park under a square (Budolfi Plads). It is not drawn; a low shed stays
+  // a record whose roof does not cover the footprint is refused (lod2Usable): the building is drawn as an extrusion
   const refused = opts.lod2 && !lod2Usable(opts.lod2, b) ? opts.lod2 : null;
-  if (refused && b.eave - ground < LOW_EAVE && Math.abs(ringArea(b.ring)) >= LOW_MIN_AREA) return null;
   const eave = Math.max(b.eave, ground + 0.5);
   // The wall stands on the terrain (js/terrain.js, the one ground model): its skirt reaches 0.25 m under the lowest
   // ground along the outline, so a sloping street never shows a gap. Without terrain: the flat plane at y = 0.

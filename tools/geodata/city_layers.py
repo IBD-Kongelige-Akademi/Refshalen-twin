@@ -111,6 +111,7 @@ def stage_furniture(a, tiles, cells) -> None:
     bbox = BC.city_bbox_utm(tiles)
     rl = load_tile_lists(tiles, "roads", ["roads", "water"])
     bl = load_tile_lists(tiles, "buildings", ["buildings"])
+    bl["buildings"] = [b for b in bl["buildings"] if not b.get("below_ground")]  # below_ground.py: trees and lamps can stand there
     log(f"[furniture] inputs: {len(rl['roads'])} roads, {len(bl['buildings'])} buildings")
     roads = F.RoadIndex(rl["roads"])
     doc = {

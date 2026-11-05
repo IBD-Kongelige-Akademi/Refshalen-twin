@@ -210,6 +210,8 @@ def tile_block(tid: str, tiles_dir: Path, parks_union, tol: float, min_area: flo
     out = bytearray()
     records = []
     for b in (bl or {}).get("buildings", []):
+        if b.get("below_ground"):
+            continue
         s = simplify_building(b, tol, min_area, min_hole)
         if s is None:
             continue

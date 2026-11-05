@@ -205,9 +205,9 @@ test('the shell of a LoD2 building closes: bad records are refused, unmatched wa
   addBuilding(refused, b, { lite: true, lod2: record(scrap) });
   assert.equal(yRange(refused.wall)[1], 6);
   assert.equal(yRange(refused.roof)[0], 6, 'a deck at the eave');
-  // refused, and barely over the ground: an underground car park under a square (Budolfi Plads) is not drawn at all
+  // marked below ground (tools/geodata/below_ground.py: the car park under Budolfi Plads): not drawn at all
   const low = createAccumulator({ lite: true });
-  assert.equal(addBuilding(low, { ...b, eave: 0.6 }, { lite: true, lod2: record(scrap) }), null);
+  assert.equal(addBuilding(low, { ...b, eave: 0.6, below_ground: 1 }, { lite: true, lod2: record(scrap) }), null);
   assert.equal(low.wall.position.length + low.roof.position.length, 0);
   // a low shed with a bad record stays: small
   const shed = { id: 'gdk:2', ring: [0, 0, 5, 0, 5, 5, 0, 5], ground: 0, eave: 2.2, ridge: 2.4 };
