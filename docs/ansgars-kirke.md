@@ -44,13 +44,15 @@ drawn height of the spire stands.
 - **Domes.** Four pavilion domes on grey attics over the corner bays, with their ridges, standing seams and finials.
 - **Tower.** Shaft, belfry with arches, grilles and clocks, copper hood with corner ribs, dormers and posts, lantern with round windows, spire with its
   garlands, ball, vane and cross.
-- **Entrance.** Stairs, landing, four banded columns, entablature and pediment, door and cartouche.
+- **Entrance.** Stairs, landing, two Ionic columns on pedestals with a pilaster behind each, entablature and pediment, door and cartouche. The capital follows
+  the side view on p. 33: a bolster with a waist, ending in a scroll to the front and back.
 
 The textures are procedural and tile (`tile_texture`, `wall_texture`, `copper_texture`, ...), coloured from the photographs and passed through the twin's albedo
-mapping, so the church is lit like the buildings around it. The roof has red pantiles with a tone per tile and patches of lichen. The hood and spire are pale
+mapping, so the church is lit like the buildings around it. The facade is pale yellow brick (mursten) in running bond; plinth and trim are smoother stone. The
+roof has red pantiles with a tone per tile and patches of lichen. The hood and spire are pale
 verdigris, the domes the same copper in a sager tint.
 
-15,434 triangles, 7 draw calls, a 0.6 MB GLB, 13.7 MB of the 32 MB override texture budget.
+16,152 triangles, 7 draw calls, a 0.7 MB GLB, 13.7 MB of the 32 MB override texture budget.
 
 ## Where it differs from the drawings
 
@@ -58,6 +60,7 @@ verdigris, the domes the same copper in a sager tint.
 | --- | --- | --- |
 | Chimney on the west ridge (p. 33) | Left out | Not visible on the 2021 photographs |
 | Lantern as a stone-like stage | Copper | Copper-clad on the photographs |
+| Horizontal joints drawn on the columns' shafts (p. 33) | Plain shafts | Not visible on the photographs |
 | Cornice tops, attics, portico roof | Grey | Grey on the photographs |
 | Cartouches, door panels, clock frames | Simplified to raised panels and scrolls | Too fine for the twin's scale |
 | Cellar stair wells and railings | Left out | They lie in the ground, and the twin's terrain has no wells |

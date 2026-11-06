@@ -64,6 +64,7 @@ PORTICO_U = 20.15
 WIN_W, WIN_SILL, WIN_TOP = 1.75, 4.06, 9.6
 BASE_W = 1.57
 DOME_U, DOME_V, DOME_HALF, DOME_BASE, DOME_TOP = 7.85, 8.0, 2.92, 13.1, 16.4
+COLUMN_U, COLUMNS_V = 19.16, (-2.5, 2.5)  # the entrance's two columns (sheets 33 and 38)
 
 # The outline of the walls, clockwise seen from above, from the north arm's north-west corner.
 WALL_RING = [(-ARM_HALF, NORTH), (ARM_HALF, NORTH), (ARM_HALF, -BAY_V), (BAY_E, -BAY_V), (BAY_E, -ARM_HALF), (EAST, -ARM_HALF), (EAST, ARM_HALF), (BAY_E, ARM_HALF),
@@ -81,7 +82,7 @@ BASEMENT_SOUTH = {10: (2.37, -2.37), 8: (7.72,), 12: (-7.85,), 14: (-13.3,), 7: 
 UP = np.array([0.0, 1.0, 0.0])
 
 # material -> size in metres of one repeat of its texture (None: vertex colours)
-TILE_M = {'tile': (9.6, 9.6), 'wall': (8.0, 8.0), 'stone': (2.0, 2.0), 'copper': (4.0, 4.0), 'dome': (4.0, 4.0), 'glass': (1.74, 1.98), 'painted': None}
+TILE_M = {'tile': (9.6, 9.6), 'wall': (5.28, 5.28), 'stone': (2.0, 2.0), 'copper': (4.0, 4.0), 'dome': (4.0, 4.0), 'glass': (1.74, 1.98), 'painted': None}
 
 
 def rgb(*srgb):
@@ -297,11 +298,13 @@ class Model:
                     nors.append(v / max(np.linalg.norm(v), 1e-9))
                 self.poly(mat, pts, nh + UP * (p[j, 0] - p[j + 1, 0]), uvs=uvs, nors=nors, color=color)
 
-    def cylinder(self, mat, cu, cv, r, h0, h1, n=12, color=None):
+    def cylinder(self, mat, cu, cv, r, h0, h1, n=12, color=None, r1=None):
+        """Upright, round, r at its foot and r1 (default r) at its head."""
+        top = r if r1 is None else r1
         for i in range(n):
             a0, a1 = i / n * 2 * math.pi, (i + 1) / n * 2 * math.pi
             n0, n1 = np.array([math.cos(a0), 0, math.sin(a0)]), np.array([math.cos(a1), 0, math.sin(a1)])
-            q = lambda a, h: (cu + r * math.cos(a), h, cv + r * math.sin(a))
+            q = lambda a, h: (cu + (r if h == h0 else top) * math.cos(a), h, cv + (r if h == h0 else top) * math.sin(a))
             self.poly(mat, [q(a0, h0), q(a1, h0), q(a1, h1), q(a0, h1)], n0 + n1, nors=[n0, n1, n1, n0],
                       uvs=[(a0 * r, h0), (a1 * r, h0), (a1 * r, h1), (a0 * r, h1)], color=color)
 
@@ -644,7 +647,7 @@ def add_domes(m):
 
 
 def add_portico(m, hb):
-    """The entrance front (sheet 38): stairs and landing, two pairs of banded columns, entablature and pediment against the tower."""
+    """The entrance front (sheets 33 and 38): stairs and landing, two Ionic columns on pedestals, entablature and pediment against the tower."""
     hw = TOWER_HALF
     u0, u1 = TOWER_U + TOWER_HALF, PORTICO_U
     m.box('stone', (u0, hb, -hw), (19.85, PLINTH, hw), skip=('b',))  # landing
@@ -652,17 +655,18 @@ def add_portico(m, hb):
         a = 19.85 + k * 0.45
         top = PLINTH - (k + 1) * 0.29
         m.box('stone', (a, hb, -3.75), (a + 0.45, top, 3.75), skip=('b', 'w'))
-    for v in (-3.25, -2.2, 2.2, 3.25):
-        cu = 19.1
-        m.box('stone', (cu - 0.58, PLINTH, v - 0.5), (cu + 0.58, 1.75, v + 0.5))
-        m.box('stone', (cu - 0.5, 1.75, v - 0.47), (cu + 0.5, 2.15, v + 0.47))
-        m.cylinder('stone', cu, v, 0.42, 2.15, 10.05, n=12)
-        for y in np.arange(2.6, 10.0, 0.82):  # the bands of the shaft (sheet 33)
-            m.cylinder('stone', cu, v, 0.45, y, y + 0.1, n=12)
-        m.loft('stone', cu, v, [(0.42, 10.05), (0.47, 10.15), (0.56, 10.5), (0.56, 10.7)], smooth=False)
-    # entablature and cornice around the portico
-    m.box('stone', (u0, 10.7, -hw), (19.88, 11.5, hw), skip=('b',))
-    m.box('stone', (u0, 11.5, -hw - 0.27), (u1, 12.1, hw + 0.27), skip=('w',))
+    for v in COLUMNS_V:
+        cu = COLUMN_U
+        m.box('stone', (cu - 0.62, PLINTH, v - 0.72), (cu + 0.62, 2.15, v + 0.72))  # pedestal
+        m.box('stone', (cu - 0.57, 2.15, v - 0.6), (cu + 0.57, 2.3, v + 0.6))
+        m.cylinder('stone', cu, v, 0.57, 2.3, 2.42, n=20)  # base
+        m.cylinder('stone', cu, v, 0.51, 2.42, 9.93, n=20, r1=0.46)  # shaft, tapering (sheet 33)
+        ionic_capital(m, cu, v)
+    # entablature around the portico: architrave, frieze and cornice (sheet 33)
+    m.box('stone', (u0, 10.56, -hw), (19.73, 10.86, hw))
+    m.box('stone', (u0, 10.86, -hw), (19.65, 11.55, hw))
+    m.box('stone', (u0, 11.55, -hw - 0.1), (19.9, 11.82, hw + 0.1))
+    m.box('stone', (u0, 11.82, -hw - 0.27), (u1, 12.1, hw + 0.27), skip=('w',))
     # pediment with its raking cornices, tile laid over it
     apex = 13.7
     m.poly('wall', [(u1 - 0.1, 12.1, -hw), (u1 - 0.1, 12.1, hw), (u1 - 0.1, apex - 0.1, 0)], (1, 0, 0))
@@ -673,6 +677,9 @@ def add_portico(m, hb):
     # the tower's front behind the columns: main door with its cartouche, the arched window over it (sheet 38)
     w = WallFrame((u0, -hw), (u0, hw))
     c = hw
+    for v in COLUMNS_V:  # the pilaster behind each column, with its half capital
+        m.wbox('stone', w, c + v - 0.6, c + v + 0.6, PLINTH, 10.3, 0.0, 0.22, top=False)
+        m.wbox('stone', w, c + v - 0.72, c + v + 0.72, 10.3, 10.56, 0.0, 0.3)
     o = arch(7.6, 10.2, 1.58, 6)
     for (h0, a0), (h1, a1) in zip(o, o[1:]):
         m.poly('glass', [w.p(c - a0, h0, 0.02), w.p(c + a0, h0, 0.02), w.p(c + a1, h1, 0.02), w.p(c - a1, h1, 0.02)], w.n, uvs=[(-a0, h0), (a0, h0), (a1, h1), (-a1, h1)])
@@ -684,6 +691,40 @@ def add_portico(m, hb):
     for sgn in (-1, 1):
         m.wbox('stone', w, c + sgn * 0.98 - 0.14, c + sgn * 0.98 + 0.14, 4.92, 6.35, 0.0, 0.3)
         m.wbox('stone', w, c + sgn * 0.98 - 0.2, c + sgn * 0.98 + 0.2, 6.35, 6.6, 0.0, 0.34)
+
+
+def ionic_capital(m, cu, cv):
+    """A capital as sheet 33 draws it from the side: a bolster with a waist running front to back, ending in a scroll on the entrance side and behind."""
+    m.cylinder('stone', cu, cv, 0.47, 9.93, 10.12, n=20, r1=0.6)  # echinus
+    m.box('stone', (cu - 0.44, 10.08, cv - 0.5), (cu + 0.44, 10.46, cv + 0.5))  # the band between the scrolls
+    m.box('stone', (cu - 0.6, 10.46, cv - 0.72), (cu + 0.6, 10.56, cv + 0.72))  # abacus
+    groove = rgb(.40, .38, .33)
+    ch, end, half = 10.2, 0.26, 0.5
+    for sgn in (-1, 1):
+        cz = cv + sgn * 0.5
+        radius = lambda t: 0.13 + (end - 0.13) * abs(t) ** 1.6
+        ts = np.linspace(-1, 1, 9)
+        n = 14
+        for t0, t1 in zip(ts, ts[1:]):
+            for i in range(n):
+                a0, a1 = i / n * 2 * math.pi, (i + 1) / n * 2 * math.pi
+                d0, d1 = np.array([0, math.sin(a0), math.cos(a0)]), np.array([0, math.sin(a1), math.cos(a1)])
+                q = lambda t, a: (cu + t * half, ch + radius(t) * math.sin(a), cz + radius(t) * math.cos(a))
+                m.poly('stone', [q(t0, a0), q(t1, a0), q(t1, a1), q(t0, a1)], d0 + d1, nors=[d0, d0, d1, d1],
+                       uvs=[(t0 * half, a0 * end), (t1 * half, a0 * end), (t1 * half, a1 * end), (t0 * half, a1 * end)])
+        for side in (-1, 1):
+            face = cu + side * half
+            normal = (side, 0, 0)
+            disc = [(face, ch + end * math.sin(a), cz + end * math.cos(a)) for a in np.linspace(0, 2 * math.pi, 15)[:-1]]
+            m.poly('stone', disc, normal)
+            # the scroll: a spiral cut in the face, winding in from the rim to the eye
+            turns = np.linspace(0, 3 * 2 * math.pi, 37)
+            rr = end * 0.94 * (1 - turns / turns[-1]) + 0.05
+            for k in range(len(turns) - 1):
+                a, b = turns[k], turns[k + 1]
+                ra, rb = rr[k], rr[k + 1]
+                out = lambda r, q: (face + side * 0.006, ch + r * math.sin(q), cz + sgn * r * math.cos(q))
+                m.poly('painted', [out(ra, a), out(rb, b), out(rb - 0.016, b), out(ra - 0.016, a)], normal, color=groove)
 
 
 def build(hb=-2.0):
@@ -745,15 +786,28 @@ def tile_texture(n=1024, cols=40, rows=32, seed=1):
     return to_image(np.clip(img, 0, 1))
 
 
-def wall_texture(n=1024, size=8.0, seed=3):
-    """The cream render of the photographs (BBR says brick under it): washes and stains running with the height of the wall, a trace of the courses."""
+def wall_texture(n=1024, rows=78, cols=22, seed=3):
+    """Mursten: pale yellow brick in running bond, 24 cm by 6.8 cm to a repeat of 5.28 m. Each brick has its own tone and the bed joints shade most. The courses
+    are laid by hand, each a little off the half-brick, so that from afar the head joints do not line up in stripes."""
     rs = np.random.default_rng(seed)
-    y = np.mgrid[0:n, 0:n][0] + 0.5
-    rows = int(round(size / 0.0775))
-    jit = rs.normal(0, 1, rows)
-    lum = 1 + 0.008 * jit[np.floor(y / n * rows).astype(int)]
-    lum = lum * (1 + 0.075 * periodic_noise(n, 1.7, seed + 1, stretch=(1.0, 0.45), low=1) + 0.02 * periodic_noise(n, 0.8, seed + 2, low=16))
-    img = np.array(albedo(TONES['wall'])) * lum[..., None]
+    y, x = np.mgrid[0:n, 0:n] + 0.5
+    cy = y / n * rows
+    cj = np.floor(cy).astype(int)
+    shift = 0.5 * (np.arange(rows) % 2) + rs.uniform(-0.09, 0.09, rows)
+    cx = x / n * cols + shift[cj]
+    ci = np.floor(cx).astype(int) % cols
+    fy, fx = cy - cj, cx % 1
+    jit = rs.normal(0, 1, (rows, cols))
+    warm = rs.normal(0, 1, (rows, cols))
+    bed = np.minimum(fy, 1 - fy) < 0.085
+    head = np.minimum(fx, 1 - fx) < 0.024
+    lum = 1 + 0.055 * jit[cj, ci]
+    lum = lum * (1 + 0.035 * periodic_noise(n, 0.9, seed + 3, low=30))
+    lum = np.where(bed, 0.86, np.where(head, 0.92, lum))
+    lum = lum * (1 + 0.05 * periodic_noise(n, 1.7, seed + 1, stretch=(1.0, 0.45), low=1))
+    lum = lum / lum.mean()
+    tint = np.where(bed | head, 0.0, 0.018 * warm[cj, ci])
+    img = np.array(albedo(TONES['wall'])) * lum[..., None] * np.stack([1 + tint, np.ones_like(tint), 1 - tint * 1.5], -1)
     return to_image(np.clip(img, 0, 1))
 
 

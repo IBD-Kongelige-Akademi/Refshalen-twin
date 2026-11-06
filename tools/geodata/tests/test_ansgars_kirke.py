@@ -29,6 +29,26 @@ def test_the_measures_of_the_drawings_hold(parts):
     assert allp[:, 0].max() == pytest.approx(19.85 + 5 * 0.45), "the foot of the stairs"
 
 
+def test_the_entrance_has_two_columns_with_scrolled_capitals(parts):
+    # the shafts' heads are rings of 20 quads: two rings at the height where shaft meets capital, one to each side of the door
+    p = parts["stone"]["p"]
+    heads = p[(np.abs(p[:, 1] - 9.93) < 1e-6) & (p[:, 0] > K.TOWER_U + K.TOWER_HALF + 0.3)]
+    centres = sorted({round(float(np.sign(v)) * 2.5, 1) for v in heads[:, 2]})
+    assert centres == [-2.5, 2.5]
+    assert np.abs(np.abs(heads[:, 2]) - 2.5).max() < 0.65, "nothing else stands at that height"
+    scroll = parts["painted"]["p"]
+    assert ((np.abs(scroll[:, 0] - (K.COLUMN_U + 0.506)) < 1e-6) & (scroll[:, 1] > 9.9) & (scroll[:, 1] < 10.5)).sum() > 0, "the scrolls face the street"
+
+
+def test_the_facade_is_brick():
+    a = np.asarray(K.wall_texture(), float).mean(axis=2)
+    rows = a.mean(axis=1)
+    # the bed joints show as dark lines every course, 78 to a repeat
+    spectrum = np.abs(np.fft.rfft(rows - rows.mean()))
+    assert spectrum.argmax() == 78
+    assert a.std() / a.mean() > 0.025, "bricks and joints, not plain render"
+
+
 def test_every_face_looks_the_way_its_normal_says(parts):
     for name, q in parts.items():
         p = q["p"].reshape(-1, 3, 3)
