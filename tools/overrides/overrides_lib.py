@@ -411,8 +411,10 @@ class GlbWriter:
         attrs = {}
         p = np.zeros((m, 4), np.uint16)  # padded to 8 bytes: WebGPU has unorm16x4, not x3
         p[:, :3] = qp[first]
-        pn = p[:, :3] / 65535.0
-        attrs['POSITION'] = self._acc(self._view(p.tobytes(), 34962, 8), 5123, m, 'VEC3', normalized=True, mn=pn.min(0), mx=pn.max(0))
+        # min and max of a normalized accessor are its raw integers (glTF 2.0 3.6.2.5): GLTFLoader scales them itself to get the bounds three culls by,
+        # and given 0..1 it would put every mesh's bounding sphere at the mesh's minimum corner, so that whole meshes drop out at some view angles
+        raw = p[:, :3]
+        attrs['POSITION'] = self._acc(self._view(p.tobytes(), 34962, 8), 5123, m, 'VEC3', normalized=True, mn=raw.min(0), mx=raw.max(0))
         nn = np.zeros((m, 4), np.int8)
         nn[:, :3] = qn[first]
         attrs['NORMAL'] = self._acc(self._view(nn.tobytes(), 34962, 4), 5120, m, 'VEC3', normalized=True)
