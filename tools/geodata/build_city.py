@@ -793,7 +793,9 @@ def stage_index(a, tiles, cells) -> None:
                       "lakes": "../city/lakes.json" if (CITY_DIR / "lakes.json").exists() else None,
                       "map": "../city/map.json",
                       "busLines": "../city/bus-lines.json" if (CITY_DIR / "bus-lines.json").exists() else None,
-                      "nightlife": "../city/nightlife.json" if (CITY_DIR / "nightlife.json").exists() else None},
+                      "nightlife": "../city/nightlife.json" if (CITY_DIR / "nightlife.json").exists() else None,
+                      # street addresses for the building info panel (tools/geodata/addresses.py, run after the tiles)
+                      "addresses": "../city/addresses.json" if (CITY_DIR / "addresses.json").exists() else None},
              "tiles": idx_tiles, "bytes": total}
     S.atomic_write(TILES_DIR / "index.json", dump(index))
     log(f"[index] {len(idx_tiles)} tiles, {total / 1e6:.1f} MB; meta.json {(CITY_DIR / 'meta.json').stat().st_size / 1e6:.2f} MB")

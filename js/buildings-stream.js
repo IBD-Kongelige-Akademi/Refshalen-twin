@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
+import { attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
 import { texRequested, createPhotoBudget } from './facade-lod.js';
 import { createSharedSlicer } from './yield-frame.js';
 import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from './detail-overrides.js';
@@ -28,7 +28,6 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   let disposed = false;
   let resourcesDisposed = false;
   let camera = null;
-  let pinned = null;
   let panel = null;
   const owner = new Map(); // building id -> tile id (for the panel)
 
@@ -175,26 +174,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
       for (const { active } of tiles.values()) active?.instance.setCamera(cam);
       if (typeof document === 'undefined' || !domElement) return;
       panel = createInfoPanel();
-      let last = 0;
-      let down = null;
-      const toNdc = (e) => {
-        const r = domElement.getBoundingClientRect();
-        return [((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1)];
-      };
-      domElement.addEventListener('pointermove', (e) => {
-        if (pinned || e.buttons) return;
-        const now = performance.now();
-        if (now - last < 80) return;
-        last = now;
-        const hit = api.pick(...toNdc(e));
-        if (hit) api.showBuilding(hit.id, false, hit); else panel.hide();
-      });
-      domElement.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
-      domElement.addEventListener('pointerup', (e) => {
-        if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
-        const hit = api.pick(...toNdc(e));
-        if (hit && hit.id !== pinned) { pinned = hit.id; api.showBuilding(hit.id, true, hit); } else { pinned = null; if (!hit) panel.hide(); }
-      });
+      attachBuildingClicks(domElement, panel, (x, y) => api.pick(x, y), (id, hit) => api.showBuilding(id, true, hit));
     },
 
     get stats() { return totals(); },

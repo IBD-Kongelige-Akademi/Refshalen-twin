@@ -162,14 +162,31 @@ function classifyWalls(b, rings, ctx) {
   return out;
 }
 
-/** What the info panel says about a building's doors: { source: 'dar' | 'heuristic' | 'none', count, conf }. */
+/**
+ * The street address of a building from its DAR entrances: the house numbers grouped by street, in door order
+ * ("Bispensgade 12, 14 · Algade 3"); null when no entrance carries a street.
+ */
+function addressOf(doors) {
+  const byStreet = new Map();
+  for (const d of doors || []) {
+    if (!d.street) continue;
+    const numbers = byStreet.get(d.street) || [];
+    for (const n of String(d.text || '').split('/')) if (n && !numbers.includes(n)) numbers.push(n);
+    byStreet.set(d.street, numbers);
+  }
+  const parts = [...byStreet].map(([street, numbers]) =>
+    `${street}${numbers.length ? ` ${numbers.slice(0, 4).join(', ')}${numbers.length > 4 ? ` +${numbers.length - 4}` : ''}` : ''}`);
+  return parts.length ? parts.join(' · ') : null;
+}
+
+/** What the info panel says about a building's doors: { source: 'dar' | 'heuristic' | 'none', count, conf, address }. */
 function doorSummary(walls, doors) {
   if (doors?.length) {
     const confs = doors.map((d) => d.conf);
-    return { source: 'dar', count: doors.length, conf: confs.includes('measured') ? 'measured' : confs.includes('observed') ? 'observed' : 'inferred', confs };
+    return { source: 'dar', count: doors.length, conf: confs.includes('measured') ? 'measured' : confs.includes('observed') ? 'observed' : 'inferred', confs, address: addressOf(doors) };
   }
   const heuristic = walls.filter((w) => w.kind === KIND.entry || w.kind === KIND.shop).length;
   return { source: heuristic ? 'heuristic' : 'none', count: heuristic, conf: 'inferred', confs: [] };
 }
 
-export { KIND, createContext, classifyWalls, doorSummary, facesStreet, partyFraction, venuesAtWall, SHOP_USE };
+export { KIND, addressOf, createContext, classifyWalls, doorSummary, facesStreet, partyFraction, venuesAtWall, SHOP_USE };

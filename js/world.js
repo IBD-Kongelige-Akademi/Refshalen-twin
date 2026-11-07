@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { CPH_FRAME, setCityBounds, getDataBbox } from './city-config.js';
-import { buildRealBuildings } from './buildings-real.js';
+import { buildRealBuildings, setAddressLoader } from './buildings-real.js';
 import { loadLod2, roofHeightSampler } from './lod2-geometry.js';
 import { createTrafficSystem } from './traffic.js';
 import { buildCphRoadSurfaces } from './road-surfaces.js';
@@ -477,6 +477,8 @@ async function buildWorld(scene, { markInit = () => {}, debug = '', geoUrl = CPH
   // the camera resident (buildStreamedWorld). `?debug=notiles` (and a custom geodata URL) load the monolithic data/cph-*.json
   // instead: the whole district is built once, as before.
   const store = debug.split(',').includes('notiles') || geoUrl !== CPH_GEODATA_URL ? null : await openStore(tilesUrl);
+  // street addresses of the buildings (data/city/addresses.json, tools/geodata/addresses.py): the info panel loads them when first opened
+  if (store) setAddressLoader(() => store.fetchCityJson('addresses.json'));
   if (store) return buildStreamedWorld(scene, store, { markInit, debug, water, treeDate, stream, start, adoptMesh });
   const geo = await loadCphGeodata(geoUrl);
   globalThis.CPH_GEO = geo;

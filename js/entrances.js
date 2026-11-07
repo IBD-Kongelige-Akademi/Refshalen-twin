@@ -80,7 +80,7 @@ function placeDoors(b, rings, entries) {
     const along = Math.max(END_MARGIN, Math.min(len - END_MARGIN, (e.x - p[0]) * tx + (e.z - p[1]) * tz));
     if (doors.some((o) => o.edgeNo === best.edgeNo && Math.abs(o.along - along) < DEDUPE)) continue;
     doors.push({
-      id: e.id, text: e.texts ? e.texts.join('/') : e.text, conf: e.conf, d: e.d, edgeNo: best.edgeNo, along, wallLen: len,
+      id: e.id, text: e.texts ? e.texts.join('/') : e.text, street: e.street || null, conf: e.conf, d: e.d, edgeNo: best.edgeNo, along, wallLen: len,
       x: p[0] + tx * along, z: p[1] + tz * along, tx, tz, nx: -tz, nz: tx
     });
   }

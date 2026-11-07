@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { createEntranceIndex, placeDoors, createDoorAccumulator, addDoors } from '../js/entrances.js';
-import { createContext, classifyWalls, KIND } from '../js/groundfloor.js';
+import { addressOf, createContext, classifyWalls, doorSummary, KIND } from '../js/groundfloor.js';
 import { cleanRing, createAccumulator, addBuilding } from '../js/building-geometry.js';
 
 // 20 x 10 block, road to the south (z > 0 side is south): street wall z = 10, courtyard wall z = 0
@@ -102,4 +102,18 @@ test('real data: engine door count matches the data and NS37 doors are on courty
   assert.equal(doors.length, 4);
   assert.ok(doors.every((d) => kinds[d.edgeNo].kind === KIND.rear), 'NS37 entrances are on the courtyard side');
   assert.ok(kinds.filter((w) => w.kind === KIND.entry).every((w) => w.doorless));
+});
+
+test('a building is titled with its street address: house numbers grouped by street, in door order', () => {
+  const doors = [
+    { street: 'Bispensgade', text: '12', conf: 'measured' },
+    { street: 'Bispensgade', text: '14A/14B', conf: 'measured' },
+    { street: 'Algade', text: '3', conf: 'observed' },
+    { street: 'Bispensgade', text: '12', conf: 'measured' }
+  ];
+  assert.equal(addressOf(doors), 'Bispensgade 12, 14A, 14B · Algade 3');
+  assert.equal(doorSummary([], doors).address, 'Bispensgade 12, 14A, 14B · Algade 3');
+  assert.equal(addressOf([{ street: 'Vesterbro', text: '1' }, { street: 'Vesterbro', text: '3' }, { street: 'Vesterbro', text: '5' },
+    { street: 'Vesterbro', text: '7' }, { street: 'Vesterbro', text: '9' }, { street: 'Vesterbro', text: '11' }]), 'Vesterbro 1, 3, 5, 7 +2');
+  assert.equal(addressOf([{ text: '4' }]), null, 'no street, no address');
 });

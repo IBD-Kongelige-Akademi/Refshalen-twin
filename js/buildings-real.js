@@ -116,32 +116,108 @@ function describeBuilding(b, lod2Info = null) {
   };
 }
 
+// Street addresses by BBR bygning id (data/city/addresses.json, tools/geodata/addresses.py: BBR enhed -> DAR adresse ->
+// husnummer, BBR opgang, DAR adgangTilBygning). Loaded once, the first time the info panel opens; a missing file leaves the panel
+// on the addresses of the building's DAR entrances.
+const addressBook = { loaded: false, byBbr: null, loader: null, pending: null };
+
+/** `loader()` -> Promise of the addresses.json document (world.js hands in the tile store's city reader). */
+function setAddressLoader(loader) {
+  addressBook.loader = loader;
+  addressBook.loaded = false;
+  addressBook.byBbr = null;
+  addressBook.pending = null;
+}
+
+function loadAddressBook() {
+  if (addressBook.loaded) return Promise.resolve(addressBook.byBbr);
+  if (!addressBook.loader) {
+    addressBook.loaded = true;
+    return Promise.resolve(null);
+  }
+  addressBook.pending ??= Promise.resolve()
+    .then(() => addressBook.loader())
+    .then((doc) => doc?.addresses || null)
+    .catch((err) => {
+      console.info('[buildings] no data/city/addresses.json:', err?.message || err);
+      return null;
+    })
+    .then((byBbr) => {
+      addressBook.byBbr = byBbr;
+      addressBook.loaded = true;
+      return byBbr;
+    });
+  return addressBook.pending;
+}
+
 /**
- * Info panel: hover shows a building, click pins it. Every inferred field is labelled as such, and the facade
- * defaults are flagged `inferred` unless the compiler marked them measured (NS37 heroes).
+ * The panel's title: the building's BBR address, else the addresses of its DAR entrances, else a plain label; undefined while
+ * the address book is still loading and the entrances give none.
+ */
+function titleFor(info, book = addressBook) {
+  const bbr = info.bbr ? book.byBbr?.[String(info.bbr).toLowerCase()] : null;
+  if (bbr) return bbr;
+  if (info.doors?.address) return info.doors.address;
+  return book.loaded ? 'Building without an address' : undefined;
+}
+
+/**
+ * Info panel: a click on a building opens it (titled with the building's street address), the close button or a click
+ * on the same building or on nothing closes it. It runs down the left side under the title card, over the minimap,
+ * and scrolls under its sticky title. Every inferred field is labelled as such, and the facade defaults are flagged
+ * `inferred` unless the compiler marked them measured (NS37 heroes). `onClose` is called when the close button is used.
  */
 function createInfoPanel() {
   const el = document.createElement('aside');
   el.id = 'building-info';
   el.setAttribute('aria-live', 'polite');
+  el.setAttribute('aria-label', 'Building');
   el.style.cssText = [
-    'position:fixed', 'left:16px', 'bottom:16px', 'z-index:20', 'width:300px', 'max-height:60vh', 'overflow:auto',
-    'padding:12px 14px', 'border-radius:10px', 'background:rgba(18,20,22,0.82)', 'color:#e8e6e1', 'backdrop-filter:blur(8px)',
-    'font:12px/1.45 ui-sans-serif,system-ui,-apple-system,sans-serif', 'pointer-events:none', 'display:none',
-    'font-variant-numeric:tabular-nums'
+    'position:fixed', 'left:16px', 'top:96px', 'bottom:16px', 'z-index:20', 'width:320px', 'max-width:calc(100vw - 32px)',
+    'box-sizing:border-box', 'overflow:auto', 'overscroll-behavior:contain', 'padding:0 14px 12px', 'border-radius:10px',
+    'background:rgba(18,20,22,0.86)', 'color:#e8e6e1', 'backdrop-filter:blur(8px)',
+    'font:12px/1.45 ui-sans-serif,system-ui,-apple-system,sans-serif', 'display:none', 'font-variant-numeric:tabular-nums'
   ].join(';');
+  // the title row stays put while the rows scroll under it; its close button sits in the top-right corner
+  const head = document.createElement('div');
+  head.style.cssText = 'position:sticky;top:0;z-index:1;display:flex;align-items:flex-start;gap:8px;margin:0 -14px 4px;padding:12px 10px 8px 14px;background:rgba(18,20,22,0.96);border-radius:10px 10px 0 0';
+  const title = document.createElement('div');
+  title.style.cssText = 'flex:1;min-width:0;font-weight:600;font-size:14px;line-height:1.3;overflow-wrap:anywhere';
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.setAttribute('aria-label', 'Close building info');
+  close.title = 'Close';
+  close.textContent = '×';
+  close.style.cssText = 'flex:none;width:26px;height:26px;margin:-4px -2px 0 0;border:0;border-radius:6px;background:rgba(255,255,255,0.08);color:#e8e6e1;font:18px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer';
+  head.append(title, close);
+  const body = document.createElement('div');
+  el.append(head, body);
   document.body.appendChild(el);
+  const panel = { onClose: null };
+  let shown = null;
+  close.addEventListener('click', () => {
+    el.style.display = 'none';
+    panel.onClose?.();
+  });
   const tag = (text, kind) => `<span style="padding:0 5px;border-radius:4px;margin-left:6px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;background:${kind === 'measured' ? '#2f6f4f' : kind === 'inferred' ? '#7a5a1c' : '#3b4a66'};color:#fff">${text}</span>`;
   const row = (label, value, conf) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-top:1px solid rgba(255,255,255,0.07)"><span style="opacity:.65">${label}</span><span style="text-align:right">${value}${conf ? tag(conf, conf) : ''}</span></div>`;
   const swatch = (rgb) => (Array.isArray(rgb) ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(255,255,255,.35);background:rgb(${rgb.map((c) => Math.round(c * 255)).join(',')})"></span>` : '');
   const e = (v) => (v === null || v === undefined || v === '' ? '<span style="opacity:.5">unknown</span>' : String(v).replace(/[<>&]/g, ''));
-  return {
+  return Object.assign(panel, {
     element: el,
-    show(info, pinned) {
+    show(info) {
       const c = info.confFields;
       const f = info.facade;
-      el.innerHTML = [
-        `<div style="font-weight:600;font-size:13px;margin-bottom:4px">${e(info.id)}${pinned ? tag('pinned', '') : ''}</div>`,
+      shown = info;
+      title.textContent = titleFor(info) ?? 'Finding the address…';
+      if (!addressBook.loaded) loadAddressBook().then(() => { if (shown === info) title.textContent = titleFor(info); });
+      // start under the title card (the HUD's top-left corner moves with the window size)
+      const card = typeof document !== 'undefined' ? document.querySelector('.hud-top-left') : null;
+      const rect = card?.getBoundingClientRect();
+      const below = rect && rect.height > 0 ? rect.bottom : 0;
+      el.style.top = `${Math.max(16, Math.round(below) + 10)}px`;
+      body.innerHTML = [
+        row('Building', e(info.id)),
         row('BBR id', e(info.bbr)),
         row('Use code', e(info.use), c.use),
         row('Year', e(info.year), c.year),
@@ -162,9 +238,38 @@ function createInfoPanel() {
         `<div style="margin-top:6px;opacity:.55;font-size:10px;word-break:break-all">${e((info.src || []).join(', '))}</div>`
       ].join('');
       el.style.display = 'block';
+      el.scrollTop = 0;
     },
     hide() { el.style.display = 'none'; }
+  });
+}
+
+/**
+ * The info panel opens on a click (a press and release within 5 px with the main button, so orbiting with a drag
+ * does not open it) on a building; a click on the open building or on no building closes it. Hovering shows nothing.
+ * `pick(ndcX, ndcY)` -> hit | null, `show(id, hit)` fills and opens the panel.
+ */
+function attachBuildingClicks(domElement, panel, pick, show) {
+  let open = null;
+  let down = null;
+  panel.onClose = () => { open = null; };
+  const toNdc = (e) => {
+    const r = domElement.getBoundingClientRect();
+    return [((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1)];
   };
+  domElement.addEventListener('pointerdown', (e) => { down = e.button === 0 ? [e.clientX, e.clientY] : null; });
+  domElement.addEventListener('pointerup', (e) => {
+    if (!down || e.button !== 0 || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
+    down = null;
+    const hit = pick(...toNdc(e));
+    if (hit && hit.id !== open) {
+      open = hit.id;
+      show(hit.id, hit);
+    } else {
+      open = null;
+      panel.hide();
+    }
+  });
 }
 
 // One photo atlas is handed to the GPU per animation frame: several decoded together would all be uploaded (and get their mipmaps) by
@@ -687,7 +792,6 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     panel = withInfoPanel && typeof document !== 'undefined' ? createInfoPanel() : null;
-    let pinned = null;
     let camera = null;
 
     /** Hides cells beyond STREAM_RADIUS (cheap: a few dozen cells). Called every frame with the camera position. */
@@ -757,29 +861,11 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
       pickables.length = 0;
     }
 
-    /** Wires hover (throttled) and click-to-pin on the canvas. Dragging (orbit) does not pin. */
+    /** Wires click-to-open on the canvas (see attachBuildingClicks). */
     function attach({ camera: cam, domElement }) {
       camera = cam;
-      let last = 0;
-      let down = null;
-      const toNdc = (e) => {
-        const r = domElement.getBoundingClientRect();
-        return [((e.clientX - r.left) / r.width) * 2 - 1, -(((e.clientY - r.top) / r.height) * 2 - 1)];
-      };
-      domElement.addEventListener('pointermove', (e) => {
-        if (pinned || e.buttons) return;
-        const now = performance.now();
-        if (now - last < 80) return;
-        last = now;
-        const hit = pick(...toNdc(e));
-        if (hit) showBuilding(hit.id, false, hit); else panel?.hide();
-      });
-      domElement.addEventListener('pointerdown', (e) => { down = [e.clientX, e.clientY]; });
-      domElement.addEventListener('pointerup', (e) => {
-        if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
-        const hit = pick(...toNdc(e));
-        if (hit && hit.id !== pinned) { pinned = hit.id; showBuilding(hit.id, true, hit); } else { pinned = null; if (!hit) panel?.hide(); }
-      });
+      if (!panel) return;
+      attachBuildingClicks(domElement, panel, pick, (id, hit) => showBuilding(id, true, hit));
     }
 
     let meshCount = 0;
@@ -809,4 +895,4 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
   }
 }
 
-export { buildRealBuildings, createBuildingMaterials, createInfoPanel, describeBuilding, rangeAt };
+export { attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel, describeBuilding, rangeAt, setAddressLoader, titleFor };
