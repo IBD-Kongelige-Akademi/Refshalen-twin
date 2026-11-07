@@ -22,10 +22,23 @@ def test_the_heights_of_the_sheets_hold(parts):
     walls = parts["wall"]["p"]
     east = walls[np.abs(walls[:, 0] - B.EAST_END) < 0.6]
     assert east[:, 1].max() == pytest.approx(B.EAST_GABLE), "the east gable's crest"
-    # the roof over the east end stands on its walls: its eaves are the walls' line, at the walls' head
-    east_roof = roof[(roof[:, 0] > B.NAVE[1] + 0.1) & (roof[:, 1] > B.EAVE - 1e-6)]  # the buttresses' caps aside
-    assert east_roof[:, 2].min() == pytest.approx(B.NAVE[2]) and east_roof[:, 2].max() == pytest.approx(B.NAVE[3])
-    assert east_roof[(east_roof[:, 2] < B.NAVE[2] + 0.01), 1].min() == pytest.approx(B.EAVE)
+    # the roof and the gable over the east end stand on its walls: nothing over the cut corners reaches past the walls under it
+    from shapely.geometry import Point, Polygon
+
+    plan = Polygon([(B.NAVE[1], B.NAVE[2]), *B.APSE, (B.NAVE[1], B.NAVE[3])]).buffer(0.08)
+    over = roof[(roof[:, 0] > B.NAVE[1] + 0.1) & (roof[:, 1] > B.EAVE - 1e-6)]
+    assert len(over) and all(plan.contains(Point(u, v)) for u, _, v in over)
+    assert any(abs(u - B.APSE[0][0]) < 1e-6 and abs(v - B.NAVE[2]) < 1e-6 and abs(h - B.EAVE) < 1e-6 for u, h, v in roof), "the north slope's eave ends at the cut"
+
+
+def test_the_east_gable_runs_round_the_cut_corners(parts):
+    walls = parts["wall"]["p"]
+    upper = walls[walls[:, 1] > B.EAVE + 0.5]
+    on_cut = upper[(upper[:, 0] > B.NAVE[1] + 0.5) & (upper[:, 0] < B.EAST_END - 0.7) & (upper[:, 2] < 19.0)]
+    assert len(on_cut), "courses of the gable stand angled on the north cut corner"
+    tops = parts["roof"]["p"]
+    heads = tops[(tops[:, 0] > B.NAVE[1] - 1) & (abs(tops[:, 1] - (B.BUTTRESS[1] + 0.55)) < 1e-6)]
+    assert len({(round(u, 2), round(v, 2)) for u, _, v in heads}) == 4 * 2, "four corner buttresses, each with its upper cap"
 
 
 def test_the_spire_follows_the_survey(parts):

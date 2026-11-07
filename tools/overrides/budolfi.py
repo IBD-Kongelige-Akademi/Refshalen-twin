@@ -42,8 +42,8 @@ NAVE = (10.2, 52.04, 16.48, 27.64)  # nave and chancel under one roof: u0, u1, v
 EAVE, RIDGE = 15.45, 22.45
 EAST_GABLE = 23.6  # the crest of the stepped gable over the chancel's east end (sheets 51-53)
 APSE = [(52.08, 16.48), (57.74, 19.47), (57.74, 24.07), (52.04, 27.64)]  # the east end, its corners cut back, north to south
-EAST_END = 57.74  # the roof runs on to the crow-stepped gable on the east front (photographs, surface model)
-CORNER_FOOT = 12.4  # the cut corners end under the gable's foot: above, the east end has the chancel's full width
+EAST_END = 57.74  # the front of the east end
+BUTTRESS = (9.5, 13.1)  # the heads of the corner buttresses' two stages (sheets 51 and 52)
 N_AISLE = (9.9, 32.0, 10.93, 16.48)
 S_AISLE = (9.9, 32.15, 27.64, 33.24)
 AISLE_FOOT_N, AISLE_FOOT_S, AISLE_HEAD = 7.75, 8.65, 14.05  # the lean-to roofs: eaves on the north and the south, and where they meet the nave
@@ -198,39 +198,119 @@ def add_nave(m, hb):
     ops = {0: [(u, win(), 'glass') for u in (14.9, 20.4, 26.2, 35.1)] + [(u, pointed(9.6, 13.1, 1.5), 'glass') for u in (44.6, 49.9)],
            2: [(u, win(), 'glass') for u in (15.7, 21.5, 26.4)] + [(u, arch(8.15, 13.05, 1.6), 'glass') for u in (42.6, 49.4)]}
     block(m, rect_ring(u0, u1, v0, v1), hb, [EAVE, EAVE, EAVE, EAVE], ops, skip=(1, 3))  # the tower and the apse close its ends
-    gable_roof(m, u0, u1, v0, v1, EAVE, RIDGE, 'u', ends=(False, False))
-    # over the east end the roof sits on its walls, flush, up to the gable
-    gable_roof(m, u1, EAST_END - 0.45, v0, v1, EAVE, RIDGE, 'u', ends=(False, False), over=0.0)
-    # the east gable, crow-stepped and set with blind recesses (sheet 52), standing on the east front
-    stepped_gable(m, WallFrame((EAST_END, v0), (EAST_END, v1)), EAVE, EAST_GABLE, 6, niches=1)
-    # the buttresses at the chancel's corners (sheets 52 and 53)
-    for v, dv in ((v0, -1.1), (v1, 1.1)):
-        buttress(m, u1 - 0.45, v, 0, dv, hb, 11.5)
+    nave_roof(m)
+    # the east gable, crow-stepped and set with blind recesses (sheets 51-53): it runs round the three-sided east end, so that its outer steps stand on
+    # the cut corners, angled, and only its middle on the front
+    wrapped_gable(m, APSE, EAVE, EAST_GABLE, 6)
+
+
+def nave_roof(m):
+    """The lead roof of nave and chancel, from the tower to the east end, where each slope ends on the three-sided wall under the gable."""
+    u0, u1, v0, v1 = NAVE
+    vm, half = (v0 + v1) / 2, (v1 - v0) / 2
+    slope = (RIDGE - EAVE) / half
+    drop = OVER * slope
+    ua = u0 - OVER * 0.3
+    (na, nb), (sa, sb) = (APSE[0], APSE[1]), (APSE[3], APSE[2])
+    h = lambda v: EAVE + (min(v - v0, v1 - v)) * slope
+    m.poly('roof', [(ua, EAVE - drop, v0 - OVER), (na[0], EAVE - drop, v0 - OVER), (na[0], EAVE, v0), (nb[0], h(nb[1]), nb[1]), (EAST_END, RIDGE, vm), (ua, RIDGE, vm)],
+           UP + (0, 0, -1))
+    m.poly('roof', [(ua, EAVE - drop, v1 + OVER), (sa[0], EAVE - drop, v1 + OVER), (sa[0], EAVE, v1), (sb[0], h(sb[1]), sb[1]), (EAST_END, RIDGE, vm), (ua, RIDGE, vm)],
+           UP + (0, 0, 1))
+
+
+def cut(line, va, vb):
+    """The part of a polyline that runs north to south (v rising) between va and vb."""
+    pts = []
+    for a, b in zip(line, line[1:]):
+        lo, hi = max(va, a[1]), min(vb, b[1])
+        if hi <= lo + 1e-9:
+            continue
+        at = lambda v: a + (b - a) * (v - a[1]) / (b[1] - a[1])
+        seg = [at(lo), at(hi)]
+        if pts and np.allclose(pts[-1], seg[0]):
+            pts.append(seg[1])
+        else:
+            pts += seg
+    return pts
+
+
+def wrapped_gable(m, path, h0, crest, steps, t=0.55):
+    """A crow-stepped gable along a wall path that is not straight (north to south round a cut-cornered end): its steps are set out across the
+    church as on a straight gable, and each course follows the walls under it, so that the outer courses stand angled on the cut corners.
+    Shaded blind recesses in the courses' faces."""
+    path = [np.array(p, float) for p in path]
+    v0, v1 = path[0][1], path[-1][1]
+    sw = (v1 - v0) / (2 * steps + 1)
+    rise = (crest - h0) / (steps + 1)
+    nrm = []
+    for a, b in zip(path, path[1:]):
+        d = (b - a) / np.linalg.norm(b - a)
+        nrm.append(np.array([d[1], -d[0]]))
+    inner = []  # the walls' inner line, mitred at the corners
+    for i, p in enumerate(path):
+        if i == 0 or i == len(path) - 1:
+            n = nrm[0] if i == 0 else nrm[-1]
+        else:
+            n = nrm[i - 1] + nrm[i]
+            n = n / np.linalg.norm(n)
+            n = n / max(float(np.dot(n, nrm[i])), 0.5)
+        inner.append(p - n * t)
+    for k in range(steps + 1):
+        va, vb = v0 + k * sw, v1 - k * sw
+        lo, hi = h0 + k * rise, h0 + (k + 1) * rise
+        o, i_ = cut(path, va, vb), cut(inner, va, vb)
+        for a, b in zip(o, o[1:]):
+            n3 = np.array([b[1] - a[1], 0, -(b[0] - a[0])])
+            m.poly('wall', [(a[0], lo, a[1]), (b[0], lo, b[1]), (b[0], hi, b[1]), (a[0], hi, a[1])], n3)
+            seg = float(np.linalg.norm(b - a))
+            if k >= 1 and seg > 0.9:
+                tt = (b - a) / seg
+                nn = np.array([tt[1], -tt[0]]) * 0.02
+                for c in ([(a + b) / 2] if seg < 2.4 else [a + (b - a) * 0.3, a + (b - a) * 0.7]):
+                    o_ = pointed(max(h0 + 0.3, lo - rise * min(k, 3) + 0.3), hi - 0.3, 0.42)
+                    m.poly('painted', [(c[0] + nn[0] - tt[0] * w_, h, c[1] + nn[1] - tt[1] * w_) for h, w_ in o_] +
+                           [(c[0] + nn[0] + tt[0] * w_, h, c[1] + nn[1] + tt[1] * w_) for h, w_ in reversed(o_)], n3, color=WHITE_SHADE)
+        for a, b in zip(i_, i_[1:]):
+            n3 = -np.array([b[1] - a[1], 0, -(b[0] - a[0])])
+            m.poly('wall', [(a[0], lo, a[1]), (b[0], lo, b[1]), (b[0], hi, b[1]), (a[0], hi, a[1])], n3)
+        for a, ai, sg in ((o[0], i_[0], -1), (o[-1], i_[-1], 1)):
+            m.poly('wall', [(a[0], lo, a[1]), (ai[0], lo, ai[1]), (ai[0], hi, ai[1]), (a[0], hi, a[1])], (0, 0, sg))
+        # the course's grey cap, where the next course does not stand on it
+        for ta, tb in ([(va, va + sw), (vb - sw, vb)] if k < steps else [(va, vb)]):
+            co, ci = cut(path, ta, tb), cut(inner, ta, tb)
+            for (a, b), (c, d) in zip(zip(co, co[1:]), zip(ci, ci[1:])):
+                m.poly('roof', [(a[0], hi + 0.06, a[1]), (b[0], hi + 0.06, b[1]), (d[0], hi + 0.06, d[1]), (c[0], hi + 0.06, c[1])], UP)
+
+
+def corner_buttress(m, p, out, hb):
+    """A buttress set on the bisector of a corner: two stages under grey caps (sheets 51 and 52)."""
+    out = np.array(out, float) / np.linalg.norm(out)
+    w = WallFrame(p, t=(-out[1], out[0]))
+    for h0, h1, proj in ((hb, BUTTRESS[0], 1.6), (BUTTRESS[0], BUTTRESS[1], 1.0)):
+        m.wbox('wall', w, -0.55, 0.55, h0, h1, -0.4, proj, top=False)
+        m.poly('roof', [w.p(-0.57, h1, proj + 0.05), w.p(0.57, h1, proj + 0.05), w.p(0.57, h1 + 0.55, max(proj - 0.65, -0.4)), w.p(-0.57, h1 + 0.55, max(proj - 0.65, -0.4))],
+               UP + w.n)
 
 
 def add_apse(m, hb):
-    """The east front: its corners are cut back to the gable's foot, carried there on stepped diagonal buttresses (photographs), and from there up the mass is
-    the full width of the chancel, so that the gable and the roof stand on walls and nothing overhangs."""
+    """The three-sided east end (its corners cut back: GeoDanmark and the photographs): walls to the eaves under the wrapped gable, buttresses at its corners."""
     ring = APSE
     ops = {1: [(21.77, arch(8.6, 12.4, 1.4), 'glass')]}
-    tops = [CORNER_FOOT, EAVE, CORNER_FOOT]
     for i in range(len(ring) - 1):
         w = WallFrame(ring[i], ring[i + 1])
         here = ops.get(i, [])
-        m.wall('wall', w, hb, tops[i], [(w.at(c), o) for c, o, _ in here])
+        m.wall('wall', w, hb, EAVE, [(w.at(c), o) for c, o, _ in here])
         openings(m, w, here)
-    # the corners over the cuts, from the buttresses' heads to the eaves: their faces flush with the chancel's walls and the front
-    for (ua, va), (ub, vb), sgn in ((ring[0], ring[1], -1), (ring[3], ring[2], 1)):
-        m.poly('wall', [(ua, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, va), (EAST_END, EAVE, va), (ua, EAVE, va)], (0, 0, sgn))
-        m.poly('wall', [(EAST_END, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, vb), (EAST_END, EAVE, vb), (EAST_END, EAVE, va)], (1, 0, 0))
-        m.poly('wall', [(ua, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, va), (ub, CORNER_FOOT, vb)], -UP)
-        # the diagonal buttress in the middle of the cut, stepping back twice, grey-capped
-        w = WallFrame((ua, va), (ub, vb)) if sgn < 0 else WallFrame((ub, vb), (ua, va))
-        s = w.length / 2
-        for h0, h1, out in ((hb, 4.6, 1.7), (4.6, 8.6, 1.25), (8.6, CORNER_FOOT, 0.8)):
-            m.wbox('wall', w, s - 0.5, s + 0.5, h0, h1, 0.0, out, top=False)
-            m.poly('roof', [w.p(s - 0.52, h1, out + 0.05), w.p(s + 0.52, h1, out + 0.05), w.p(s + 0.52, h1 + 0.45, max(out - 0.55, 0.0)), w.p(s - 0.52, h1 + 0.45, max(out - 0.55, 0.0))],
-                   UP + w.n)
+    # the outward bisectors at the four corners: where the chancel's walls meet the cut corners, and the cut corners the front
+    edge_n = [np.array([0.0, -1.0])]
+    for a, b in zip(ring, ring[1:]):
+        d = np.array(b, float) - np.array(a, float)
+        d /= np.linalg.norm(d)
+        edge_n.append(np.array([d[1], -d[0]]))
+    edge_n.append(np.array([0.0, 1.0]))
+    for i, p in enumerate(ring):
+        corner_buttress(m, p, edge_n[i] + edge_n[i + 1], hb)
 
 
 def add_aisles(m, hb):

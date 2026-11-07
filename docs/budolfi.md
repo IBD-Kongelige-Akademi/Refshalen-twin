@@ -32,15 +32,16 @@ No pixel of a drawing or photograph is in the model. The drawings give numbers a
 - **Spire.** Octagonal throughout: the bell-shaped lower roof, the white lantern with eight round-headed openings, the upper bell, the needle, the gilt ball,
   the vane and the rod. The tip of the rod is 60.4 m in the twin's frame, about 58 m over the street.
 - **Nave and chancel.** One lead roof (eaves 15.45, ridge 22.45) runs from the tower to the east front. The clerestory has its small round-headed windows,
-  and the chancel has two tall windows to each side. The roof stands on its walls, with eaves only 0.15 m out, and sits flush over the east end.
-- **East front.** Its corners are cut back up to 12.4 m and carried there on diagonal buttresses that step back twice under grey caps. Above that, the east
-  end has the chancel's full width, so the crow-stepped gable (crest 23.6, with its blind recesses) and the roof stand on walls.
+  and the chancel has two tall windows to each side. The roof stands on its walls, with eaves only 0.15 m out.
+- **East end.** It is three-sided, with its corners cut back to the eaves (GeoDanmark, sheets 51-53). The crow-stepped gable (crest 23.6) runs round it, so its
+  outer courses stand angled on the cut corners and only the middle ones on the front. Each course has shaded blind recesses in its face. Each slope of the roof
+  ends on the cut wall under the gable. Four buttresses stand on the corners' bisectors, each in two stages under grey caps (heads at 9.5 and 13.1 m).
 - **Aisles.** Lean-to roofs, with four large round-headed windows and buttresses on each side. The south aisle's eaves are 0.9 m higher than the north's.
 - **North chapel (1899).** Its decorated crow-stepped gable has pinnacles and lancets, with a low room before it, and its roof runs on to the nave.
 - **South porch** and the **room south of the tower**. Each has a crow-stepped gable towards Algade, a pointed door and windows. A low room under a lean-to
   stands north of the tower.
 
-About 7,300 triangles, 5 draw calls, a 0.27 MB GLB and 3.1 MB of textures. The three overrides now hold 28.0 MB of the 32 MiB budget.
+About 7,400 triangles, 5 draw calls, a 0.27 MB GLB and 3.1 MB of textures. The three overrides now hold 28.0 MB of the 32 MiB budget.
 
 ## How well it fits
 
@@ -61,7 +62,7 @@ model's edges, projected with each 2021 oblique camera, fall on the roofs, gable
 
 | Sheets | Model | Why |
 | --- | --- | --- |
-| East gable drawn over the chancel's end | Gable on the east front at u = 57.7, the cut corners carried up on buttresses to full width under it | The photographs and DHM: the ridge runs on to the east front, and nothing overhangs |
+| East gable over the three-sided end (sheets 51 and 52) | As drawn: angled on the cut corners, square on the front | |
 | Plan positions of the porch, chancel windows and gables | GeoDanmark footprint | The drawn elevations disagree with the footprint by up to 2 m in places; the footprint is surveyed |
 | Room south of the tower: ridge 17.65 (west sheet) | 18.1, crest 19.9 | DHM over that roof |
 | The spire's fan of timbers, the iron anchors ("1779" on the north face), the clock's numerals | Left out | Too fine for the twin, or inside |
@@ -74,6 +75,8 @@ model's edges, projected with each 2021 oblique camera, fall on the roofs, gable
   heights are as drawn.
 - **Blind recesses** in the gables are shaded panels on the gable's face. They do not have depth.
 - **Licence.** As with the other drawings, the licence of the building-file sheets is unknown, and this needs settling before the twin is published.
+
+![The east end, its gable round the cut corners](budolfi/eastclose.jpg)
 
 ![The spire](budolfi/spire.jpg)
 
