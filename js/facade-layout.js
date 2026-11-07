@@ -122,6 +122,49 @@ export function snapToBay(m, along, maxShift = 0.9) {
   return Math.abs(u - along) <= maxShift ? { u, bay: c } : null;
 }
 
+/**
+ * The window bays of a wall as the facade shader lays them out (js/tsl-materials.js facadeCell): a measured grid, or whole bays between the corner piers.
+ * -> { start, pitch, bays } in the wall's frame.
+ */
+export function wallBays(len, m, bayW, cornerPier) {
+  if (m) return { start: m.u0, pitch: m.p, bays: m.n };
+  const pier = Math.min(cornerPier, len * 0.2);
+  const inner = len - 2 * pier;
+  const bays = Math.max(Math.floor(inner / bayW + 0.5), 1);
+  return { start: pier, pitch: inner / bays, bays };
+}
+
+export const DOOR_REACH = 0.85; // m either side of a door's centre that its frame, step and canopy take up (js/entrances.js)
+const GROUND_OPENING = 0.78; // the widest ground-floor opening as a share of its bay: a shopfront (js/tsl-materials.js effHalfX)
+export const DOOR_MASK_BAYS = 32; // ground-floor bays a door can close: two 16-bit words
+
+/** The ground-floor bays whose opening a door centred at `along` would overlap. A door always overrules the window: these bays get none. */
+export function baysUnderDoor(grid, along, reach = DOOR_REACH) {
+  const half = grid.pitch * GROUND_OPENING / 2;
+  const out = [];
+  const first = Math.floor((along - reach - half - grid.start) / grid.pitch);
+  const last = Math.floor((along + reach + half - grid.start) / grid.pitch);
+  for (let c = first; c <= last; c++) {
+    const centre = grid.start + (c + 0.5) * grid.pitch;
+    if (Math.abs(centre - along) < reach + half) out.push(c);
+  }
+  return out;
+}
+
+/**
+ * The bays closed by a wall's doors as vertex words: `open` (16 bits, ANDed into layoutWords' ground mask: bays 0-15) and `closed` (bays 16-31, 0 when none: it rides on
+ * the integer part of facadeWindow.w, over the reveal). A bay outside those has no bit: see DOOR_MASK_BAYS.
+ */
+export function doorBayWords(bays) {
+  let open = 65535;
+  let closed = 0;
+  for (const c of new Set(bays)) {
+    if (c >= 0 && c < 16) open -= 2 ** c;
+    else if (c >= 16 && c < DOOR_MASK_BAYS) closed += 2 ** (c - 16);
+  }
+  return { open, closed };
+}
+
 /** Openings a measured edge draws (u in its frame, v above the ground): what tests and audits compare against the photo. */
 export function layoutOpenings(m) {
   const out = [];

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyWindows, measuredEdges, layoutWords, snapToBay, layoutOpenings, LAYOUT_FORMAT } from '../js/facade-layout.js';
+import { applyWindows, measuredEdges, layoutWords, snapToBay, layoutOpenings, LAYOUT_FORMAT, wallBays, baysUnderDoor, doorBayWords } from '../js/facade-layout.js';
+import { createAccumulator, addBuilding } from '../js/building-geometry.js';
 import { mapObservedEdges } from '../js/appearance.js';
 import { cleanRing } from '../js/building-geometry.js';
 
@@ -68,4 +69,42 @@ test('layoutOpenings lists the windows the shader draws', () => {
   assert.equal(o.length, 4); // 2 columns x 2 rows
   assert.deepEqual(o[0].u.map((x) => +x.toFixed(2)), [0.95, 2.05]);
   assert.deepEqual(o[0].v.map((x) => +x.toFixed(2)), [4.9, 6.4]);
+});
+
+test('a door overrules the windows in its bay: only the overlapped bays close, in two 16-bit words', () => {
+  const grid = wallBays(30, null, 3, 0.9);
+  assert.deepEqual(grid.start, 0.9);
+  assert.equal(grid.bays, 9);
+  const centre = grid.start + 3.5 * grid.pitch;
+  assert.deepEqual(baysUnderDoor(grid, centre), [3], 'at a bay centre: that bay alone');
+  assert.deepEqual(baysUnderDoor(grid, grid.start + 4 * grid.pitch), [3, 4], 'between two bays: both');
+  assert.deepEqual(baysUnderDoor({ start: 0, pitch: 1.2, bays: 10 }, 3.0), [1, 2, 3], 'narrow bays: the neighbours too');
+  const m = { u0: 2, p: 2.5, n: 5 };
+  assert.deepEqual(wallBays(20, m, 3, 0.9), { start: 2, pitch: 2.5, bays: 5 }, 'a measured grid is the shader\'s grid');
+
+  assert.deepEqual(doorBayWords([]), { open: 65535, closed: 0 }, 'no door: every bay open, nothing added to the reveal');
+  assert.deepEqual(doorBayWords([0, 3, 3]), { open: 65535 - 1 - 8, closed: 0 });
+  assert.deepEqual(doorBayWords([15, 16, 31]), { open: 65535 - 2 ** 15, closed: 1 + 2 ** 15 });
+  assert.deepEqual(doorBayWords([-1, 32]), { open: 65535, closed: 0 }, 'out of reach of the words');
+});
+
+test('a building closes the bay under its real door', () => {
+  const ring = [0, 0, 30, 0, 30, -8, 0, -8];
+  const b = { id: 'door:1', ring, holes: [], ground: 0, eave: 12, ridge: 12, roof: 'flat', year: 1930, facade: { floor_h: 3, ground_floor_h: 3, bay_w: 3, window_w: 1.2 } };
+  const word = (acc, base) => acc.wall.facadeWindow[base * 4 + 1];
+  const reveal = (acc, base) => acc.wall.facadeWindow[base * 4 + 3];
+  const entrance = (x) => ({ id: 'e' + x, bid: b.id, x, z: 0.3, sx: x, sz: 0, d: 1, text: 'Testgade ' + x, conf: 'observed' });
+  const build = (x) => {
+    const acc = createAccumulator();
+    addBuilding(acc, structuredClone(b), { ground: { entrances: new Map([[b.id, [entrance(x)]]]) }, wallKinds: Array(4).fill({ kind: 1, doorless: true }), details: false, layouts: false });
+    return { acc };
+  };
+  const { acc } = build(12.4);
+  const bays = wallBays(30, null, 3, 0.9);
+  const closed = Math.round((12.4 - bays.start) / bays.pitch - 0.5);
+  // the wall along z = 0 is one of the four; find it by its word
+  const words = [0, 4, 8, 12].map((k) => word(acc, k));
+  assert.equal(words.filter((w) => w !== 65535).length, 1, 'only the door\'s wall is touched');
+  assert.equal(words.find((w) => w !== 65535), 65535 - 2 ** closed, 'its bay is closed, and no other');
+  assert.ok([0, 4, 8, 12].every((k) => reveal(acc, k) < 1), 'the reveal is untouched under bay 16');
 });

@@ -426,7 +426,7 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0, wallAttr
   let era = float(0.0); // wallAttr: 0 modern, 1 mid, 2 historic
   let wallTop = float(1e4); // wallAttr: metres from the ground to the top of the wall
   let measured = float(0.0); // wallAttr: 1 on a wall with a measured window grid (js/facade-layout.js)
-  let measuredSolid = float(0.0); // wallAttr: 1 where that grid has no opening (outside its columns, a masked column / bay, above its rows)
+  let measuredSolid = float(0.0); // wallAttr: 1 where that grid has no opening (outside its columns, a masked column / bay, above its rows) or a door closes the bay
   let mSill = float(0.0); // wallAttr: the measured sill / head as fractions of the storey
   let mHead = float(0.0);
 
@@ -506,7 +506,12 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0, wallAttr
     const bi = clamp(bayIdx, 0.0, 31.0);
     const colOn = mix(maskBit(mix(fuv.z, fuv.w, step(15.5, bi)), mod(bi, 16.0)), float(1.0), step(31.5, bayIdx));
     const outside = float(1.0).sub(step(0.0, bayIdx).mul(step(bayIdx, bays.sub(0.5))));
-    const groundOn = mix(maskBit(fwin.y, clamp(bayIdx, 0.0, 15.0)), float(1.0), max(step(15.5, bayIdx), outside));
+    // The ground floor's bays are masked on every wall, measured or not: a real door (js/building-geometry.js closedBays) overrules the window in its bay, wherever that is on the
+    // wall. Bays 0-15 are bits of facadeWindow.y (1: open), bays 16-31 bits of the integer part of facadeWindow.w (1: closed by a door); a bay outside them stays open.
+    const firstWord = step(0.0, bayIdx).mul(float(1.0).sub(step(15.5, bayIdx)));
+    const secondWord = step(15.5, bayIdx).mul(float(1.0).sub(step(31.5, bayIdx)));
+    const groundShut = firstWord.mul(float(1.0).sub(maskBit(fwin.y, clamp(bayIdx, 0.0, 15.0))))
+      .add(secondWord.mul(maskBit(floor(fwin.w), clamp(bayIdx.sub(16.0), 0.0, 15.0))));
     // Beyond the measured columns (the strip covers only part of the cleaned edge, or a sliver at a wall end) the grid carries on at
     // the measured pitch: whole bays between the corner piers get windows, never a blank stretch the guessed grid would have filled
     const bayStart = start.add(bayIdx.mul(bayWidth));
@@ -516,7 +521,7 @@ function facadeCell(windowWidth, floorHeight, boxLocal, cornerPier = 0, wallAttr
     const onGround = float(1.0).sub(step(0.5, storey));
     const aboveRows = step(mRows.add(0.5), storey);
     const colOnAll = max(colOn, outside); // columns outside the measured span are windowed (see blindOutside for the wall ends)
-    measuredSolid = measured.mul(max(blindOutside, mix(max(float(1.0).sub(colOnAll), aboveRows), float(1.0).sub(groundOn), onGround)));
+    measuredSolid = max(measured.mul(max(blindOutside, float(1.0).sub(onGround).mul(max(float(1.0).sub(colOnAll), aboveRows)))), onGround.mul(groundShut));
     uCoord = gridU.mul(bayWidth);
     wallS = s;
     wallW = len;
@@ -854,7 +859,7 @@ function createPreWarBuildingMaterial(opts = {}) {
   const windowInfo = CPH ? attribute('facadeWindow', 'vec4') : vec4(0, 0, 0.075, 0);
   const winCode = floor(windowInfo.x.add(0.5));
   const typeCode = floor(winCode.div(4));
-  const windows = vec4(winCode.sub(typeCode.mul(4)), mod(typeCode, 4), windowInfo.z, windowInfo.w);
+  const windows = vec4(winCode.sub(typeCode.mul(4)), mod(typeCode, 4), windowInfo.z, fract(windowInfo.w)); // .w's integer part is door bays (facadeCell)
   const cellH = mix(facade.floorH, groundH, floor0);
   const openingSize = vec2(bayWidth.mul(float(1).sub(effHalfX.mul(2))), cellH.mul(effHiY.sub(effHalfY)));
   const openingUV = vec2(cellUV.x.sub(effHalfX), cellUV.y.sub(effHalfY))

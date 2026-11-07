@@ -118,7 +118,7 @@ Requests per visit (`tools/hosting/measure_visit.py`, same bucket): 172 with thi
 ## Known limits
 
 - The shader draws a regular grid: one pitch and one window size per wall, and separable column and row masks. Per-column and per-row offsets, irregular facades, bay windows, and openings that differ by storey are not drawn. `rm` and the per-cell detail are fitted but not used.
-- The ground floor is a bay mask on the upper grid. A shopfront that spans two bays, or a door between bays, is drawn per bay.
+- The ground floor is a bay mask on the upper grid. A shopfront that spans two bays is drawn per bay. A real door (`js/entrances.js`) overrules the mask on every wall, measured or not: it moves to its nearest bay's centre and the bays it would overlap get no window (`js/facade-layout.js baysUnderDoor`). The vertex words reach bay 31, so a door further along a wall than that keeps the windows beside it. A door outside a measured grid's bays that stays where the address has it can still meet a window before bay 0.
 - At 10 to 13 cm per pixel a window is about 10 texels. Small attic windows, and windows behind trees or balconies, are missed. Balcony slabs and access galleries mostly fail the fit and keep the procedural facade, as intended.
 - The column pitch can lock onto a harmonic (every second window) when the panes are faint. The confidence cutoff catches most of these cases, not all.
 - A front whose window groups have different spacings (a centre bay plus outer pairs, as on Christianshavn's Overgaden) gets the strongest group's pitch across the whole wall. The other groups get windows at that pitch, not at their own spacing, so they sit a little off the photo's. They are no longer blank.

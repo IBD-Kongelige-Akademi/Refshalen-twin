@@ -6,7 +6,8 @@
 //              the mask words of a measured window layout (js/facade-layout.js layoutWords, 0 otherwise)
 //   facadeWall (len, floor_h, ground_floor_h, bay_w)  (a measured layout's storey pitch, ground-floor height and column pitch)
 //   facadeBldg (hash 0..1, WALL_KINDS of the ground floor, style code = material + 4 * era, integer seed)
-//   facadeWindow (frame palette + 4 * (division type + 4 if a physical cornice is present), ground-floor bay mask, frame width m, reveal m)
+//   facadeWindow (frame palette + 4 * (division type + 4 if a physical cornice is present), ground-floor bay mask, frame width m,
+//                 reveal m + bays 16-31 that a door closes, as an integer)
 //   facadeTop  (metres from the ground to the top of the wall (cornice placement), measured grid start u0, sill/head word, rows/cols word)
 //   facadeTone (r, g, b linear, window width / bay width)
 // Frame (docs/cph-geodata-schema.md): x east, z south, y up. Rings are CCW seen from above (in x / -z), holes CW, so
@@ -14,11 +15,11 @@
 // With a LoD2 record (opts.lod2, js/lod2-geometry.js) the roof is the roofer mesh and each wall ends at its roofer eave.
 import { lod2EdgeTops, lod2RoofTriangles, lod2WallPieces, lod2ClosingWalls, lod2RoofCover, lod2RoofHasGaps, lod2Usable } from './lod2-geometry.js';
 import { mapObservedEdges, roofSurface, observedToneSrgb, buildingTone as observedBuildingTone } from './appearance.js';
-import { facadeStyle, windowStyle } from './facade-style.js';
+import { facadeStyle, windowStyle, FACADE_CORNER_PIER } from './facade-style.js';
 import { classifyWalls, doorSummary } from './groundfloor.js';
 import { appendBuildingDetails, selectDetailEdges } from './building-details.js';
 import { placeDoors } from './entrances.js';
-import { measuredEdges, layoutWords, snapToBay } from './facade-layout.js';
+import { measuredEdges, layoutWords, snapToBay, wallBays, baysUnderDoor, doorBayWords } from './facade-layout.js';
 
 const PARAPET_H = 0.45;
 const PARAPET_T = 0.22;
@@ -309,17 +310,22 @@ function addBuilding(acc, b, opts = {}) {
   const buildingTone = lite ? (opts.observed === false ? tone : observedBuildingTone(b)) : mapping?.hasObserved ? mapping.buildingTone : tone;
   // Measured window grids (the tile's `windows` layer) per cleaned edge; real entrance doors on such a wall move to its nearest bay
   const measured = lite || opts.layouts === false ? null : measuredEdges(b, rings, mapping);
-  if (measured) {
-    for (const d of doors) {
-      const m = measured[d.edgeNo];
-      const snap = snapToBay(m, d.along);
-      if (!snap) continue;
+  // A door takes a whole bay: it moves to the nearest bay's centre and overrules the windows under it, which the facade shader leaves out (`closedBays`, per edge)
+  const closedBays = new Map();
+  for (const d of doors) {
+    const m = measured?.[d.edgeNo] || null;
+    const grid = wallBays(d.wallLen, m, bayW, FACADE_CORNER_PIER);
+    // a measured grid may span only part of the wall: a door far from it stays where the address has it
+    const c = Math.max(0, Math.min(grid.bays - 1, Math.round((d.along - grid.start) / grid.pitch - 0.5)));
+    const snap = m ? snapToBay(m, d.along) : { u: grid.start + (c + 0.5) * grid.pitch };
+    if (snap) {
       d.x += d.tx * (snap.u - d.along);
       d.z += d.tz * (snap.u - d.along);
       d.along = snap.u;
-      if (m.gm !== null && snap.bay < 53) m.gm += Math.floor(m.gm / 2 ** snap.bay) % 2 ? 0 : 2 ** snap.bay;
       d.snapped = true;
     }
+    d.closedBays = baysUnderDoor(grid, d.along);
+    closedBays.set(d.edgeNo, [...(closedBays.get(d.edgeNo) || []), ...d.closedBays]);
   }
   const edgeTone = (k) => (mapping?.hasObserved ? mapping.edges[k].tone : tone);
   const quadOf = []; // cleaned edge -> its opts.quads entry (the roofer pieces above its eave join it)
@@ -356,6 +362,7 @@ function addBuilding(acc, b, opts = {}) {
       }
       const m = measured?.[edgeNo] || null;
       const lw = layoutWords(m);
+      const shut = doorBayWords(closedBays.get(edgeNo) || []);
       for (const [p, u, y, v] of corners) {
         w.position.push(p[0], y, p[1]);
         w.normal.push(nx, 0, nz);
@@ -364,7 +371,7 @@ function addBuilding(acc, b, opts = {}) {
         w.facadeBldg.push((idHash % 1000) / 1000, wallKind, styleCode, idHash % 997);
         w.facadeTone.push(wt[0], wt[1], wt[2], m ? Math.min(Math.max(m.w / m.p, 0.12), 0.92) : Math.min(Math.max(windowW / bayW, 0.12), 0.85));
         w.facadeTop.push(v1, lw.top[0], lw.top[1], lw.top[2]);
-        w.facadeWindow.push(windows.frame + 4 * windows.type, lw.ground, windows.frameWidth, windows.reveal);
+        w.facadeWindow.push(windows.frame + 4 * windows.type, lw.ground & shut.open, windows.frameWidth, windows.reveal + shut.closed);
       }
       w.index.push(base, base + 1, base + 2, base, base + 2, base + 3);
     }
