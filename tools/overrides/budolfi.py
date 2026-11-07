@@ -42,7 +42,8 @@ NAVE = (10.2, 52.04, 16.48, 27.64)  # nave and chancel under one roof: u0, u1, v
 EAVE, RIDGE = 15.45, 22.45
 EAST_GABLE = 23.6  # the crest of the stepped gable over the chancel's east end (sheets 51-53)
 APSE = [(52.08, 16.48), (57.74, 19.47), (57.74, 24.07), (52.04, 27.64)]  # the east end, its corners cut back, north to south
-EAST_END = 57.74  # the roof runs on over the cut corners to the crow-stepped gable on the east front (photographs, surface model)
+EAST_END = 57.74  # the roof runs on to the crow-stepped gable on the east front (photographs, surface model)
+CORNER_FOOT = 12.4  # the cut corners end under the gable's foot: above, the east end has the chancel's full width
 N_AISLE = (9.9, 32.0, 10.93, 16.48)
 S_AISLE = (9.9, 32.15, 27.64, 33.24)
 AISLE_FOOT_N, AISLE_FOOT_S, AISLE_HEAD = 7.75, 8.65, 14.05  # the lean-to roofs: eaves on the north and the south, and where they meet the nave
@@ -58,7 +59,7 @@ PORCH_EAVE, PORCH_RIDGE, PORCH_GABLE = 9.5, 13.0, 16.15
 ANNEX = (1.27, 9.9, 27.05, 33.24)  # south of the tower, its stepped gable towards Algade
 ANNEX_EAVE, ANNEX_RIDGE, ANNEX_GABLE = 13.25, 18.1, 19.9
 NW_ROOM = (1.38, 8.89, 15.22, 17.55, 8.2, 10.0)  # the low room north of the tower: u0, u1, v0, v1, eave, head against the tower
-OVER = 0.35  # how far the eaves stand out
+OVER = 0.15  # how far the eaves stand out: little, as the photographs show them over the whitewashed walls
 
 # The spire (1934 survey, 55.9 px to the metre at the scan's 2400 px; the section cut through the flats): (half across the flats, height over the cornice).
 LOWER_BELL = [(4.3, 0.0), (3.13, 1.52), (3.49, 1.88), (3.79, 2.33), (3.97, 2.86), (3.97, 4.3), (3.67, 5.0), (3.04, 5.72), (2.68, 6.44), (2.68, 6.62)]
@@ -197,7 +198,9 @@ def add_nave(m, hb):
     ops = {0: [(u, win(), 'glass') for u in (14.9, 20.4, 26.2, 35.1)] + [(u, pointed(9.6, 13.1, 1.5), 'glass') for u in (44.6, 49.9)],
            2: [(u, win(), 'glass') for u in (15.7, 21.5, 26.4)] + [(u, arch(8.15, 13.05, 1.6), 'glass') for u in (42.6, 49.4)]}
     block(m, rect_ring(u0, u1, v0, v1), hb, [EAVE, EAVE, EAVE, EAVE], ops, skip=(1, 3))  # the tower and the apse close its ends
-    gable_roof(m, u0, EAST_END - 0.45, v0, v1, EAVE, RIDGE, 'u', ends=(False, False))
+    gable_roof(m, u0, u1, v0, v1, EAVE, RIDGE, 'u', ends=(False, False))
+    # over the east end the roof sits on its walls, flush, up to the gable
+    gable_roof(m, u1, EAST_END - 0.45, v0, v1, EAVE, RIDGE, 'u', ends=(False, False), over=0.0)
     # the east gable, crow-stepped and set with blind recesses (sheet 52), standing on the east front
     stepped_gable(m, WallFrame((EAST_END, v0), (EAST_END, v1)), EAVE, EAST_GABLE, 6, niches=1)
     # the buttresses at the chancel's corners (sheets 52 and 53)
@@ -206,19 +209,28 @@ def add_nave(m, hb):
 
 
 def add_apse(m, hb):
+    """The east front: its corners are cut back to the gable's foot, carried there on stepped diagonal buttresses (photographs), and from there up the mass is
+    the full width of the chancel, so that the gable and the roof stand on walls and nothing overhangs."""
     ring = APSE
     ops = {1: [(21.77, arch(8.6, 12.4, 1.4), 'glass')]}
+    tops = [CORNER_FOOT, EAVE, CORNER_FOOT]
     for i in range(len(ring) - 1):
         w = WallFrame(ring[i], ring[i + 1])
         here = ops.get(i, [])
-        m.wall('wall', w, hb, EAVE, [(w.at(c), o) for c, o, _ in here])
+        m.wall('wall', w, hb, tops[i], [(w.at(c), o) for c, o, _ in here])
         openings(m, w, here)
-    # over each cut corner, a ledge under the gable's overhang
-    (a, b), (c, d) = (ring[0], ring[1]), (ring[2], ring[3])
-    m.poly('roof', [(a[0], EAVE, a[1]), (EAST_END, EAVE, a[1]), (b[0], EAVE, b[1])], UP)
-    m.poly('roof', [(d[0], EAVE, d[1]), (c[0], EAVE, c[1]), (EAST_END, EAVE, d[1])], UP)
-    for u, v in ring[1:3]:
-        buttress(m, u, v + (0.0 if v > 22 else 0.0), 1.0, 0, hb, 10.5)
+    # the corners over the cuts, from the buttresses' heads to the eaves: their faces flush with the chancel's walls and the front
+    for (ua, va), (ub, vb), sgn in ((ring[0], ring[1], -1), (ring[3], ring[2], 1)):
+        m.poly('wall', [(ua, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, va), (EAST_END, EAVE, va), (ua, EAVE, va)], (0, 0, sgn))
+        m.poly('wall', [(EAST_END, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, vb), (EAST_END, EAVE, vb), (EAST_END, EAVE, va)], (1, 0, 0))
+        m.poly('wall', [(ua, CORNER_FOOT, va), (EAST_END, CORNER_FOOT, va), (ub, CORNER_FOOT, vb)], -UP)
+        # the diagonal buttress in the middle of the cut, stepping back twice, grey-capped
+        w = WallFrame((ua, va), (ub, vb)) if sgn < 0 else WallFrame((ub, vb), (ua, va))
+        s = w.length / 2
+        for h0, h1, out in ((hb, 4.6, 1.7), (4.6, 8.6, 1.25), (8.6, CORNER_FOOT, 0.8)):
+            m.wbox('wall', w, s - 0.5, s + 0.5, h0, h1, 0.0, out, top=False)
+            m.poly('roof', [w.p(s - 0.52, h1, out + 0.05), w.p(s + 0.52, h1, out + 0.05), w.p(s + 0.52, h1 + 0.45, max(out - 0.55, 0.0)), w.p(s - 0.52, h1 + 0.45, max(out - 0.55, 0.0))],
+                   UP + w.n)
 
 
 def add_aisles(m, hb):

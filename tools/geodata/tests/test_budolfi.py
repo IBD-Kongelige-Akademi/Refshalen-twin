@@ -22,6 +22,10 @@ def test_the_heights_of_the_sheets_hold(parts):
     walls = parts["wall"]["p"]
     east = walls[np.abs(walls[:, 0] - B.EAST_END) < 0.6]
     assert east[:, 1].max() == pytest.approx(B.EAST_GABLE), "the east gable's crest"
+    # the roof over the east end stands on its walls: its eaves are the walls' line, at the walls' head
+    east_roof = roof[(roof[:, 0] > B.NAVE[1] + 0.1) & (roof[:, 1] > B.EAVE - 1e-6)]  # the buttresses' caps aside
+    assert east_roof[:, 2].min() == pytest.approx(B.NAVE[2]) and east_roof[:, 2].max() == pytest.approx(B.NAVE[3])
+    assert east_roof[(east_roof[:, 2] < B.NAVE[2] + 0.01), 1].min() == pytest.approx(B.EAVE)
 
 
 def test_the_spire_follows_the_survey(parts):
@@ -37,7 +41,7 @@ def test_the_spire_follows_the_survey(parts):
 def test_the_walls_stand_on_the_geodanmark_footprint(parts):
     walls = parts["wall"]["p"]
     low = walls[walls[:, 1] < 2.0]
-    assert low[:, 0].min() == pytest.approx(B.ANNEX[0], abs=0.05) and low[:, 0].max() == pytest.approx(57.74 + 1.0, abs=0.05), "west front to the apse's buttresses"
+    assert low[:, 0].min() == pytest.approx(B.ANNEX[0], abs=0.05) and low[:, 0].max() < 57.74 + 1.7, "west front to the east front's diagonal buttresses"
     assert low[:, 2].min() == pytest.approx(0.0, abs=0.05) and low[:, 2].max() == pytest.approx(39.8, abs=0.05), "the north chapel's room to the south porch"
 
 
