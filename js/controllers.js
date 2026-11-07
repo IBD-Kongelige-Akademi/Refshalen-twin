@@ -1481,6 +1481,13 @@ class ThirdPersonControllerManager {
       this.scene.add(group);
       return { group, spec, state: material.userData.busState, wheels, spin: 0, x: 0, z: 0 };
     });
+    // low beams from the twin headlamps in the nose's lamp pods, like the car's (lit with the evening, see update)
+    const headLights = [-1, 1].map((side) => {
+      const spot = createVehicleHeadlight();
+      placeVehicleHeadlight(spot, modules[0].spec, side);
+      modules[0].group.add(spot, spot.target);
+      return spot;
+    });
     const bellowsMat = new THREE.MeshStandardNodeMaterial({ color: 0x9a9fa3, roughness: 0.62, metalness: 0.25, side: THREE.DoubleSide });
     const bellows = [createBusBellows(bellowsMat), createBusBellows(bellowsMat)];
     for (const b of bellows) this.scene.add(b.mesh);
@@ -1496,6 +1503,7 @@ class ThirdPersonControllerManager {
       art,
       modules,
       bellows,
+      headLights,
       position: new THREE.Vector3(start.x, 0, start.z),
       heading: start.heading,
       speed: 0,
@@ -1927,6 +1935,7 @@ class ThirdPersonControllerManager {
         spot.intensity = HEADLIGHTS.intensity * beamScale;
       }
     }
+    for (const spot of this.entities.bus?.headLights || []) spot.intensity = HEADLIGHTS.busIntensity * beamScale;
     for (const mode of ['cyclist', 'cargobike']) {
       const bike = this.entities[mode];
       if (bike.headLight) bike.headLight.intensity = this.activeMode === mode ? 115 * beamScale : 0;

@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { REF_H, TREE_STYLES, hashString, mulberry32 } from './street-furniture-data.js';
+import { MAST_LENS, REF_H, TREE_STYLES, hashString, mulberry32 } from './street-furniture-data.js';
 
 // js/street-furniture-geometry.js
 // Geometry and textures of the street furniture (vertex-coloured, merged per model; origin on the ground, +z = front).
@@ -323,7 +323,7 @@ export function buildMastHead() {
 }
 
 export function buildMastLens() {
-  return new THREE.PlaneGeometry(0.26, 0.62).rotateX(Math.PI / 2).translate(0, 0.085, 1.1);
+  return new THREE.PlaneGeometry(0.26, 0.62).rotateX(Math.PI / 2).translate(0, MAST_LENS.y, MAST_LENS.reach);
 }
 
 export function buildParkHead() {

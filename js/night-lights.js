@@ -55,16 +55,19 @@ export function buildPoolWindow(lamps, cx, cz, { size = 256, cell = 0.75, snap =
   for (const l of lamps) {
     const p = l.photo || (l.photo = lampPhotometry(l));
     const R = p.radius;
-    if (l.x + R < x0 || l.x - R > x0 + size * cell || l.z + R < z0 || l.z - R > z0 + size * cell) continue;
+    // the pool lies under the lens (a mast's hangs out on its arm), not under the pole
+    const lx = l.lx ?? l.x;
+    const lz = l.lz ?? l.z;
+    if (lx + R < x0 || lx - R > x0 + size * cell || lz + R < z0 || lz - R > z0 + size * cell) continue;
     used++;
-    const i0 = Math.max(0, Math.floor((l.x - R - x0) / cell));
-    const i1 = Math.min(size - 1, Math.ceil((l.x + R - x0) / cell));
-    const j0 = Math.max(0, Math.floor((l.z - R - z0) / cell));
-    const j1 = Math.min(size - 1, Math.ceil((l.z + R - z0) / cell));
+    const i0 = Math.max(0, Math.floor((lx - R - x0) / cell));
+    const i1 = Math.min(size - 1, Math.ceil((lx + R - x0) / cell));
+    const j0 = Math.max(0, Math.floor((lz - R - z0) / cell));
+    const j1 = Math.min(size - 1, Math.ceil((lz + R - z0) / cell));
     for (let j = j0; j <= j1; j++) {
-      const dz = z0 + (j + 0.5) * cell - l.z;
+      const dz = z0 + (j + 0.5) * cell - lz;
       for (let i = i0; i <= i1; i++) {
-        const dx = x0 + (i + 0.5) * cell - l.x;
+        const dx = x0 + (i + 0.5) * cell - lx;
         const r = Math.hypot(dx, dz);
         if (r > R) continue;
         // smooth cut-off at the radius so the pool has no edge

@@ -61,3 +61,19 @@ test('real data: every lamp class has a sensible pool, wire lamps hang higher th
   assert.ok(Math.min(...by('sodium').map((p) => p.cct)) <= 2000 && by('led').every((p) => p.cct >= 2700 && p.cct <= 4000));
   assert.ok(haloSize(photos[0], 60) > haloSize(photos[0], 5), 'the glare grows with distance');
 });
+
+test('a mast lamp lights the street from its lens at the end of the arm, not from the pole', () => {
+  const [mast] = mapLamps([{ x: 10, z: 20, mount: 'mast', pole: 'kbh', pole_h: 8, yaw: Math.PI / 2, light: 'led', cct: 3000, watt: 66 }]);
+  assert.equal(mast.x, 10, 'the pole stays where it stands');
+  assert.ok(Math.abs(mast.lx - 11.1) < 1e-9 && Math.abs(mast.lz - 20) < 1e-9, `lens at ${mast.lx}, ${mast.lz}`);
+  assert.ok(mast.ly > mast.lampY);
+  const win = buildPoolWindow([mast], 10, 20, { size: 64, cell: 0.25, snap: 1 });
+  let best = -1, bx = 0;
+  for (let j = 0; j < win.size; j++) for (let i = 0; i < win.size; i++) {
+    const e = win.data[(j * win.size + i) * 3];
+    if (e > best) { best = e; bx = win.x0 + (i + 0.5) * win.cell; }
+  }
+  assert.ok(Math.abs(bx - 11.1) < 0.3, `the pool peaks at x=${bx}, under the lens`);
+  const [park] = mapLamps([{ x: 3, z: 4, mount: 'mast', pole: 'park', pole_h: 4, yaw: 1 }]);
+  assert.equal(park.lx, 3, 'a park lantern sits on top of its pole');
+});

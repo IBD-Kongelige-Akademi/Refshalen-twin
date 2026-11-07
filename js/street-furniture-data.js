@@ -193,6 +193,9 @@ export function wireSpan(span, lamp, base, segments = 10, endGround = null, anch
   return { pts, t, len, lampX: ax + (bx - ax) * t, lampZ: az + (bz - az) * t, lampY: base + wy - 0.55, wireY: base + wy };
 }
 
+// The lens of a mast's cobra head, from the pole top: `reach` out along the arm (the lamp's yaw), `y` up
+export const MAST_LENS = { reach: 1.1, y: 0.085 };
+
 export function mapLamps(lamps, groundHeight) {
   const out = [];
   for (const l of lamps || []) {
@@ -218,6 +221,15 @@ export function mapLamps(lamps, groundHeight) {
       item.bracket = true;
     } else {
       item.lampY = y + item.poleH;
+    }
+    // where the light comes from: a mast's lens hangs under the cobra head at the end of its arm, the others at (x, lampY, z)
+    item.lx = item.x;
+    item.lz = item.z;
+    item.ly = item.lampY;
+    if (l.mount === 'mast' && l.pole !== 'park') {
+      item.lx = item.x + Math.sin(item.yaw) * MAST_LENS.reach;
+      item.lz = item.z + Math.cos(item.yaw) * MAST_LENS.reach;
+      item.ly = item.lampY + MAST_LENS.y;
     }
     out.push(item);
   }

@@ -547,7 +547,7 @@ export function createStreetFurniture(scene, doc, { groundHeight = null, seed = 
       }
       if (on > 0.01 && d < 170) {
         const photo = l.photo || (l.photo = lampPhotometry(l));
-        putHalo(l.x, l.lampY - 0.12, l.z, haloSize(photo, d), lin(l.color), 0.9 + photo.lumens / 20000);
+        putHalo(l.lx ?? l.x, (l.ly ?? l.lampY) - 0.12, l.lz ?? l.z, haloSize(photo, d), lin(l.color), 0.9 + photo.lumens / 20000);
         nearLamps.push(l);
       }
     }
@@ -619,7 +619,7 @@ export function createStreetFurniture(scene, doc, { groundHeight = null, seed = 
         light.userData.base = 0;
         continue;
       }
-      light.position.set(l.x, l.lampY - 0.3, l.z);
+      light.position.set(l.lx ?? l.x, (l.ly ?? l.lampY) - 0.3, l.lz ?? l.z);
       light.color.copy(lin(l.color));
       light.userData.base = realIntensity(l.photo);
       light.intensity = light.userData.base * state.on;
