@@ -2,11 +2,18 @@
 // batched into a cell-wide stream without relying on a double-sided material.
 // Dormers stay deferred: this data has no surveyed opening locations, and adding them requires invasive roof cutouts.
 
-import { facadeStyle, hasFacadeDetails, ERA, FACADE_CORNER_PIER } from './facade-style.js';
+import { facadeStyle, hasFacadeDetails, ERA, FACADE_CORNER_PIER, WINDOW } from './facade-style.js';
 import { KIND } from './groundfloor.js';
 
 const MAX_STREET_EDGES = 4;
 const MIN_DETAIL_EDGE_LENGTH = 1.5;
+const EAVE_JOG = 0.3; // m: neighbouring eaves this close are one line, at the lower of them; further apart the band steps
+const CORNICE_UNDER_EAVE = 0.18; // m between the eave and the cornice's top
+const CORNICE_MIN_H = 0.15; // m: a cornice with less room than this over the windows is left out
+const GUTTER_UNDER_EAVE = 0.035;
+const GUTTER_H = 0.13;
+const GUTTER_MIN_H = 0.05;
+const WINDOW_CLEARANCE = 0.05; // m kept free over a window's head
 
 const dot2 = (a, b) => a[0] * b[0] + a[1] * b[1];
 const length2 = (a) => Math.hypot(a[0], a[1]);
@@ -113,7 +120,26 @@ function appendPart(mesh, parts, id, kind, build, edges = []) {
   if (end > start) parts.push({ id, kind, start, end, edges });
 }
 
-/** Appends one mitered, capped annular band per selected edge run. */
+/** A run of edges cut where the band's height changes, so that every piece is level. */
+function levelRuns(run, bottoms, tops) {
+  const same = (a, b) => Math.abs(tops[a] - tops[b]) < 1e-4 && Math.abs(bottoms[a] - bottoms[b]) < 1e-4;
+  const list = run.edges;
+  let edges = list;
+  if (run.closed) {
+    const k = list.findIndex((e, i) => !same(e, list[(i + list.length - 1) % list.length]));
+    if (k < 0) return [run];
+    edges = [...list.slice(k), ...list.slice(0, k)];
+  }
+  const out = [];
+  for (const e of edges) {
+    const cur = out[out.length - 1];
+    if (cur && same(cur.edges[cur.edges.length - 1], e)) cur.edges.push(e);
+    else out.push({ edges: [e], closed: false });
+  }
+  return out;
+}
+
+/** Appends one mitered, capped annular band per selected edge run; `bottoms` and `tops` are per edge, so every piece of it is horizontal. */
 function appendRingBand(mesh, parts, id, kind, ring, selected, bottoms, tops, projection, material) {
   const n = ring.length;
   if (n < 3) return;
@@ -133,18 +159,19 @@ function appendRingBand(mesh, parts, id, kind, ring, selected, bottoms, tops, pr
       }
     }
   }
-  for (const run of edgeRuns(safe, ring)) {
+  for (const run of edgeRuns(safe, ring).flatMap((r) => levelRuns(r, bottoms, tops))) {
+    const yb = bottoms[run.edges[0]], yt = tops[run.edges[0]];
     appendPart(mesh, parts, id, kind, () => {
       for (const i of run.edges) {
         const j = (i + 1) % n;
-        const inner0b = [ring[i][0], bottoms[i], ring[i][1]];
-        const inner1b = [ring[j][0], bottoms[j], ring[j][1]];
-        const outer0b = [outer[i][0], bottoms[i], outer[i][1]];
-        const outer1b = [outer[j][0], bottoms[j], outer[j][1]];
-        const inner0t = [ring[i][0], tops[i], ring[i][1]];
-        const inner1t = [ring[j][0], tops[j], ring[j][1]];
-        const outer0t = [outer[i][0], tops[i], outer[i][1]];
-        const outer1t = [outer[j][0], tops[j], outer[j][1]];
+        const inner0b = [ring[i][0], yb, ring[i][1]];
+        const inner1b = [ring[j][0], yb, ring[j][1]];
+        const outer0b = [outer[i][0], yb, outer[i][1]];
+        const outer1b = [outer[j][0], yb, outer[j][1]];
+        const inner0t = [ring[i][0], yt, ring[i][1]];
+        const inner1t = [ring[j][0], yt, ring[j][1]];
+        const outer0t = [outer[i][0], yt, outer[i][1]];
+        const outer1t = [outer[j][0], yt, outer[j][1]];
         const dx = ring[j][0] - ring[i][0], dz = ring[j][1] - ring[i][1];
         const len = Math.hypot(dx, dz) || 1;
         const outwardNormal = [-dz / len, 0, dx / len];
@@ -164,15 +191,15 @@ function appendRingBand(mesh, parts, id, kind, ring, selected, bottoms, tops, pr
       const startDir = [firstNext[0] - p[0], firstNext[1] - p[1]];
       const startLen = length2(startDir) || 1;
       addQuad(mesh,
-        [p[0], bottoms[first], p[1]], [q[0], bottoms[first], q[1]],
-        [q[0], tops[first], q[1]], [p[0], tops[first], p[1]],
+        [p[0], yb, p[1]], [q[0], yb, q[1]],
+        [q[0], yt, q[1]], [p[0], yt, p[1]],
         [-startDir[0] / startLen, 0, -startDir[1] / startLen], material);
       const prev = ring[last];
       const endDir = [d[0] - prev[0], d[1] - prev[1]];
       const endLen = length2(endDir) || 1;
       addQuad(mesh,
-        [d[0], bottoms[end], d[1]], [r[0], bottoms[end], r[1]],
-        [r[0], tops[end], r[1]], [d[0], tops[end], d[1]],
+        [d[0], yb, d[1]], [r[0], yb, r[1]],
+        [r[0], yt, r[1]], [d[0], yt, d[1]],
         [endDir[0] / endLen, 0, endDir[1] / endLen], material);
     }, run.edges);
   }
@@ -193,9 +220,50 @@ function corniceMetrics(year, era) {
   return { projection: 0.30, height: 0.46 };
 }
 
-function eavesAtVertices(ring, edgeTops, edgeOffset) {
-  const n = ring.length;
-  return Array.from({ length: n }, (_, i) => Math.min(edgeTops[edgeOffset + ((i + n - 1) % n)], edgeTops[edgeOffset + i]));
+/**
+ * The height of the eave trim per edge of the outer ring: each edge's own wall top, never its neighbour's (a band laid from one wall's top to a lower neighbour's would slant
+ * across the storeys). Neighbouring selected edges within EAVE_JOG share the lower height, so a measured eave's few centimetres do not step the band.
+ */
+function eaveLevels(edgeTops, selected, n) {
+  const levels = edgeTops.slice(0, n);
+  const link = (i, lo, hi) => selected[i] && Math.max(hi, levels[i]) - Math.min(lo, levels[i]) <= EAVE_JOG;
+  let start = 0;
+  for (let i = 0; i < n; i++) {
+    const prev = (i + n - 1) % n;
+    if (!link(i, levels[prev], levels[prev]) || !selected[prev]) { start = i; break; }
+  }
+  for (let k = 0; k < n;) {
+    const first = (start + k) % n;
+    if (!selected[first]) { k++; continue; }
+    const group = [first];
+    let lo = levels[first], hi = levels[first];
+    for (k++; k < n && link((start + k) % n, lo, hi); k++) {
+      const i = (start + k) % n;
+      group.push(i);
+      lo = Math.min(lo, levels[i]);
+      hi = Math.max(hi, levels[i]);
+    }
+    for (const i of group) levels[i] = lo;
+  }
+  return levels;
+}
+
+/**
+ * The head of the top window row that starts under a wall top `top` (m above the ground), by the same rows as the facade shader: a measured grid's, or the ground floor
+ * and the storeys over it with the window ratio of js/facade-style.js. Above `top` when the wall cuts that row off; null without window rows.
+ */
+function topWindowHead(top, rows, edge) {
+  if (!rows) return null;
+  const m = rows.measured?.[edge] || null;
+  const g = m ? m.g : rows.groundH;
+  const f = m ? m.f : rows.floorH;
+  if (!(f > 0) || !(g > 0)) return null;
+  const sill = m ? m.sill : f * (1 - WINDOW.ratioY) / 2;
+  const head = m ? Math.min(m.head, 0.97 * f) : f * (1 + WINDOW.ratioY) / 2;
+  for (let r = Math.min(Math.floor((top - g) / f), m ? m.rows - 1 : Infinity); r >= 0; r--) {
+    if (g + r * f + sill < top) return g + r * f + head;
+  }
+  return 0.76 * g; // the ground floor's openings (js/tsl-materials.js effHiY)
 }
 
 function addBox(mesh, parts, id, center, along, across, yBottom, yTop, lengthAlong, widthAcross, material) {
@@ -320,42 +388,60 @@ function plinthOutline(building, ring, selected, height, layout) {
       mask.push(keep); edgeHeights.push(h);
     }
   }
-  const tops = edgeHeights.map((h, i) => building.ground + Math.min(h, edgeHeights[(i + edgeHeights.length - 1) % edgeHeights.length]));
-  return { ring: points, selected: mask, tops };
+  return { ring: points, selected: mask, tops: edgeHeights.map((h) => building.ground + h) };
 }
 
 /** Adds cornices, plinths, the zinc eave band and eligible ridge chimneys to a detail stream. */
-function appendBuildingDetails(mesh, parts, building, rings, edgeTops, streetEdges, roofTriangles, wallTone, layout = null) {
+function appendBuildingDetails(mesh, parts, building, rings, edgeTops, streetEdges, roofTriangles, wallTone, layout = null, rows = null) {
   const style = facadeStyle(building);
   if (!hasFacadeDetails(building, style)) return mesh.index.length;
   const id = building.id;
   const ring = rings[0];
   if (!ring || ring.length < 3) return 0;
   const n = ring.length;
-  const selected = streetEdges ? streetEdges.slice(0, n) : Array(n).fill(true);
   const ground = building.ground;
-  const eaves = eavesAtVertices(ring, edgeTops, 0);
+  const minWall = 0.75;
+  // an edge whose wall is too low for trim (or has no known top) gets none; the others keep theirs
+  const selected = (streetEdges ? streetEdges.slice(0, n) : Array(n).fill(true)).map((s, i) => !!s && edgeTops[i] - ground >= minWall);
+  if (!selected.some(Boolean)) return mesh.index.length;
+  const eaves = eaveLevels(edgeTops, selected, n);
   const year = building.year !== null && building.year !== undefined && Number.isFinite(Number(building.year)) ? Number(building.year) : null;
   const plinthHeight = Math.min(1.2, Math.max(0.6, building.facade?.plinth_h || (year !== null && year < 1950 ? 0.95 : 0.75)));
-  const wallHeight = Math.min(...eaves) - ground;
-  if (!Number.isFinite(wallHeight) || wallHeight < 0.75) return mesh.index.length;
-  let cornice = corniceMetrics(year || 1900, style.era);
-  // Keep the historic band below the gutter and above the plinth. Very low sheds do not have room for all three details.
-  if (cornice && wallHeight < 0.18 + cornice.height + plinthHeight + 0.03) cornice = null;
-  if (cornice) {
-    const metrics = cornice;
-    const tops = eaves.map((y) => y - 0.18);
-    const bottoms = tops.map((y) => y - metrics.height);
+  const heads = eaves.map((y, i) => (selected[i] ? topWindowHead(y - ground, rows, i) : null));
+  const cornice = corniceMetrics(year || 1900, style.era);
+  // The cornice under the eave and clear of the windows: it gives way to the top row's head, and an edge without room for it has none.
+  // Keep it above the plinth too: very low sheds do not have room for all the details.
+  const corniceH = eaves.map((y, i) => {
+    const wall = y - ground;
+    if (!selected[i] || wall < CORNICE_UNDER_EAVE + cornice.height + plinthHeight + 0.03) return 0;
+    const room = heads[i] === null ? Infinity : wall - CORNICE_UNDER_EAVE - heads[i] - WINDOW_CLEARANCE;
+    return room < CORNICE_MIN_H ? 0 : Math.min(cornice.height, room);
+  });
+  // one height along a straight line of eaves, the lowest any of its windows allows
+  const corniceAt = corniceH.slice();
+  for (let i = 0; i < n; i++) {
+    const next = (i + 1) % n;
+    if (!corniceH[i] || !corniceH[next] || Math.abs(eaves[i] - eaves[next]) > 1e-4) continue;
+    const h = Math.min(corniceAt[i], corniceAt[next]);
+    corniceAt[i] = corniceAt[next] = h;
+  }
+  const hasCornice = corniceAt.map((h) => h > 0);
+  if (hasCornice.some(Boolean)) {
+    const tops = eaves.map((y) => y - CORNICE_UNDER_EAVE);
+    const bottoms = tops.map((y, i) => y - corniceAt[i]);
     const color = (wallTone || [0.48, 0.4, 0.32]).map((v) => v * 0.9);
-    appendRingBand(mesh, parts, id, 'cornice', ring, selected, bottoms, tops, metrics.projection, { color, rough: 0.88, metal: 0.01 });
+    appendRingBand(mesh, parts, id, 'cornice', ring, hasCornice, bottoms, tops, cornice.projection, { color, rough: 0.88, metal: 0.01 });
   }
 
   const plinth = plinthOutline(building, ring, selected, plinthHeight, layout);
   appendRingBand(mesh, parts, id, 'plinth', plinth.ring, plinth.selected, Array(plinth.ring.length).fill(ground), plinth.tops, 0.04, PLINTH_MATERIAL);
 
-  const gutterTops = eaves.map((y) => y - 0.035);
-  const gutterProjection = cornice ? cornice.projection + 0.14 : 0.15;
-  appendRingBand(mesh, parts, id, 'gutter', ring, selected, gutterTops.map((y) => y - 0.13), gutterTops, gutterProjection, GUTTER_MATERIAL);
+  const gutterTops = eaves.map((y) => y - GUTTER_UNDER_EAVE);
+  // the gutter is thinner over a window that comes close to the eave, and is left out over a row the wall cuts off
+  const gutterBottoms = gutterTops.map((y, i) => (heads[i] === null ? y - GUTTER_H : Math.max(y - GUTTER_H, ground + heads[i] + 0.02)));
+  const hasGutter = selected.map((s, i) => s && gutterTops[i] - gutterBottoms[i] >= GUTTER_MIN_H);
+  const gutterProjection = hasCornice.some(Boolean) ? cornice.projection + 0.14 : 0.15;
+  appendRingBand(mesh, parts, id, 'gutter', ring, hasGutter, gutterBottoms, gutterTops, gutterProjection, GUTTER_MATERIAL);
 
   const pitched = roofTriangles.some((tri) => {
     const ny = triangleNormal(tri[0], tri[1], tri[2])[1];
@@ -365,4 +451,4 @@ function appendBuildingDetails(mesh, parts, building, rings, edgeTops, streetEdg
   return mesh.index.length;
 }
 
-export { selectDetailEdges, appendBuildingDetails, outwardOffsetRing, ridgeLines };
+export { selectDetailEdges, appendBuildingDetails, outwardOffsetRing, ridgeLines, eaveLevels, topWindowHead };

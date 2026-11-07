@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createAccumulator, addBuilding, hashString } from '../js/building-geometry.js';
-import { selectDetailEdges } from '../js/building-details.js';
+import { selectDetailEdges, appendBuildingDetails, eaveLevels, topWindowHead } from '../js/building-details.js';
 import { createContext, classifyWalls, KIND } from '../js/groundfloor.js';
 
 const rect = (length = 10, width = 6) => [0, 0, length, 0, length, -width, 0, -width];
@@ -22,6 +22,12 @@ function roofRecord(length = 10, width = 6, eave = 5, ridge = 8) {
     idx: Uint16Array.from([0, 1, 2, 0, 2, 3, 3, 2, 4, 3, 4, 5]),
     kind: new Uint8Array(4), edge: new Int16Array(4).fill(-1), top: new Float32Array(4).fill(eave)
   };
+}
+
+function appendTrim(acc, b, edges, tops, rows = { floorH: 3, groundH: 3 }) {
+  const ring = [];
+  for (let i = 0; i < b.ring.length; i += 2) ring.push([b.ring[i], b.ring[i + 1]]);
+  appendBuildingDetails(acc.roof, acc.detailParts, b, [ring], tops, edges, [], null, null, rows);
 }
 
 const pointKey = (position, i) => [0, 1, 2].map((k) => Math.round(position[i * 3 + k] * 1e5)).join(',');
@@ -91,7 +97,8 @@ test('historic cornice, dark plinth and gutter are closed, mitered solids under 
   const cornice = verticesOfPart(acc, acc.detailParts.find((p) => p.kind === 'cornice'));
   const corniceY = cornice.map((p) => p[1]);
   assert.ok(Math.max(...corniceY) < b.eave, 'cornice stays below the eave');
-  assert.ok(Math.max(...corniceY) - Math.min(...corniceY) >= 0.4 && Math.max(...corniceY) - Math.min(...corniceY) <= 0.7);
+  // 1890: 0.64 m by its era, but this facade's top window head (9.40 m) leaves it 0.37 m under the eave
+  assert.ok(Math.max(...corniceY) - Math.min(...corniceY) >= 0.3 && Math.max(...corniceY) - Math.min(...corniceY) <= 0.7);
   assert.ok(Math.min(...cornice.map((p) => p[0])) <= -0.25 && Math.min(...cornice.map((p) => p[0])) >= -0.45, 'cornice projection is within the Copenhagen range');
 
   const plinth = verticesOfPart(acc, acc.detailParts.find((p) => p.kind === 'plinth'));
@@ -103,6 +110,59 @@ test('historic cornice, dark plinth and gutter are closed, mitered solids under 
   assert.ok(Math.max(...gutter.map((p) => p[1])) < b.eave, 'zinc band sits below the eave');
   assert.ok(Math.min(...gutter.map((p) => p[0])) < -0.5, 'historic gutter projects past the cornice so it remains visible');
   assert.ok(acc.roof.mat.some((v) => v > 0.5), 'zinc gutter carries a metal value');
+});
+
+function bandPieces(acc, kind) {
+  return acc.detailParts.filter((p) => p.kind === kind).map((part) => {
+    const ys = verticesOfPart(acc, part).map((p) => p[1]);
+    return { part, lo: Math.min(...ys), hi: Math.max(...ys), levels: new Set(ys.map((y) => y.toFixed(3))).size };
+  });
+}
+
+test('eave trim is horizontal: each wall keeps its own top even beside a much lower neighbour', () => {
+  const tops = [18, 18, 9, 9];
+  const levels = eaveLevels(tops, [true, true, true, true], 4);
+  assert.deepEqual(levels, tops, 'walls 9 m apart keep their own heights');
+  assert.deepEqual(eaveLevels([10, 10.2, 10.1, 10.05], [true, true, true, true], 4), [10, 10, 10, 10], 'a few centimetres are one line');
+  assert.deepEqual(eaveLevels([10, 10.2, 12, 12.1], [true, true, false, true], 4), [10, 10, 12, 12.1], 'an unselected edge breaks the line');
+  assert.deepEqual(eaveLevels([10.1, 12, 12, 10], [true, true, true, true], 4), [10, 12, 12, 10], 'a line across the start of the ring is still one line');
+  const acc = createAccumulator();
+  const b = building({ id: 'detail:step', ring: rect(30, 12), eave: 18, ridge: 18, year: 1910 });
+  // the lowered wall stands next to the street edge: its neighbour's vertex used to pull the band down along the front
+  const low = { ...b };
+  const edges = [true, true, true, true];
+  appendTrim(acc, low, edges, [18, 18, 9, 9]);
+  for (const kind of ['cornice', 'gutter']) {
+    const pieces = bandPieces(acc, kind);
+    assert.ok(pieces.length >= 2, `${kind} steps where the wall does`);
+    for (const { part, lo, hi, levels: n } of pieces) {
+      assert.ok(hi - lo < 0.7, `${kind} stays one band`);
+      assert.equal(n, 2, `${kind} has one bottom and one top: level`);
+      assertWatertightPart(acc, part);
+    }
+  }
+});
+
+test('eave trim stays clear of the windows', () => {
+  assert.ok(Math.abs(topWindowHead(10, { floorH: 3, groundH: 3.5 }, 0) - (3.5 + 3 + 3 * 0.82)) < 1e-9, 'storey 2 of a 3 m pitch: its sill is under the top, storey 3 starts at 12.5');
+  assert.ok(topWindowHead(11.5, { floorH: 3, groundH: 3.5 }, 0) > 11.5, 'a row the wall cuts off stands above the top');
+  assert.equal(topWindowHead(10, null, 0), null);
+  const measured = [{ g: 3, f: 3, sill: 1, head: 2.4, rows: 1, u0: 0, p: 2, w: 1, n: 4 }];
+  assert.ok(Math.abs(topWindowHead(20, { floorH: 3, groundH: 3, measured }, 0) - 5.4) < 1e-9, 'a measured grid has only its rows');
+  for (const [top, rows, cornice, gutter] of [
+    [10, { floorH: 3.35, groundH: 3.3 }, true, true], // head 9.40: a cornice of 0.37 m
+    [9.6, { floorH: 3.35, groundH: 3.3 }, false, true], // head 9.40: room for no cornice, a gutter
+    [9.3, { floorH: 3.35, groundH: 3.3 }, false, false] // head 9.40: the wall cuts the row off, no trim on it
+  ]) {
+    const acc = createAccumulator();
+    const b = building({ eave: top, ridge: top });
+    appendTrim(acc, b, [true, false, false, false], [top, top, top, top], rows);
+    const head = topWindowHead(top, rows, 0);
+    const parts = (kind) => bandPieces(acc, kind);
+    assert.equal(parts('cornice').length > 0, cornice, `cornice at ${top}`);
+    assert.equal(parts('gutter').length > 0, gutter, `gutter at ${top}`);
+    for (const { lo } of [...parts('cornice'), ...parts('gutter')]) assert.ok(lo > head, `over the head at ${head}`);
+  }
 });
 
 test('main era rules give mid-era and unknown-year fronts trim, but modern buildings and sheds none', () => {

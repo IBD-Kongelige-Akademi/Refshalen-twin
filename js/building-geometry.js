@@ -439,7 +439,7 @@ function addBuilding(acc, b, opts = {}) {
     const selected = opts.streetEdges || selectDetailEdges(rings, wallKinds);
     appendBuildingDetails(acc.roof, acc.detailParts, b, rings,
       lod?.tops || Array(rings.reduce((n, r) => n + r.length, 0)).fill(eave), selected, roofTriangles, buildingTone,
-      wallKinds ? { wallKinds, groundH, bayW, tone: (idHash % 1000) / 1000, measured } : null);
+      wallKinds ? { wallKinds, groundH, bayW, tone: (idHash % 1000) / 1000, measured } : null, { floorH, groundH, measured });
     for (const part of acc.detailParts.slice(partStart)) {
       if (part.kind !== 'cornice') continue;
       for (const edge of part.edges) {
