@@ -606,9 +606,12 @@ export function createStreetFurniture(scene, doc, { groundHeight = null, seed = 
     assignLights(cx, cz);
   }
 
+  // the last `reserved` lights of the pool are lent out (js/nightlife-scene.js colours them at the bars); the lamps get the rest
+  let reserved = 0;
   function assignLights(cx, cz) {
-    const chosen = state.on < 0.01 ? [] : selectRealLights(nearLamps, cx, cz, MAX_LIGHTS);
-    for (let i = 0; i < MAX_LIGHTS; i++) {
+    const own = MAX_LIGHTS - reserved;
+    const chosen = state.on < 0.01 ? [] : selectRealLights(nearLamps, cx, cz, own);
+    for (let i = 0; i < own; i++) {
       const l = chosen[i];
       const light = lights[i];
       if (!l) {
@@ -652,7 +655,19 @@ export function createStreetFurniture(scene, doc, { groundHeight = null, seed = 
     lensMat.color.setScalar(0.42 + state.on * 9);
     poolUniforms.on.value = state.on;
     haloOn.value = state.on;
-    for (const l of lights) if (l.userData.base) l.intensity = l.userData.base * state.on;
+    for (let i = 0; i < MAX_LIGHTS - reserved; i++) if (lights[i].userData.base) lights[i].intensity = lights[i].userData.base * state.on;
+  }
+
+  /**
+   * Lends the last n (0-3) real lights of the fixed pool to another system, which sets their colour, position and intensity; the
+   * street lamps make do with the rest. The pool never changes size (that would recompile every lit shader). Returns the lights.
+   */
+  function reserveLights(n) {
+    reserved = Math.max(0, Math.min(3, n | 0));
+    const lent = lights.slice(MAX_LIGHTS - reserved);
+    for (const l of lent) { l.intensity = 0; l.userData.base = 0; }
+    if (Number.isFinite(state.x)) assignLights(state.x, state.z);
+    return lent;
   }
 
   /** Per frame: (camera x, z, the lighting system's night factor). Rebuilds the instance sets after a few metres of travel. */
@@ -678,6 +693,7 @@ export function createStreetFurniture(scene, doc, { groundHeight = null, seed = 
     group,
     plan,
     update,
+    reserveLights,
     addTile,
     removeTile,
     get tileCount() { return tilePlans.size; },

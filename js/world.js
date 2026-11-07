@@ -9,6 +9,7 @@ import { buildDirectionOverlay } from './direction-overlay.js';
 import { buildSignalHeads } from './signal-heads.js';
 import { createWalkSpace } from './walk-space.js';
 import { createWalkLimits } from './walk-limits.js';
+import { nightlife } from './nightlife.js';
 import { buildLakes } from './water.js';
 import { setCalibration } from './appearance.js';
 import { applySurfaceCuts } from './lakes.js';
@@ -778,7 +779,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   if (!flags.has('noroads')) {
     roads = await createRoadSurfaceLayer(scene, { terrain: terrain.flat ? null : terrain, tiledHeight });
     walk = createWalkSpace(geo, waterDoc);
-    walkLimits = createWalkLimits({ deckAt: deckField.deckAt });
+    walkLimits = createWalkLimits({ deckAt: deckField.deckAt, hotspots: () => nightlife.clusters }); // the strips' footways are walked too
     layers.push({
       name: 'roads', rings: ['near', 'mid'], fidelity: true,
       add: async (ctx, ring) => {

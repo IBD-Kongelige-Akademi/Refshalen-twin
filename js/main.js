@@ -14,6 +14,8 @@ import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
+import { nightlife, nightlifeLevel } from './nightlife.js';
+import { createNightlifeScene } from './nightlife-scene.js';
 import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.js';
 import { OverviewMap } from './overview-map.js';
 
@@ -526,6 +528,9 @@ async function initApp() {
   world.fetchCityJson?.('map.json').then((doc) => mapSystem.setData(doc)).catch((e) => console.info('[map] no data/city/map.json:', e?.message || e));
   // line 2's route for the AI Plusbuses (tools/geodata/bus_lines.py)
   world.fetchCityJson?.('bus-lines.json').then((doc) => trafficSystem.setBusLines?.(doc)).catch((e) => console.info('[traffic] no data/city/bus-lines.json:', e?.message || e));
+  // the bars, pubs and nightclubs (tools/geodata/nightlife.py): neon, coloured spill and beats after dark (js/nightlife*.js)
+  const nightlifeScene = createNightlifeScene(scene, nightlife, { groundHeight: world.groundHeight, furniture: world.furniture });
+  world.fetchCityJson?.('nightlife.json').then((doc) => nightlife.setVenues(doc.venues)).catch((e) => console.info('[nightlife] no data/city/nightlife.json:', e?.message || e));
   const openMapBtn = document.getElementById('btn-open-map');
   if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
 
@@ -693,7 +698,7 @@ async function initApp() {
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
     const updateCamera = cameraSystem.update.bind(cameraSystem);
-    Object.assign(globalThis.__twin, { THREE, trafficSystem, mapSystem, freeCam: null, frozen: false, stream: world.stream || null });
+    Object.assign(globalThis.__twin, { THREE, trafficSystem, mapSystem, freeCam: null, frozen: false, stream: world.stream || null, nightlife, nightlifeScene, audioSystem });
     cameraSystem.update = (dt, time) => {
       updateCamera(dt, time);
       const f = globalThis.__twin.freeCam;
@@ -740,6 +745,8 @@ async function initApp() {
     lightingSystem.update(cameraSystem.currentPos);
     mapSystem.update(now);
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
+    nightlife.setLevel(nightlifeLevel(lightingSystem.activePresetId, lightingSystem.uNightFactor.value));
+    nightlifeScene.update(dt, cameraSystem.currentPos.x, cameraSystem.currentPos.z, audioSystem.beatClock ?? elapsed);
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)

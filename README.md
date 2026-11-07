@@ -8,6 +8,7 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 - Bridges on piers at their measured deck heights (Limfjordsbroen, Østre Allé, the foot bridges) and the railway tracks.
 - Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); six teleports and scenic cameras.
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
+- Nightlife after dark: the bars, pubs and nightclubs of Jomfru Ane Gade (and every other strip of bars) light their fronts with neon and coloured, beat-flashing spill, play muffled beats you hear as you pass, and draw an evening crowd; quiet at Midday, building at Blue Hour, full at Night ([docs/nightlife.md](docs/nightlife.md)).
 
 Forked from [copenhagen-twin](https://github.com/martincollignon/copenhagen-twin) by Martin Collignon at `1b1316a` (28 Oct 2026), itself based on Slop New York by mrdoob; both MIT. The upstream repository stays the `upstream` git remote for engine fixes.
 
@@ -51,6 +52,7 @@ uv run tools/geodata/build_city.py --stage lod2 --stage index --stage report
 uv run tools/geodata/city_water.py --fetch                           # the Limfjord, lakes, streams, quay walls, green ground
 PYTHONUTF8=1 uv run tools/geodata/city_structures.py                # bridges and railways (after the water)
 PYTHONUTF8=1 uv run tools/geodata/far_lod.py                          # the far ring (on Windows: set PYTHONUTF8=1)
+uv run --no-project --with pyproj python -X utf8 tools/geodata/nightlife.py  # bars, pubs and nightclubs at their street fronts
 uv run tools/geodata/build_city.py --stage index --stage report
 ```
 

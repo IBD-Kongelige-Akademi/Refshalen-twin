@@ -2,7 +2,8 @@
 // Where pedestrians may not walk, per streamed tile: the carriageways (roadAt), and the water and the railway (hazardAt: the tracks' corridor
 // and the OSM landuse=railway areas). A bridge deck is exempt: what is on it is over the water, the road or the tracks, not in them.
 // js/pedestrian-routes.js lays its walking lines and corners by these; the crosswalks at the intersections are the only way over a road.
-// parkPaths(): the footways that run mostly through the green ground, which pedestrians walk as well.
+// parkPaths(): the footways that run mostly through the green ground, which pedestrians walk as well, and the footways through a
+// nightlife strip (`hotspots`, js/nightlife.js clusters: Jomfru Ane Gade is a pedestrian street, not a road with pavements).
 
 import { createCarriagewayIndex, createSegmentIndex } from './road-surfaces.js';
 import { pointInRings } from './deck-field.js';
@@ -22,7 +23,12 @@ function polyOf(ring, holes = []) {
 
 const inPoly = (p, x, z) => x >= p.x0 && x <= p.x1 && z >= p.z0 && z <= p.z1 && pointInRings(x, z, p.ring, p.holes);
 
-export function createWalkLimits({ deckAt = null } = {}) {
+const nearHotspot = (spots, x, z) => {
+  for (const c of spots) if (Math.hypot(x - c.x, z - c.z) <= c.r) return true;
+  return false;
+};
+
+export function createWalkLimits({ deckAt = null, hotspots = null } = {}) {
   const tiles = new Map(); // tag -> { roads, rails, polys }
   const onDeck = (x, z) => !!deckAt && deckAt(x, z) !== null;
 
@@ -47,21 +53,27 @@ export function createWalkLimits({ deckAt = null } = {}) {
     return false;
   };
 
-  /** The resident footways that run mostly through the green ground: [{ id, pts }]. */
+  /** The resident footways that run mostly through the green ground, or through a nightlife hotspot: [{ id, pts, hot? }]. */
   function parkPaths() {
     const out = [];
     const seen = new Set();
+    const spots = hotspots ? hotspots() || [] : [];
     for (const t of tiles.values()) {
       for (const r of t.footways) {
         if (seen.has(r.id) || !r.pts || r.pts.length < 4) continue;
         seen.add(r.id);
-        let inside = 0, all = 0;
+        let inside = 0, all = 0, hot = 0;
         for (let i = 2; i < r.pts.length; i += 2) {
           const ax = r.pts[i - 2], az = r.pts[i - 1], bx = r.pts[i], bz = r.pts[i + 1];
           const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / PATH_SAMPLE));
-          for (let k = 0; k < n; k++, all++) if (inGreen(ax + (bx - ax) * (k + 0.5) / n, az + (bz - az) * (k + 0.5) / n)) inside++;
+          for (let k = 0; k < n; k++, all++) {
+            const x = ax + (bx - ax) * (k + 0.5) / n, z = az + (bz - az) * (k + 0.5) / n;
+            if (inGreen(x, z)) inside++;
+            if (spots.length && nearHotspot(spots, x, z)) hot++;
+          }
         }
-        if (all && inside / all >= PATH_GREEN_SHARE) out.push({ id: r.id, pts: r.pts });
+        if (all && hot / all >= PATH_GREEN_SHARE) out.push({ id: r.id, pts: r.pts, hot: true });
+        else if (all && inside / all >= PATH_GREEN_SHARE) out.push({ id: r.id, pts: r.pts });
       }
     }
     return out;
@@ -85,5 +97,7 @@ export function createWalkLimits({ deckAt = null } = {}) {
     return false;
   }
 
+  // the paths change when the hotspots do (the nightlife data arrives after the first tiles): js/pedestrian-routes.js rebuilds on a new stamp
+  parkPaths.stamp = () => (hotspots ? hotspots() : null);
   return { add, remove: (tag) => tiles.delete(tag), has: (tag) => tiles.has(tag), roadAt, hazardAt, parkPaths };
 }

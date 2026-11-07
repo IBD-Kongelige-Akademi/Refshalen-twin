@@ -199,6 +199,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   // ---- paths in the green
   let pathTracks = null;
   let pathTries = 0;
+  let pathStamp = parkPaths?.stamp ? parkPaths.stamp() : null;
   function buildPaths() {
     const nodes = new Map();
     const nodeAt = (x, z) => {
@@ -212,7 +213,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
         const a = { x: path.pts[i - 2], z: path.pts[i - 1] }, b = { x: path.pts[i], z: path.pts[i + 1] };
         if (Math.hypot(b.x - a.x, b.z - a.z) < 0.3 || !clear(a, b) || !lawfulCorner(a, b, null)) continue;
         const na = nodeAt(a.x, a.z), nb = nodeAt(b.x, b.z);
-        const t = segment(a, b, { path: true, from: na, to: nb });
+        const t = segment(a, b, { path: true, from: na, to: nb, hot: !!path.hot });
         na.ends.push({ track: t, end: 0 });
         nb.ends.push({ track: t, end: 1 });
         tracks.push(t);
@@ -242,6 +243,8 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   /** The path tracks with a point within r of (x, z). */
   function pathsNear(x, z, r) {
     if (!parkPaths) return [];
+    const stamp = parkPaths.stamp ? parkPaths.stamp() : null;
+    if (stamp !== pathStamp) { pathStamp = stamp; pathTracks = null; pathTries = 0; } // new hotspots: lay the paths again
     if (!pathTracks && pathTries++ % 300 === 0) {
       const built = buildPaths();
       if (built.length) pathTracks = built;

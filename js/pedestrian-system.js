@@ -1,5 +1,6 @@
 import { createPedestrianRoutes } from './pedestrian-routes.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
+import { nightlife } from './nightlife.js';
 
 // Local pedestrian population: connected walks, curb queues, conversations and player avoidance.
 // Traffic supplies crossing permissions and view checks; this system owns the crowd and its animation.
@@ -53,6 +54,7 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
       placed: false,
       crossesStreets: i % 6 === 0, // some start near crossings; everyone can use them along their route
       parkWalker: i % 6 === 2, // some start on the paths in the green, where there are any nearby
+      nightOwl: i % 4 === 3, // a quarter go out in the evening: to a nightlife strip near by (js/nightlife.js), as lively as the night is
       x: 0,
       z: 0,
       prevX: 0,
@@ -144,12 +146,30 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     for (const p of peds) if (p.placed) atCurb(p);
   }
 
+  /** The track (of `tracks`) nearest (x, z). */
+  function nearestTrack(tracks, x, z) {
+    let best = tracks[0], bestD = Infinity;
+    for (const t of tracks) {
+      const s = clamp((x - t.ax) * t.ux + (z - t.az) * t.uz, 0, t.len);
+      const d = Math.hypot(t.ax + t.ux * s - x, t.az + t.uz * s - z);
+      if (d < bestD) { bestD = d; best = t; }
+    }
+    return best;
+  }
+
   // Try crosswalks first for crossing pedestrians, then fall back to sidewalks if no suitable crossing fits.
   function spawnPed(p, rMin, rMax, protectView) {
+    const hot = p.nightOwl && Math.random() < nightlife.level ? nightlife.hotspotNear(focusX, focusZ, rMax) : null;
+    const hotPaths = hot ? pedRoutes.pathsNear(hot.x, hot.z, hot.r).filter((t) => t.hot) : null;
     for (let attempt = 0; attempt < 10; attempt++) {
       const crosswalk = p.crossesStreets && nearSignals.length > 0 && attempt < 5;
-      const paths = p.parkWalker && attempt < 5 ? pedRoutes.pathsNear(focusX, focusZ, rMax) : null;
-      const ok = paths?.length
+      const fromDoor = !!hotPaths?.length && attempt < 6;
+      // a night owl comes out of the door of one of the strip's venues, onto the strip's footway nearest it
+      const door = fromDoor ? nightlife.venues[hot.venues[Math.floor(Math.random() * hot.venues.length)]] : null;
+      const paths = fromDoor ? null : p.parkWalker && attempt < 5 ? pedRoutes.pathsNear(focusX, focusZ, rMax) : null;
+      const ok = door
+        ? pathTrack(nearestTrack(hotPaths, door.x, door.z))
+        : paths?.length
         ? pathTrack(paths[Math.floor(Math.random() * paths.length)])
         : crosswalk
         ? crosswalkTrack(nearSignals[Math.floor(Math.random() * nearSignals.length)])
@@ -158,11 +178,18 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
       const along = (focusX - track.ax) * track.ux + (focusZ - track.az) * track.uz;
       const minT = Math.max(0, along - rMax), maxT = Math.min(track.len, along + rMax);
       if (minT > maxT) continue;
-      const t = crosswalk ? (Math.random() < 0.5 ? Math.random() * KERB : track.len - Math.random() * KERB) : minT + Math.random() * (maxT - minT);
+      let t = crosswalk ? (Math.random() < 0.5 ? Math.random() * KERB : track.len - Math.random() * KERB) : minT + Math.random() * (maxT - minT);
+      if (door) {
+        // the point of the footway beside the door (the whole strip is often in view, and near the player, so the usual
+        // out-of-sight rule would keep it empty; a guest leaving a club 30 m off in the dark is no pop)
+        const s = (door.x - track.ax) * track.ux + (door.z - track.az) * track.uz;
+        if (s < 0 || s > track.len || Math.abs((door.x - track.ax) * track.uz - (door.z - track.az) * track.ux) > 12) continue;
+        t = s;
+      }
       const x = track.ax + track.ux * t;
       const z = track.az + track.uz * t;
       const d = Math.hypot(x - focusX, z - focusZ);
-      if (d < rMin || d > rMax || (protectView && nearView(x, z, 2, PED_SPAWN_DISTANCE))) continue;
+      if (door ? d < Math.min(rMin, 25) || d > rMax || (protectView && nearView(x, z, 2, 30)) : d < rMin || d > rMax || (protectView && nearView(x, z, 2, PED_SPAWN_DISTANCE))) continue;
       if (player.active && Math.hypot(x - player.x, z - player.z) < 10) continue;
       if (crosswalk && track.node.curb.some((q) => Math.hypot(q.x - x, q.z - z) < QUEUE_GAP)) continue;
       if (p.conversation) endConversation(p.conversation);
@@ -383,10 +410,19 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     if (p.pause > 0) p.pause = Math.max(0, p.pause - dt);
     const ahead = p.dir > 0 ? p.len - p.t : p.t;
     if (clock >= p.goalTime || Math.hypot(p.x - p.goalX, p.z - p.goalZ) < 25) {
-      const destination = nearEdges[Math.floor(Math.random() * nearEdges.length)];
-      p.goalX = destination ? destination.sx + destination.dx * destination.len * 0.5 : p.x;
-      p.goalZ = destination ? destination.sz + destination.dz * destination.len * 0.5 : p.z;
-      p.goalTime = clock + 120 + Math.random() * 180;
+      const hot = p.nightOwl && nightlife.level > 0 ? nightlife.hotspotNear(p.x, p.z, 150) : null;
+      if (hot) {
+        // out for the night: from bar to bar along the strip
+        const a = Math.random() * Math.PI * 2, r = Math.random() * hot.r * 0.7;
+        p.goalX = hot.x + Math.cos(a) * r;
+        p.goalZ = hot.z + Math.sin(a) * r;
+        p.goalTime = clock + 40 + Math.random() * 60;
+      } else {
+        const destination = nearEdges[Math.floor(Math.random() * nearEdges.length)];
+        p.goalX = destination ? destination.sx + destination.dx * destination.len * 0.5 : p.x;
+        p.goalZ = destination ? destination.sz + destination.dz * destination.len * 0.5 : p.z;
+        p.goalTime = clock + 120 + Math.random() * 180;
+      }
     }
     if (!p.nextRoute && p.route && ahead < 4) {
       p.nextRoute = pedRoutes.next(p.route, p.dir, p.goalX, p.goalZ);
@@ -396,6 +432,10 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     if (!p.node && p.route?.edge && p.t > 6 && p.t < p.len - 6 && clock >= p.restTime) {
       p.pause = 1.5 + Math.random() * 3;
       p.restTime = clock + 35 + Math.random() * 55;
+    } else if (p.route?.hot && p.t > 2 && p.t < p.len - 2 && clock >= p.restTime && nightlife.level > 0) {
+      // outside the bars people stop, stand about and look in, longer the later it is
+      p.pause = (3 + Math.random() * 9) * nightlife.level;
+      p.restTime = clock + 12 + Math.random() * 25;
     }
     let vMax = avoiding ? p.avoidSpeed : p.pause > 0 || p.conversation ? 0 : p.speed;
     if (!p.nextRoute) vMax = Math.min(vMax, Math.sqrt(2 * brake * ahead));
@@ -588,11 +628,15 @@ function createPedestrianSystem(initialNetwork, { player, nearEdges, nearSignals
     for (const n of walkedNodes) n.walkers.length = 0;
     walkedNodes.length = 0;
     let pedBudget = jump ? NUM_PEDS : 6;
+    // with a nightlife strip near by after dark, a night owl walking elsewhere out of sight now and then goes there instead
+    const hotNear = nightlife.level > 0 ? nightlife.hotspotNear(focusX, focusZ, 280) : null;
     for (let scanned = 0; scanned < NUM_PEDS && pedBudget > 0; scanned++) {
       const p = peds[pedCursor];
       pedCursor = (pedCursor + 1) % NUM_PEDS;
       const d = p.placed ? Math.hypot(p.x - focusX, p.z - focusZ) : Infinity;
-      if (d <= (jump ? NEAR_RADIUS : PED_RADIUS)) continue;
+      const recall = hotNear && p.nightOwl && p.placed && !p.route?.hot && !p.node && !p.conversation && d > 60
+        && Math.random() < 0.01 * nightlife.level && !nearView(p.x, p.z, 2, PED_SPAWN_DISTANCE);
+      if (d <= (jump ? NEAR_RADIUS : PED_RADIUS) && !recall) continue;
       pedBudget--;
       spawnPed(p, jump ? 0 : 60, jump ? NEAR_RADIUS : 280, !jump);
     }

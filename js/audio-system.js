@@ -2,6 +2,8 @@ import { createSynthResources, createMotorVoice, setControlRate } from './audio-
 import { createEventResources, playEvent, createWindVoice } from './audio-events.js';
 import { CityAudioSources } from './audio-sources.js';
 import { CityAcoustics } from './audio-acoustics.js';
+import { NightlifeAudio } from './nightlife-audio.js';
+import { nightlife } from './nightlife.js';
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const smooth = (param, value, now, time = 0.035, immediate = false) => {
@@ -96,7 +98,7 @@ class CityAudioSystem {
     this.enabled = true;
     try { this.enabled = localStorage.getItem('cph-sound') !== 'off'; } catch { /* Private browsing. */ }
     const smallDevice = navigator.hardwareConcurrency <= 4 || matchMedia('(pointer: coarse)').matches;
-    this.limits = smallDevice ? { motors: 6, sirens: 1, events: 5 } : { motors: 8, sirens: 2, events: 8 };
+    this.limits = smallDevice ? { motors: 6, sirens: 1, events: 5, venues: 2 } : { motors: 8, sirens: 2, events: 8, venues: 3 };
     this.motors = new Map();
     this.sirens = new Map();
     this.events = [];
@@ -179,6 +181,8 @@ class CityAudioSystem {
     this.reflectionFilter.Q.value = 0.5;
     this.reflections.connect(this.reverb).connect(this.reflectionFilter).connect(this.mix);
     this.wind = createWindVoice(context, this.resources, this.mix);
+    // the beats from the bars and clubs (js/nightlife-audio.js): only the venues nearest the listener play
+    this.nightlife = new NightlifeAudio(context, this.mix, this.reflections, this.acoustics, SpatialEmitter, this.limits.venues);
     context.onstatechange = () => this.onStateChange();
   }
 
@@ -209,6 +213,7 @@ class CityAudioSystem {
     }
     for (const event of this.events) { event.voice.dispose(true); event.emitter.dispose(); }
     this.events.length = 0;
+    this.nightlife?.reset();
     this.conversations = new WeakMap();
     this.states = new WeakMap();
     this.collisionPairs = new WeakMap();
@@ -492,6 +497,12 @@ class CityAudioSystem {
     }
     Object.assign(this.windParams, { speed: Math.min(sources.motion, 50), altitude: position.y, traffic: sources.traffic, night: night ? 1 : 0, enclosure });
     this.wind.update(this.windParams, now);
+    this.nightlife.update(this.listener, now, nightlife);
+  }
+
+  /** The clock the beats run on (s): the audio clock while sound plays, else null (js/nightlife-scene.js keeps its own). */
+  get beatClock() {
+    return this.context?.state === 'running' && this.ready && this.enabled ? this.context.currentTime : null;
   }
 
   dispose() {
@@ -502,6 +513,7 @@ class CityAudioSystem {
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.reset();
     this.wind?.dispose(true);
+    this.nightlife?.dispose();
     for (const node of [this.mix, this.compressor, this.master, this.reflections, this.reverb, this.reflectionFilter]) node?.disconnect();
     if (this.context) {
       this.context.onstatechange = null;
@@ -510,4 +522,4 @@ class CityAudioSystem {
   }
 }
 
-export { CityAudioSystem };
+export { CityAudioSystem, SpatialEmitter };
