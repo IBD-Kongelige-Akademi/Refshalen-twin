@@ -48,6 +48,7 @@ unpacked data (local dev)                data/tiles/<id>/overrides.json, data/ov
         "textureBytes": 349524,               // RGBA8 + full mip chain (js/facade-lod.js estimateTextureBytes): what the budget counts
         "gpuBytes": 7400                      // vertex + index buffers
       },
+      "walk": { "decks": [...], "solids": [...] }, // optional, see Walking on and around an override
       "details": { ... }                      // optional, see Parametric details
     }
   }
@@ -80,6 +81,22 @@ Each value of v is in metres above the building record's `ground` (local frame),
 
 `js/detail-overrides.js detailGeometry` draws them in one vertex-coloured mesh per tile. An opening is a framed dark pane a few cm in front of the generated wall (the generated wall has no holes). A cornice is a box along the edge. A dormer is a box with a window face, set inward from the eave edge. A chimney is a box.
 
+### (c) Walking on and around an override
+
+A mesh can bring ground that the twin's terrain does not have, such as a terrace on walls. The entry's optional `walk` holds it, in the local frame:
+
+```jsonc
+"walk": {
+  "decks": [{ "id": "gdk:1019237254:terrace", "ring": [x, z, ...], "axes": [{ "pts": [x, z, deck y, ground y, ...] }], "solid": true }],
+  "solids": [{ "ring": [x, z, ...], "top": 6.0 }]
+}
+```
+
+- **`decks`** use the bridge decks' format (js/deck-field.js): a point inside `ring` takes the height of the nearest point of its axes, so an axis of at least two points gives a flat terrace or a ramp for a flight. Stairs are ramps underfoot. A deck under the terrain loses to the terrain, so a flight's foot runs into the ground. With `solid`, a deck has no underneath: what stands below it inside the outline is lifted onto it, which covers a tile that comes in after someone was placed there.
+- **`solids`** are closed footprints up to `top`: colliders, and left out of the walk space. Each must be at least as thick as the collision sweep needs, and 0.2 m walls hold.
+
+`overrideDecks()` hands the decks to the deck field (layer `override-decks`, near ring), and `overrideFootprints()` appends the solids to the buildings. Both follow the mesh, so they end when the tile leaves the near ring. The format number stays the same, because an engine that ignores `walk` still draws the mesh correctly.
+
 ## Engine
 
 - **Rings.** `overrides` is in `RING_LAYERS.near` only (js/tile-rings.js). A near tile builds its mesh overrides in place of the generated buildings they cover. A mid tile never loads them, and draws the generated building with its measured tones. The swap therefore happens with the near/mid rebuild that already swaps the photo walls. There is no popping inside the near ring, because a covered building is never built there.
@@ -89,7 +106,7 @@ Each value of v is in metres above the building record's `ground` (local frame),
 - **Dispose.** The tile disposes its overrides with everything else: geometries, materials, textures and decoded bitmaps. The budget is released at the same time.
 - **Colliders and walk space.** `overrideFootprints()` keeps the gdk footprints when an entry says `footprint.use: "gdk"`. With `"override"`, the entry's own ring takes the place of every building it covers, in the static colliders (near ring) and in the walk space (rebuilt when the tile changes ring).
 - **Picking and info.** An override's group carries `userData.buildingId`. The info panel shows the gdk record plus a `Detail model` row (set, IoU, confidence) and the attribution keys with their licences.
-- **Switches.** `?overrides=0` turns the layer off (the "before" of a comparison). `?overrides=details` draws only the parametric details on the generated buildings.
+- **Switches.** `?overrides=0` turns the layer off (the "before" of a comparison), including its footprints, decks and solids. `?overrides=details` draws only the parametric details on the generated buildings.
 
 ## Mapping (source footprints to gdk ids)
 

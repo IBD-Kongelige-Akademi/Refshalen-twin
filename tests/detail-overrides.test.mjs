@@ -5,8 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
-  OVERRIDE, OVERRIDE_FORMAT, readOverrideLayer, createOverrideBudget, createOverrideBudgetLease, admitOverrides, overrideFootprints, ringEdge, detailGeometry, overridesMode, attributionLines
+  OVERRIDE, OVERRIDE_FORMAT, readOverrideLayer, createOverrideBudget, createOverrideBudgetLease, admitOverrides, overrideDecks, overrideFootprints, ringEdge, detailGeometry, overridesMode, attributionLines
 } from '../js/detail-overrides.js';
+import { buildStaticColliders } from '../js/static-colliders.js';
+import { createDeckField, withDecks } from '../js/deck-field.js';
 import { encodePack, readPack, createAtlasSource, setAtlasSource, gzip } from '../js/data-packs.js';
 import { RING_LAYERS } from '../js/tile-rings.js';
 import { openTileStore } from '../js/tile-store.js';
@@ -94,6 +96,39 @@ test('colliders and walk space keep the generated footprint unless the override 
   assert.deepEqual(out[0].ring, square(0, 0, 20));
   assert.ok(out[0].footprintOverride);
   assert.equal(overrideFootprints(buildings, merged, () => false), buildings, 'an override that is not shown changes nothing');
+});
+
+test('an override brings its terrace and walls: decks to stand on, solids that stop walkers', () => {
+  const ring = [0, 0, 10, 0, 10, 0.2, 0, 0.2];
+  const deck = { id: 'gdk:9:terrace', ring: [0, 0, 10, 0, 10, 10, 0, 10], axes: [{ pts: [5, 0, 7, 3, 5, 10, 7, 3] }] };
+  const payload = (walk) => ({ format: OVERRIDE_FORMAT, tile: 't', buildings: { 'gdk:9': { mode: 'replace', mesh: { path: 'm.glb', textureBytes: 1 }, covers: ['gdk:9'], footprint: { use: 'gdk' }, walk } } });
+  const buildings = [{ id: 'gdk:9', ring: [0, 0, 1, 0, 1, 1] }];
+  const layer = readOverrideLayer(payload({ decks: [deck], solids: [{ ring, top: 8 }] }));
+  const out = overrideFootprints(buildings, layer);
+  assert.equal(out.length, 2);
+  assert.equal(out[0], buildings[0], 'the building itself stays');
+  assert.deepEqual(out[1].ring, ring);
+  assert.ok(!Number.isFinite(out[1].base), 'closed: walk space keeps people out of it');
+  const collider = buildStaticColliders({ buildings: [out[1]] }, {}).find((c) => c.id.includes('#solid0'));
+  assert.ok(collider, 'a wall 0.2 m thick survives the ring cleaning');
+  assert.ok(Math.abs(collider.maxY - 8) < 1e-9, 'a collider up to the top');
+  assert.equal(overrideFootprints(buildings, layer, () => false), buildings, 'an override that is not shown brings nothing');
+  assert.deepEqual(overrideDecks(layer), [deck]);
+  assert.deepEqual(overrideDecks(layer, () => false), []);
+  assert.deepEqual(overrideDecks(null), []);
+  assert.equal(overrideFootprints(buildings, readOverrideLayer(payload(undefined))), buildings, 'no walk: the very same records');
+
+  const field = createDeckField();
+  field.add('override:t', overrideDecks(layer));
+  const ground = withDecks(field, { heightAt: () => 3, terrainAt: () => 3 });
+  assert.equal(ground.heightAt(5, 5), 7, 'a person placed there stands on the terrace');
+  assert.equal(ground.levelAt(5, 5, 7, true), 7, 'walks on it');
+  assert.equal(ground.levelAt(5, 5, 3, true), 3, 'and from far below does not jump up to it');
+  field.remove('override:t');
+  assert.equal(ground.heightAt(5, 5), 3);
+  field.add('override:t', [{ ...deck, solid: true }]);
+  assert.equal(ground.levelAt(5, 5, 3, true), 7, 'a solid deck has no underneath: a person it arrived over is lifted onto it');
+  assert.equal(ground.levelAt(20, 5, 3, true), 3, 'off the deck the ground holds');
 });
 
 test('ring edges: unit direction, length and an outward normal for either winding', () => {

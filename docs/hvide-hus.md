@@ -48,7 +48,8 @@ drawn heights.
 - **East block.** White cladding in courses, three tiers of recessed openings with real depth, deep loggias at the foot, the apse's piers, ring beams and curved
   glass, the ribbed metal vault with its skylight, four coolers.
 - **Terrace.** Flame-cut granite in quarter bond at kote 8.83, the clipped beech on its bank down to the wall on the park's boundary, the mirror pool, the plinth, the
-  dark disc in the apse's mouth, white walls, stairs down to the park at both ends through kote 7.00 to kote 4.70.
+  dark disc in the apse's mouth, white walls, stairs down to the park at both ends through kote 7.00 towards kote 4.70, in open wells in the paving, with cheeks that fall with
+  the lower flights.
 
 The balcony walls are one texture of two rooms (5.1 m and 3.6 m) in four variants, so floors differ in their blinds and curtains.
 
@@ -64,13 +65,25 @@ About 6,600 triangles, 14 draw calls, a 0.4 MB GLB, 11.2 MB of the 32 MB overrid
 | Open stairs behind the block's end openings, and down from the terrace at s 12-16 and 34-38 | Dark openings | Their flights and the terrace's stair wells are not modelled |
 | Planting holes, lamps, furniture on the terrace (LA.02) | Left out | The twin's vegetation and furniture layers look after those |
 | Stairs at the terrace's ends | Simplified to one upper and one lower flight | The drawn fan of steps is finer than the twin needs |
+| Landing at kote 7.00 and foot at kote 4.70 | North landing h -1.83 (kote 7.00), foot h -3.58; south landing h -1.58, foot h -3.40 (h is metres from kote 8.83) | They stand on the twin's smoothed ground, which is higher there than the koter |
 | Signs ("Comwell Hotel Hvide Hus", "HOTEL") | Left out | Not on the drawings |
+
+## Walking
+
+The twin's ground under the terrace stays as it is, 0.2-3.3 m below the paving (median 0.8 m). The override entry's `walk` carries what people use instead (docs/detail-overrides.md):
+
+- **Decks.** The terrace, the two wells with their upper flights and landings, and the two lower flights stand in the deck field that also carries the bridges. They are marked `solid`, so someone who is inside the outline when the tile comes in is lifted onto the paving, not left under it.
+- **Solids.** The bank with its hedge, the terrace's end walls, the cross walls against the podium, the wells' parapets, the north cheek and the plinth stop walkers and keep them out of the walk space. The hotel itself keeps its GeoDanmark footprint as collider.
+- **The way up.** From the park the terrace is reached only by the two stairs. There is no way through the hotel. The OSM footway at u = 50 now runs on the paving.
+
+The south upper flight now follows LA.05: v 42.3-45.9, with the landing at v 45.9-49.2. It used to overrun the terrace's end wall. The paving no longer covers the wells.
+
+Walked in the viewer as the person: down and up the north stair, down the south stair, and against the hedge wall, the parapet, the block, both end walls from outside, the bank from the park and the north cheek. A walker steps about 0.5 m up over about a metre at the north foot, on the lower side of the flight, where the ground falls away from the stair's level foot.
+
+![The south stair from the park](hvide-hus/stairs.jpg)
 
 ## Known limits
 
-- **Walking on the terrace.** The paving is drawn at kote 8.83, but the twin's ground under it is not raised: it lies 0.2-3.3 m lower (median 0.8 m), and the bank and
-  stairs are drawn over ground 2-3 m lower still. Walkers, cars and collisions keep to that ground, so someone walking there goes through the paving, and the hedge and
-  terrace walls do not stop them. Colliders keep the GeoDanmark footprint.
 - **The lower ground.** The ground on the north and south sides lies about 3 m under the ground floor, which the drawings do not show. The podium's stone band runs down to
   it. The white wall and piers along the south side, which the 2021 photographs show, are not modelled, and the north escape stair's upper flights stand on long posts.
 - **The terrace's south stairs** follow the plans. The 2021 photographs do not confirm them, because trees hide that corner.

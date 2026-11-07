@@ -5,7 +5,7 @@
 // A tile's `overrides` layer (near ring only, in the detail packs) holds per GeoDanmark id one entry:
 //   mode 'replace'  a mesh (a compact GLB: quantised attributes, webp textures) replaces the generated walls, roof, photo atlas and doors of
 //                   the building and of every id in `covers`; colliders and walk space follow `footprint` ('gdk': unchanged, 'override':
-//                   the entry's ring)
+//                   the entry's ring), and an optional `walk` adds what people stand on and what stops them around it
 //   mode 'details'  parametric details (openings on wall edges, cornices, dormers, chimneys) are added to the generated building
 // `details` may come with a mesh too (`baked: true`: the mesh carries them); they are then drawn only when the mesh is not shown (its load
 // failed, or the texture budget did not admit it), so the building never goes back to bare walls.
@@ -161,19 +161,37 @@ export function admitOverrides(layer, cam, budget, p = budget?.p || OVERRIDE) {
  */
 export function overrideFootprints(buildings, layer, shown = null) {
   if (!layer?.entries.size) return buildings;
+  const solids = [];
+  for (const e of layer.entries.values()) {
+    if (!e.mesh || (shown && !shown(e.id))) continue;
+    // an entry's `walk.solids` (a terrace's walls, a hedge) stand beside the building: a closed footprint up to `top` (a collider ends 0.45 m over a record's eave)
+    (e.walk?.solids || []).forEach((s, i) => solids.push({ id: `${e.id}#solid${i}`, ring: s.ring, holes: [], eave: s.top - 0.45, roof: 'flat', walkSolid: true }));
+  }
   const swap = new Map(); // covered id -> replacement record (or null: covered by another building's replacement)
   for (const e of layer.entries.values()) {
     if (!e.mesh || e.footprint?.use !== 'override' || !e.footprint.ring?.length || (shown && !shown(e.id))) continue;
     for (const c of e.covers) swap.set(c, null);
     swap.set(e.id, { id: e.id, ring: e.footprint.ring, holes: e.footprint.holes || [], override: true });
   }
-  if (!swap.size) return buildings;
+  if (!swap.size && !solids.length) return buildings;
   const out = [];
   for (const b of buildings) {
     if (!swap.has(b.id)) { out.push(b); continue; }
     const r = swap.get(b.id);
     if (r) out.push({ ...b, ring: r.ring, holes: r.holes, footprintOverride: true });
   }
+  out.push(...solids);
+  return out;
+}
+
+/**
+ * The walkable surfaces an override brings (its `walk.decks`: a terrace and its stairs over a lower ground), in the bridge decks' format (js/deck-field.js), so that people
+ * stand on them and what is under them stays under them. `layer` = readOverrideLayer(...) or null; `shown` as in overrideFootprints.
+ */
+export function overrideDecks(layer, shown = null) {
+  if (!layer?.entries.size) return [];
+  const out = [];
+  for (const e of layer.entries.values()) if (e.mesh && (!shown || shown(e.id))) out.push(...(e.walk?.decks || []));
   return out;
 }
 

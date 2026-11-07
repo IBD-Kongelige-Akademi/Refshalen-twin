@@ -46,6 +46,82 @@ def test_the_terrace_keeps_the_koter_of_the_landscape_plans(parts):
     assert hedge[:, 1].min() == pytest.approx(6.64 - 8.83)
 
 
+def test_the_terrace_can_only_be_left_by_its_stairs():
+    """Walk the surfaces from the terrace's middle, stopped by the solids: the way out is the stairs' feet, or a wall of the hotel itself."""
+    from shapely import contains_xy
+    from shapely.geometry import Polygon
+    from shapely.ops import unary_union
+
+    decks = unary_union([Polygon(ring).buffer(0.001) for _, ring, _ in H.walk_surfaces()])
+    solids = H.walk_solids()
+    step = 0.13  # under a wall's thickness
+    solid = lambda u, v: any(u0 < u < u1 and v0 < v < v1 for u0, u1, v0, v1, _ in solids)
+    start = (int(50.0 / step), int(25.0 / step))
+    assert contains_xy(decks, start[0] * step, start[1] * step)
+    seen = {start}
+    todo = [start]
+    exits = set()
+    while todo:
+        i, j = todo.pop()
+        for a, b in ((i + 1, j), (i - 1, j), (i, j + 1), (i, j - 1)):
+            if (a, b) in seen:
+                continue
+            seen.add((a, b))
+            u, v = a * step, b * step
+            if solid(u, v):
+                continue
+            if contains_xy(decks, u, v):
+                todo.append((a, b))
+            else:
+                exits.add((u, v))
+    assert len(seen) > 30000, "the walk covers the terrace"
+    feet = [(u, v) for u, v in exits if u >= H.TERR_E + H.STAIR_RUN - .2]
+    assert any(v < 10 for _, v in feet) and any(v > 40 for _, v in feet), "both stairs reach the park"
+    hotel = [(u, v) for u, v in exits if (u <= H.BLOCK_E + .2 and H.BLOCK_N - .2 <= v <= H.BLOCK_S + .2) or (u <= H.PE and H.GN - .2 <= v <= H.GS + .2)]
+    assert sorted(exits - set(feet) - set(hotel)) == []
+
+
+def test_the_walk_has_no_step_a_person_could_not_take():
+    from shapely.geometry import Point, Polygon
+
+    surfaces = [(Polygon(ring), axis) for _, ring, axis in H.walk_surfaces()]
+
+    def height(u, v):
+        for poly, axis in surfaces:
+            if poly.intersects(Point(u, v)):
+                best, y = 1e9, None
+                for (au, av, ah), (bu, bv, bh) in zip(axis, axis[1:]):
+                    du, dv = bu - au, bv - av
+                    t = max(0.0, min(1.0, ((u - au) * du + (v - av) * dv) / (du * du + dv * dv)))
+                    d = (au + du * t - u) ** 2 + (av + dv * t - v) ** 2
+                    if d < best:
+                        best, y = d, ah + (bh - ah) * t
+                return y
+        return None
+
+    # down the north stair and down the south one, from the terrace to the foot
+    for route in (((50.3, 20.0), (50.3, 1.0), (58.0, 1.0)), ((50.3, 30.0), (50.3, 47.5), (58.0, 47.5))):
+        last = None
+        for (u0, v0), (u1, v1) in zip(route, route[1:]):
+            for t in np.linspace(0, 1, 120):
+                y = height(u0 + (u1 - u0) * t, v0 + (v1 - v0) * t)
+                assert y is not None
+                if last is not None:
+                    assert abs(y - last) < 0.25
+                last = y
+        assert last == pytest.approx(H.PARK, abs=0.01)
+
+
+def test_the_stair_wells_are_open_to_the_sky(parts):
+    pave = parts["paving"]["p"].reshape(-1, 3, 3)
+    flat = pave[np.ptp(pave[:, :, 1], axis=1) < 1e-6]
+    at_deck = flat[np.abs(flat[:, 0, 1] - 0.02) < 1e-6]
+    centre = at_deck.mean(axis=1)
+    for v0, v1 in ((H.TERR_N, H.STAIRS[0][0]), (H.STAIRS[1][0], H.TERR_S)):
+        inside = (centre[:, 0] > H.WELL_U) & (centre[:, 0] < H.TERR_E) & (centre[:, 2] > v0) & (centre[:, 2] < v1)
+        assert not inside.any(), "no paving over the well"
+
+
 def test_every_face_looks_the_way_its_normal_says(parts):
     for name, q in parts.items():
         p = q["p"].reshape(-1, 3, 3)

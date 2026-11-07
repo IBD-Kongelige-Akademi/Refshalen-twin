@@ -72,6 +72,13 @@ HEDGE = (6.2, 45.9, 52.0, 57.85)  # v0, v1, u0, u1: the clipped beech on its ban
 K = lambda kote: kote - 8.83  # a kote on the plans as h
 HEDGE_TOP, HEDGE_FOOT, WALL_FOOT, PARK = K(9.83), K(6.64), K(6.00), K(4.70)
 LANDING = K(7.00)
+# the stairs at the terrace's ends (LA.05): a flight in a well in the terrace's edge, down to the landing, and the flight on towards the park. v at the flight's top, at the
+# landing, at the landing's end, and the lower flight's width. The drawn fan of steps is simplified to one flight.
+WELL_U, STEPS, STAIR_RUN = 48.7, 12, 6.0
+STAIRS = ((HEDGE[0], HEDGE[0] - 3.6, TERR_N, (TERR_N, HEDGE[0])), (HEDGE[1] - 3.6, HEDGE[1], TERR_S, (HEDGE[1], TERR_S)))
+LEVELS = ((LANDING, PARK), (LANDING, PARK))  # per stair (landing h, foot h): the koter; stair_levels sets them on the twin's ground
+WALL_T, PARAPET = 0.2, 0.9
+WALL_W = PE - 1.5  # the terrace's walls start here, against the podium
 POOL = (39.8, 42.0, 3.0, 9.9, K(8.78))
 PLINTH = (39.0, 44.0, 40.2, 41.0)
 
@@ -413,9 +420,10 @@ def add_vault(m):
 
 
 # ----------------------------------------------------------------------------------------------------------------------------------------------- the terrace
-def add_terrace(m, deck):
+def add_terrace(m, deck, levels=None):
     """The granite terrace, its hedge on the bank, its walls, pool and stairs (LA.02-LA.06). `deck`: its height (h)."""
-    pieces = [(BLOCK_E, TERR_E, TERR_N, TERR_S), (PE - 1.3, BLOCK_E, TERR_N, BLOCK_N), (PE - 1.3, BLOCK_E, BLOCK_S, TERR_S)]
+    n_top, s_top = STAIRS[0][0], STAIRS[1][0]
+    pieces = [(BLOCK_E, TERR_E, n_top, s_top), (BLOCK_E, WELL_U, TERR_N, n_top), (BLOCK_E, WELL_U, s_top, TERR_S), (WALL_W + WALL_T, BLOCK_E, TERR_N, BLOCK_N), (WALL_W + WALL_T, BLOCK_E, BLOCK_S, TERR_S)]
     for u0, u1, v0, v1 in pieces:
         m.poly('paving', [(u0, deck, v0), (u1, deck, v0), (u1, deck, v1), (u0, deck, v1)], UP)
     # the belægningsskifte: the darker disc in the apse's mouth
@@ -433,7 +441,7 @@ def add_terrace(m, deck):
     u0, u1, v0, v1 = PLINTH
     m.box('paving', (u0, deck, v0), (u1, deck + .45, v1), skip=('b',))
     add_hedge(m, deck)
-    add_terrace_stairs(m, deck)
+    add_terrace_stairs(m, deck, levels)
 
 
 def add_hedge(m, deck):
@@ -451,54 +459,66 @@ def add_hedge(m, deck):
     m.box('stone', (u1, PARK - .3, v0), (u1 + .2, HEDGE_FOOT + 0.05, v1), skip=('b',))
 
 
-def add_terrace_stairs(m, deck):
-    """Down to the park at both ends of the terrace, in granite with white cheeks: from the terrace along the hedge's end to a landing at kote 7.00, then out to kote 4.70."""
-    for sgn, v_end, v_out in ((1, HEDGE[0], TERR_N), (-1, HEDGE[1], TERR_S)):
-        # the upper flight, in the terrace's edge
-        n = 12
-        u0, u1 = 48.7, TERR_E
-        run = 0.3
+def sloped_wall(m, u0, u1, v0, v1, y0, top0, top1):
+    """A wall along u whose top falls from top0 at u0 to top1 at u1: beside a flight, so that it stays a parapet all the way down."""
+    for v, sgn in ((v0, -1), (v1, 1)):
+        m.poly('stone', [(u0, y0, v), (u1, y0, v), (u1, top1, v), (u0, top0, v)], (0, 0, sgn))
+    m.poly('stone', [(u0, top0, v0), (u1, top1, v0), (u1, top1, v1), (u0, top0, v1)], UP)
+    m.poly('stone', [(u1, y0, v0), (u1, y0, v1), (u1, top1, v1), (u1, top1, v0)], (1, 0, 0))
+
+
+def add_terrace_stairs(m, deck, levels=None):
+    """Down to the park at both ends of the terrace, in granite with white cheeks (LA.05): a flight in a well in the terrace's edge to a landing at kote 7.00, then a flight
+    out towards the park. The landing and the foot are where stair_levels puts them on the twin's ground."""
+    levels = levels or LEVELS
+    for sgn, (v_top, v_land, v_out, lower), (landing, foot) in zip((1, -1), STAIRS, levels):
+        u0, u1 = WELL_U, TERR_E
+        n = STEPS
+        run = abs(v_top - v_land) / n
         for k in range(n):
-            v_a = v_end - sgn * k * run
-            v_b = v_end - sgn * (k + 1) * run
-            y = deck + (LANDING - deck) * (k + 1) / n
+            v_a = v_top - sgn * k * run
+            v_b = v_top - sgn * (k + 1) * run
+            y = deck + (landing - deck) * (k + 1) / n
             m.poly('paving', [(u0, y, min(v_a, v_b)), (u1, y, min(v_a, v_b)), (u1, y, max(v_a, v_b)), (u0, y, max(v_a, v_b))], UP)
-            ya = deck + (LANDING - deck) * k / n
+            ya = deck + (landing - deck) * k / n
             m.poly('paving', [(u0, ya, v_a), (u1, ya, v_a), (u1, y, v_a), (u0, y, v_a)], (0, 0, -sgn))
-        v_land = v_end - sgn * n * run
         a, b = sorted((v_land, v_out))
-        m.poly('paving', [(u0, LANDING, a), (TERR_E, LANDING, a), (TERR_E, LANDING, b), (u0, LANDING, b)], UP)
+        m.poly('paving', [(u0, landing, a), (TERR_E, landing, a), (TERR_E, landing, b), (u0, landing, b)], UP)
         # the lower flight, out towards the park
         n2 = 15
-        c, d = sorted((v_out, v_end))
+        c, d = lower
         for k in range(n2):
-            e0, e1 = TERR_E + k * 0.4, TERR_E + (k + 1) * 0.4
-            ya = LANDING + (PARK - LANDING) * k / n2
-            yb = LANDING + (PARK - LANDING) * (k + 1) / n2
+            e0, e1 = TERR_E + k * STAIR_RUN / n2, TERR_E + (k + 1) * STAIR_RUN / n2
+            ya = landing + (foot - landing) * k / n2
+            yb = landing + (foot - landing) * (k + 1) / n2
             m.poly('paving', [(e0, yb, c), (e1, yb, c), (e1, yb, d), (e0, yb, d)], UP)
             m.poly('paving', [(e0, ya, c), (e0, ya, d), (e0, yb, d), (e0, yb, c)], (1, 0, 0))
-        # the white cheeks
-        for v in (v_out,):
-            m.box('stone', (u0 - .2, PARK - .3, min(v, v - sgn * 0.2)), (TERR_E + n2 * .4, deck + 1.0, max(v, v - sgn * 0.2)), skip=('b',))
-        # the wall from the block to the stair
-        vw = v_out
-        m.box('stone', (PE - 1.3, PARK - .3, min(vw, vw - sgn * .2)), (u0 - .2, deck + 1.0, max(vw, vw - sgn * .2)), skip=('b',))
+        # the wall on the terrace's end, as far as the flight, and from there the cheek that falls with it
+        w0, w1 = sorted((v_out, v_out - sgn * WALL_T))
+        m.box('stone', (WALL_W, PARK - .3, w0), (TERR_E, deck + 1.0, w1), skip=('b',))
+        sloped_wall(m, TERR_E, TERR_E + STAIR_RUN, w0, w1, PARK - .3, landing + PARAPET, foot + PARAPET)
         # and across, from that wall to the podium, so that nobody sees under the paving (the ground beside it lies up to 3 m lower)
-        c0, c1 = sorted((vw, GN if sgn > 0 else GS))
-        m.box('stone', (PE - 1.5, PARK - .3, c0), (PE - 1.3, deck, c1), skip=('b', 't'))
-        # the sunken stair's side against the terrace
-        m.poly('stone', [(u0, deck, a), (u0, deck, b), (u0, LANDING - .05, b), (u0, LANDING - .05, a)], (1, 0, 0))
+        c0, c1 = sorted((v_out, GN if sgn > 0 else GS))
+        m.box('stone', (WALL_W, PARK - .3, c0), (WALL_W + WALL_T, deck, c1), skip=('b', 't'))
+        # the well's parapet against the terrace
+        p0, p1 = sorted((v_top, v_out))
+        m.box('stone', (WELL_U - WALL_T, landing - .05, p0), (WELL_U, deck + PARAPET, p1), skip=('b',))
+    # the wells' far sides: the hedge's wall over the south flight, and over the north flight, which stands above the flight below it, a parapet
+    (v_top, v_land, _, _), (landing, _) = STAIRS[1], levels[1]
+    m.poly('stone', [(TERR_E, landing - .05, v_top), (TERR_E, landing - .05, v_land), (TERR_E, deck, v_land), (TERR_E, deck, v_top)], (-1, 0, 0))
+    (v_top, v_land, _, _), (landing, _) = STAIRS[0], levels[0]
+    m.box('stone', (TERR_E, levels[0][1], v_land), (TERR_E + WALL_T, deck + PARAPET, v_top), skip=('b',))
 
 
-def build(hb=-1.0, deck=0.02):
-    """The hotel's model in its own frame. hb: how far its walls go down. deck: the height of the terrace's paving."""
+def build(hb=-1.0, deck=0.02, levels=None):
+    """The hotel's model in its own frame. hb: how far its walls go down. deck: the height of the terrace's paving. levels: the stairs' (stair_levels)."""
     m = Model()
     add_tower(m)
     add_lift(m, hb)
     add_podium(m, hb)
     add_wing_tops(m)
     add_block(m, hb)
-    add_terrace(m, deck)
+    add_terrace(m, deck, levels)
     return m
 
 
@@ -691,6 +711,78 @@ def terrace_deck(frame):
     return high
 
 
+# ------------------------------------------------------------------------------------------------------------------------------------------------- walking
+def terrace_ring():
+    """The terrace's walkable outline (u, v): the paving, less the block and the stair wells."""
+    (n_top, *_), (s_top, *_) = STAIRS
+    return [(WALL_W + WALL_T, TERR_N), (WELL_U, TERR_N), (WELL_U, n_top), (TERR_E, n_top), (TERR_E, s_top), (WELL_U, s_top), (WELL_U, TERR_S), (WALL_W + WALL_T, TERR_S),
+            (WALL_W + WALL_T, BLOCK_S), (BLOCK_E, BLOCK_S), (BLOCK_E, BLOCK_N), (WALL_W + WALL_T, BLOCK_N)]
+
+
+def walk_surfaces(deck=0.02, levels=None):
+    """What people walk on: (name, ring (u, v), axis [(u, v, h), ...]). A point's height is that of the nearest point of the axis, as on a bridge deck (js/deck-field.js)."""
+    levels = levels or LEVELS
+    mid = (WALL_W + TERR_E) / 2
+    out = [('terrace', terrace_ring(), [(mid, TERR_N, deck), (mid, TERR_S, deck)])]
+    uc = (WELL_U + TERR_E) / 2
+    for name, (v_top, v_land, v_out, lower), (landing, foot) in zip(('north', 'south'), STAIRS, levels):
+        a, b = sorted((v_top, v_out))
+        out.append((f'{name}-well', [(WELL_U, a), (TERR_E, a), (TERR_E, b), (WELL_U, b)], [(uc, v_top, deck), (uc, v_land, landing), (uc, v_out, landing)]))
+        c, d = lower
+        out.append((f'{name}-flight', [(TERR_E, c), (TERR_E + STAIR_RUN, c), (TERR_E + STAIR_RUN, d), (TERR_E, d)], [(TERR_E, (c + d) / 2, landing), (TERR_E + STAIR_RUN, (c + d) / 2, foot)]))
+    return out
+
+
+def walk_solids(deck=0.02):
+    """What stops them: (u0, u1, v0, v1, top h). The bank with its hedge, the terrace's walls from the ground up, the parapets of the wells, the seat."""
+    v_n, v_s = STAIRS[0], STAIRS[1]
+    return [
+        (TERR_E, HEDGE[3] + .2, HEDGE[0], HEDGE[1], HEDGE_TOP),
+        (WALL_W, TERR_E + STAIR_RUN, TERR_N - WALL_T, TERR_N, deck + 1.0),
+        (WALL_W, TERR_E + STAIR_RUN, TERR_S, TERR_S + WALL_T, deck + 1.0),
+        (WALL_W, WALL_W + WALL_T, TERR_N, GN, deck),
+        (WALL_W, WALL_W + WALL_T, GS, TERR_S, deck),
+        (WELL_U - WALL_T, WELL_U, TERR_N, v_n[0], deck + PARAPET),
+        (WELL_U - WALL_T, WELL_U, v_s[0], TERR_S, deck + PARAPET),
+        (TERR_E, TERR_E + WALL_T, v_n[1], v_n[0], deck + PARAPET),
+        (PLINTH[0], PLINTH[1], PLINTH[2], PLINTH[3], deck + .45),
+    ]
+
+
+def twin_xz(u, v):
+    a = math.radians(AXIS_DEG)
+    return ORIGIN[0] + u * math.cos(a) - v * math.sin(a), ORIGIN[1] + u * math.sin(a) + v * math.cos(a)
+
+
+def stair_levels(frame):
+    """Per stair (landing h, foot h): kote 7.00 and the twin's ground at the foot, as the twin's smoothed terrain stands up to 0.7 m above kote 4.70 there; the landing stands
+    just over its terrain, as the paving does."""
+    terrain = lambda u, v: frame.height_at(*twin_xz(u, v)) - GRADE_Y
+    out = []
+    for v_top, v_land, v_out, (c, d) in STAIRS:
+        a, b = sorted((v_land, v_out))
+        high = max(terrain(u, v) for u in np.arange(WELL_U, TERR_E + .1, .5) for v in np.arange(a, b + .1, .5))
+        foot = max(terrain(TERR_E + STAIR_RUN, v) for v in np.arange(c, d + .1, .5))
+        out.append((max(LANDING, high + .03), max(PARK, foot + .03)))
+    return tuple(out)
+
+
+def walk_layer(frame, deck, levels):
+    """The override entry's `walk`, in the twin's frame (docs/detail-overrides.md)."""
+    decks = []
+    for name, ring, axis in walk_surfaces(deck, levels):
+        pts = []
+        for u, v, h in axis:
+            x, z = twin_xz(u, v)
+            pts += [round(float(x), 3), round(float(z), 3), round(float(GRADE_Y + h), 3), round(float(frame.height_at(x, z)), 3)]
+        decks.append({'id': f'{GDK_ID}:{name}', 'ring': [round(float(c), 3) for u, v in ring for c in twin_xz(u, v)], 'axes': [{'pts': pts}], 'solid': True})
+    solids = []
+    for u0, u1, v0, v1, top in walk_solids(deck):
+        corners = [(u0, v0), (u1, v0), (u1, v1), (u0, v1)]
+        solids.append({'ring': [round(float(c), 3) for u, v in corners for c in twin_xz(u, v)], 'top': round(float(GRADE_Y + top), 3)})
+    return {'decks': decks, 'solids': solids}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--data', default=str(ROOT / 'data'))
@@ -704,7 +796,9 @@ def main():
     high = terrace_deck(frame)
     deck = max(0.02, high + 0.03)
     print(f'ground low {low:.2f}, terrain at most {high:+.2f} against kote 8.83 under the terrace, paving at {deck:+.2f}')
-    model = build(hb, deck)
+    levels = stair_levels(frame)
+    print('stairs (landing, foot):', [tuple(round(float(y), 2) for y in s) for s in levels])
+    model = build(hb, deck, levels)
     body, mesh, lo, hi = model_to_glb(model, AXIS_DEG, (ORIGIN[0], GRADE_Y, ORIGIN[1]), MATERIALS, TEXTURES, SET,
                                       root_extras={'building_id': GDK_ID, 'source_ids': list(ATTRIBUTION)[:3], 'attribution': list(ATTRIBUTION), 'confidence': 'observed'},
                                       asset_extras={'frame': 'twin local: x east, y up, z south', 'attribution': ATTRIBUTION},
@@ -713,7 +807,7 @@ def main():
     (out / 'meshes').mkdir(parents=True, exist_ok=True)
     (out / rel).write_bytes(body)
     entry = {
-        'tile': TILE, 'mode': 'replace', 'covers': [GDK_ID], 'footprint': {'use': 'gdk'},
+        'tile': TILE, 'mode': 'replace', 'covers': [GDK_ID], 'footprint': {'use': 'gdk'}, 'walk': walk_layer(frame, deck, levels),
         'match': {'kind': '1:1', 'iou': 0.93, 'hausdorff': 1.0},
         'source': {'ids': list(ATTRIBUTION)[:3], 'kind': 'architect-drawing', 'reconstruction': 'tools/overrides/hvide_hus.py'},
         'confidence': 'observed', 'attribution': list(ATTRIBUTION),

@@ -45,7 +45,7 @@ import { applyPlainGround } from './ground-shader.js';
 import { BODY_SPECS } from './actor-models.js';
 import { createCityCollisions, createCollisionActor } from './city-collisions.js';
 import { buildStaticColliders, createStaticIndex, createTiledStaticIndex } from './static-colliders.js';
-import { overrideFootprints } from './detail-overrides.js';
+import { overrideDecks, overrideFootprints, overridesMode } from './detail-overrides.js';
 
 // js/world.js
 // The Copenhagen world: a ground plane in the Copenhagen frame (docs/cph-geodata-schema.md) plus data/cph-geodata.json,
@@ -768,6 +768,10 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     layers.push({ name: 'structures', rings: ['near', 'mid'], add: (ctx) => structures.addTile(ctx.id, ctx.structures), remove: (id) => structures.removeTile(id) });
     globalThis.__structures = structures;
   }
+  // what the override meshes bring for people to walk: `?overrides=0` draws no mesh, so nothing of theirs is underfoot or in the way either
+  const shownOverrides = overridesMode() === 'on' ? (ctx) => ctx.overrides : () => null;
+  // a terrace and its stairs (an entry's `walk.decks`) stand in the deck field, each tile's apart from its bridges
+  layers.push({ name: 'override-decks', rings: ['near'], add: (ctx) => deckField.add(`override:${ctx.id}`, overrideDecks(shownOverrides(ctx))), remove: (id) => deckField.remove(`override:${id}`) });
   let roads = null;
   let walk = null;
   let walkLimits = null; // the carriageways, the water and the railway, where people do not walk (js/walk-limits.js)
@@ -790,7 +794,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
       name: 'walk', rings: ['near', 'mid'], fidelity: true,
       add: (ctx, ring) => {
         walk.removeBuildings(ctx.id);
-        walk.addBuildings(ctx.id, ring === 'near' ? overrideFootprints(ctx.ownBuildings, ctx.overrides) : ctx.ownBuildings);
+        walk.addBuildings(ctx.id, ring === 'near' ? overrideFootprints(ctx.ownBuildings, shownOverrides(ctx)) : ctx.ownBuildings);
         if (!walkLimits.has(ctx.id)) walkLimits.add(ctx.id, { roads: ctx.geo.roads || [], rails: ctx.structures?.rails || [], railAreas: ctx.structures?.railAreas || [], water: ctx.water?.bodies || [], footways: [...(ctx.geo.own?.roads || [])].filter((r) => r.class === 'footway'), green: ctx.water?.green || [] });
       },
       remove: (id) => { walk.removeBuildings(id); walkLimits.remove(id); }
@@ -804,7 +808,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   if (!flags.has('nobuildings')) {
     layers.push({
       name: 'colliders', rings: ['near'],
-      add: (ctx) => staticIndex.set(`b:${ctx.id}`, buildStaticColliders({ buildings: overrideFootprints(ctx.ownBuildings, ctx.overrides) }, { groundHeight: colliderGround })),
+      add: (ctx) => staticIndex.set(`b:${ctx.id}`, buildStaticColliders({ buildings: overrideFootprints(ctx.ownBuildings, shownOverrides(ctx)) }, { groundHeight: colliderGround })),
       remove: (id) => staticIndex.remove(`b:${id}`)
     });
   }

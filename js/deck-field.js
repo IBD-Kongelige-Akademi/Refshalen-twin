@@ -8,7 +8,7 @@
 // withDecks(field, g)   a ground model (heightAt / terrainAt) that stands on the decks: what static things drape on and the agents walk
 // levelAt(x, z, y)      the ground for something now at height y: the deck when it is at or above the deck's level (DECK_REACH under
 //                       it at most), else the ground under the deck, so what drives onto a bridge stays on it and what passes under
-//                       stays under
+//                       stays under; a deck marked `solid` (an override's terrace, walled to the ground) carries whatever is inside its outline
 
 export const DECK_REACH = 0.8; // m: something this far under a deck top (or higher) is on the deck: a deck end is tied to its road
 const CELL = 32;
@@ -224,7 +224,9 @@ export function withDecks(field, ground) {
         }
       }
       if (d === null || d <= base) return base;
-      return !Number.isFinite(y) || y >= d - DECK_REACH ? d : base;
+      if (!Number.isFinite(y) || y >= d - DECK_REACH) return d;
+      // a solid deck (a terrace on its walls) has no underneath: what finds itself below it, as its tile came in late, stands on it
+      return field.deckInfo?.(x, z)?.deck.solid ? d : base;
     },
     /**
      * The level at distance s along a straight way (x0, z0) + (ux, uz) * s of length len, for something placed there: walked out from an
