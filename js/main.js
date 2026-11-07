@@ -238,6 +238,8 @@ async function initApp() {
   const bikeTypeSwitch = document.getElementById('bike-type-switch');
   const bikeTypeButtons = bikeTypeSwitch ? [...bikeTypeSwitch.querySelectorAll('[data-bike-type]')] : [];
   let lastBikeMode = controllerManager.activeMode === 'cargobike' ? 'cargobike' : 'cyclist';
+  const walkTypeSwitch = document.getElementById('walk-type-switch');
+  const walkTypeButtons = walkTypeSwitch ? [...walkTypeSwitch.querySelectorAll('[data-walk-type]')] : [];
   touchControls.onAvailabilityChange = placeModeIndicator;
 
   const elFps = document.getElementById('hud-fps');
@@ -264,6 +266,7 @@ async function initApp() {
   const controlHints = {
     person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
+    skate: [[['W', 'S'], 'Push / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Push hard'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
     drone: [[['W', 'S'], 'Fly'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Climb / Take off'], [['Q', 'C'], 'Descend / Land'], [['Shift'], 'Sport']],
     bus: [[['W', 'S'], 'Drive / Brake'], [['A', 'D'], 'Steer'], [['Stop'], 'Doors open'], [['B'], 'Horn'], [['Drag'], 'Orbit']]
@@ -311,6 +314,13 @@ async function initApp() {
       btn.classList.toggle('active', btn.getAttribute('data-mode') === primaryMode);
     });
     if (bikeTypeSwitch) bikeTypeSwitch.hidden = !bikeActive;
+    const walker = controllerManager.entities.person.avatar;
+    if (walkTypeSwitch) walkTypeSwitch.hidden = activeMode !== 'person';
+    walkTypeButtons.forEach((btn) => {
+      const selected = btn.getAttribute('data-walk-type') === walker;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', String(selected));
+    });
     bikeTypeButtons.forEach((btn) => {
       const selected = btn.getAttribute('data-bike-type') === activeMode;
       btn.classList.toggle('active', selected);
@@ -320,7 +330,8 @@ async function initApp() {
     placeModeIndicator();
     const ent = controllerManager.getActiveEntity();
     if (elMode) elMode.textContent = ent.label;
-    renderControlHints(primaryMode);
+    const skating = activeMode === 'person' && (walker === 'skater' || walker === 'skateboarder');
+    renderControlHints(skating ? 'skate' : primaryMode);
 
     // If currently on a static scenic camera, switch to 3rd-Person Chase so user sees their selected character/vehicle
     const currentCam = cameraSystem.getActivePreset();
@@ -394,6 +405,13 @@ async function initApp() {
   modeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       selectMode(btn.getAttribute('data-mode'));
+    });
+  });
+
+  walkTypeButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      controllerManager.setPersonAvatar(btn.getAttribute('data-walk-type'));
+      selectMode('person');
     });
   });
 

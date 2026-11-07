@@ -16,6 +16,7 @@ import {
 } from './actor-models.js';
 import { URBINO_24, createArticulation } from './articulated-bus.js';
 import { PersonCrowd, PersonRig } from './pedestrians.js';
+import { BOARD_DECK_TOP, SKATE_LIFT, createRollerSkate, createSkateboard } from './skate-props.js';
 import { HEADLIGHTS, createVehicleHeadlight, placeVehicleHeadlight } from './vehicle-lights.js';
 import { collisionBody, buildingContact, colliderContainsPoint } from './collision-shapes.js';
 import { createStaticIndex } from './static-colliders.js';
@@ -232,6 +233,21 @@ function addBikeCable(parent, points, material, radius = 0.0032) {
   return cable;
 }
 
+// Who the Walk mode's player is: the rig's build & dress (its seed picks the clothes), and what they ride, if anything.
+// `eye` scales the chase camera's framing to their height.
+export const PERSON_AVATARS = {
+  man: { label: 'Pedestrian', rig: { seed: 4.2, scale: 1.0, girth: 1.02, hair: 0.18, armSwing: 1.0 } },
+  woman: { label: 'Woman', rig: { seed: 40.0, scale: 0.97, female: true, girth: 0.97, hair: 0.92, armSwing: 0.9 } },
+  skater: { label: 'Roller skater', ride: 'skates', eye: 0.75, rig: { seed: 21.3, scale: 0.74, female: true, girth: 0.92, hair: 0.95, armSwing: 1.1 } },
+  skateboarder: { label: 'Skateboarder', ride: 'board', eye: 0.8, rig: { seed: 1.0, scale: 0.78, girth: 0.93, hair: 0.4 } }
+};
+
+// Rolling: top speed (Shift for the boosted one, m/s), push acceleration, braking, and backwards roll-off
+const SKATE_RIDE = {
+  skates: { speed: 5.4, boostSpeed: 7.8, acceleration: 2.3, brake: 4.5, reverse: 1.4 },
+  board: { speed: 6.0, boostSpeed: 8.6, acceleration: 1.9, brake: 3.4, reverse: 1.2 }
+};
+
 // Walking surface for the player's pedestrian (its rig samples it around its feet)
 const personGround = (controllers, x, z) => controllers.getGroundHeight(x, z, 'person', controllers.entities?.person?.position.y);
 
@@ -383,6 +399,26 @@ class ThirdPersonControllerManager {
     return this.entities[this.activeMode];
   }
 
+  // Swap the Walk mode's player for another avatar, standing where the last one stood
+  setPersonAvatar(kind) {
+    const p = this.entities.person;
+    const avatar = PERSON_AVATARS[kind];
+    if (!avatar || !p?.rigs?.[kind]) return false;
+    p.avatar = kind;
+    p.label = avatar.label;
+    p.rig = p.rigs[kind];
+    p.rig.placed = false;
+    p.push = p.turnRate = 0;
+    if (!avatar.ride) p.speed = Math.max(-4.4, Math.min(4.4, p.speed));
+    const eye = avatar.eye ?? 1;
+    p.cameraTargetOffset.y = 1.55 * eye;
+    p.chaseHeight = 1.95 - (1 - eye) * 1.4;
+    p.chaseDistance = 4.3 - (1 - eye) * 1.6;
+    for (const skate of p.skates) skate.root.visible = avatar.ride === 'skates';
+    p.board.root.visible = avatar.ride === 'board';
+    return true;
+  }
+
   teleportActiveTo(x, z, heading = Math.PI, savedAltitude = null) {
     const ent = this.getActiveEntity();
     this.resetInput();
@@ -506,10 +542,19 @@ class ThirdPersonControllerManager {
     const root = new THREE.Group();
     root.name = 'PlayerPerson';
 
-    // One skinned person, posed in world space every frame by its rig (walk, run, turn, jump)
+    // One skinned person, posed in world space every frame by the chosen avatar's rig (walk, run, turn, jump, skate)
     const crowd = new PersonCrowd(1, { farDistance: Infinity });
     crowd.meshes.forEach((m) => this.scene.add(m));
-    const rig = new PersonRig({ seed: 4.2, scale: 1.0, girth: 1.02, hair: 0.18, armSwing: 1.0 });
+    const rigs = Object.fromEntries(Object.entries(PERSON_AVATARS).map(([kind, a]) => [kind, new PersonRig(a.rig)]));
+    const rig = rigs.man;
+
+    // What the skaters ride, posed in world space from the rig's feet (hidden until their avatar is chosen)
+    const skates = [createRollerSkate(), createRollerSkate()];
+    const board = createSkateboard();
+    for (const prop of [...skates, board]) {
+      prop.root.visible = false;
+      this.scene.add(prop.root);
+    }
 
     // Soft Under-Foot Contact Shadow (AO)
     const shadowGeo = new THREE.PlaneGeometry(0.95, 0.95);
@@ -523,10 +568,16 @@ class ThirdPersonControllerManager {
 
     return {
       type: 'person',
-      label: 'Pedestrian',
+      label: PERSON_AVATARS.man.label,
       mesh: root,
       crowd,
       rig,
+      rigs,
+      avatar: 'man',
+      skates,
+      board,
+      push: 0,
+      turnRate: 0,
       position: new THREE.Vector3(-11.6, ISLAND_BOUNDS.sidewalkHeight, SPAWN_Z + 12),
       heading: 0,
       speed: 0,
@@ -1772,7 +1823,9 @@ class ThirdPersonControllerManager {
   poseCharacters(dt) {
     const p = this.entities.person;
     const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
-    p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
+    const ride = PERSON_AVATARS[p.avatar]?.ride;
+    if (ride) this.poseSkater(dt, p, ride, air > 0.02 ? air : 0);
+    else p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
     p.crowd.begin();
     p.crowd.add(p.rig, 0);
     p.crowd.end();
@@ -1789,6 +1842,39 @@ class ThirdPersonControllerManager {
       bike.riderCrowd.end();
       bike.helmet.quaternion.copy(bike.riderRig.headQuaternion);
       bike.helmet.position.set(0, 0.175, -0.012).applyQuaternion(bike.helmet.quaternion).add(bike.riderRig.headPosition);
+    }
+  }
+
+  // The skater's rig rolls (PersonRig.skate); the skates follow its feet, the board runs under them, wheels turning
+  poseSkater(dt, p, ride, air) {
+    const rig = p.rig;
+    const active = this.activeMode === 'person';
+    rig.skate(dt, p.position.x, p.position.z, p.heading, personGround, this, {
+      style: ride,
+      push: active ? p.push : 0,
+      turn: active ? p.turnRate : 0,
+      lift: ride === 'board' ? BOARD_DECK_TOP : SKATE_LIFT * rig.s,
+      air
+    });
+    const roll = rig.speed * dt * Math.sign(p.speed || 1);
+    if (ride === 'skates') {
+      for (let i = 0; i < 2; i++) {
+        const foot = rig.feet[i];
+        const skate = p.skates[i];
+        skate.root.position.set(foot.ax, foot.ay, foot.az);
+        skate.root.rotation.set(0, foot.yaw, 0);
+        skate.root.scale.setScalar(rig.s);
+        for (const wheel of skate.wheels) wheel.rotation.x += roll / (skate.wheelRadius * rig.s);
+      }
+    } else {
+      const board = p.board;
+      const ground = personGround(this, p.position.x, p.position.z);
+      board.root.position.set(p.position.x, ground + air, p.position.z);
+      // carving: the deck rolls towards the inside of the turn; an ollie tips the nose up on the way up
+      const ollie = active ? Math.min(0.25, Math.max(0, p.verticalVel || 0) * 0.06) : 0;
+      board.root.rotation.set(-ollie, p.heading, 0, 'YXZ');
+      board.tilt.rotation.z = -rig.lean * 0.6;
+      for (const wheel of board.wheels) wheel.rotation.x += roll / board.wheelRadius;
     }
   }
 
@@ -1851,6 +1937,8 @@ class ThirdPersonControllerManager {
 
   updatePerson(dt) {
     const p = this.entities.person;
+    const ride = PERSON_AVATARS[p.avatar]?.ride;
+    if (ride) return this.updateSkater(dt, p, SKATE_RIDE[ride]);
     const maxWalk = this.keys.boost ? 8.2 : 4.4;
     const turnRate = 2.6;
 
@@ -1872,6 +1960,52 @@ class ThirdPersonControllerManager {
     if (this.keys.up && p.position.y <= groundY + 0.02) {
       p.verticalVel = 5.2;
     }
+    p.verticalVel -= 14.5 * dt;
+    p.position.y += p.verticalVel * dt;
+    if (p.position.y < groundY) {
+      p.position.y = groundY;
+      p.verticalVel = 0;
+    }
+  }
+
+  // Roller skates & skateboard: W pushes off (harder with Shift), the skater then rolls on and slows only slowly; S
+  // brakes, then rolls backwards; A / D turn, less sharply the faster they go; Space jumps. Running into a wall
+  // takes away the speed into it.
+  updateSkater(dt, p, ride) {
+    const forward = this.keys.forward || 0;
+    const backward = this.keys.backward || 0;
+    const top = (this.keys.boost ? ride.boostSpeed : ride.speed) * (forward || 1);
+    p.push = 0;
+    if (forward && p.speed < top) {
+      p.speed = Math.min(top, p.speed + (p.speed < 0 ? ride.brake : ride.acceleration * (this.keys.boost ? 1.35 : 1)) * forward * dt);
+      p.push = Math.min(1, forward * (this.keys.boost ? 1 : 0.8));
+    } else if (backward) {
+      p.speed = p.speed > 0
+        ? Math.max(0, p.speed - ride.brake * backward * dt)
+        : Math.max(-ride.reverse * backward, p.speed - 1.2 * backward * dt);
+    } else {
+      // rolling resistance and air drag
+      const drag = (0.16 + 0.012 * p.speed * p.speed) * dt;
+      p.speed = Math.sign(p.speed) * Math.max(0, Math.abs(p.speed) - drag);
+    }
+
+    const steer = (this.keys.left || 0) - (this.keys.right || 0);
+    const rate = steer * 2.5 / (1 + 0.14 * Math.abs(p.speed));
+    p.heading += rate * dt;
+    p.turnRate = rate;
+
+    const previousPosition = { x: p.position.x, z: p.position.z };
+    const step = p.speed * dt;
+    p.position.x += Math.sin(p.heading) * step;
+    p.position.z += Math.cos(p.heading) * step;
+    this.resolveHorizontalCollision(p.position, 0.48, null, p, previousPosition);
+    if (dt > 0 && Math.abs(step) > 1e-6) {
+      const along = ((p.position.x - previousPosition.x) * Math.sin(p.heading) + (p.position.z - previousPosition.z) * Math.cos(p.heading)) / step;
+      p.speed *= Math.max(0, Math.min(1, along));
+    }
+
+    const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
+    if (this.keys.up && p.position.y <= groundY + 0.02) p.verticalVel = 4.6;
     p.verticalVel -= 14.5 * dt;
     p.position.y += p.verticalVel * dt;
     if (p.position.y < groundY) {

@@ -1387,7 +1387,7 @@ class PersonRig {
     this.writeBone(BONE.CHEST, _qChest, _chest);
 
     const look = Math.sin(this.time * 0.37 + this.seed) * 0.25 * idle * idle;
-    qY(_qa, yaw + look).multiply(qX(_q, 0.05 - 0.1 * run));
+    qY(_qa, this.lookYaw ?? yaw + look).multiply(qX(_q, 0.05 - 0.1 * run));
     _v.copy(j[BONE.HEAD]).sub(j[BONE.CHEST]).multiplyScalar(s).applyQuaternion(_qChest).add(_chest);
     this.writeBone(BONE.HEAD, _qa, _v);
 
@@ -1396,7 +1396,7 @@ class PersonRig {
     for (let i = 0; i < 2; i++) {
       const side = SIDES[i];
       const flex = 0.06 - side * this.spreadF * swingAmp + idle * 0.02;
-      const abduction = 0.1 + (this.girth - 1) * 0.35 + run * 0.08;
+      const abduction = 0.1 + (this.girth - 1) * 0.35 + run * 0.08 + (this.armOut || 0);
       _shoulder.copy(j[LIMB.upperArm[i]]).sub(j[BONE.CHEST]).multiplyScalar(s).applyQuaternion(_qChest).add(_chest);
       _qUpper.copy(_qChest).multiply(qZ(_q, side * (abduction - ARM_BIND_ABDUCTION))).multiply(qX(_q, -flex));
       this.writeBone(LIMB.upperArm[i], _qUpper, _shoulder);
@@ -1419,6 +1419,149 @@ class PersonRig {
       qY(_q2, footYaw).multiply(qX(_q, foot.pitch + foot.toe));
       this.writeBone(LIMB.toe[i], _q2, _v);
     }
+  }
+
+  /**
+   * Rolling instead of stepping, the body moved to ground position (x, z) heading `heading`. `style` 'skates': quad
+   * roller skates, each leg in turn pushing out to the side and back, then swinging in again; coasting, the feet run
+   * side by side, a little scissored. 'board': a skateboard ridden regular (left foot forward), standing sideways over
+   * the trucks, the head turned to look ahead; pushing, the body turns forward and the back foot kicks along the ground
+   * beside the board. `push` (0..1) is how hard they push, `turn` the heading's rate (rad/s; they lean into it),
+   * `lift` how far the wheels raise the soles (skates) or the deck top above the ground (board), `air` the jump height.
+   * The feet (ax, ay, az, yaw, pitch) are left where the skates or the board go; `lean` is the lean into the turn.
+   */
+  skate(dt, x, z, heading, ground, owner, { style = 'skates', push = 0, turn = 0, lift = 0.07, air = 0 } = {}) {
+    dt = Math.min(Math.max(dt, 1e-4), 0.1);
+    const s = this.s;
+    if (!this.placed || this.bx === undefined || Math.hypot(x - this.bx, z - this.bz) > 3) {
+      this.reset(x, z, heading, ground, owner);
+      this.bx = x;
+      this.bz = z;
+      this.skateAmt = this.lean = this.strokePhase = 0;
+    }
+    this.time += dt;
+    const kv = 1 - Math.exp(-dt / 0.1);
+    this.vx += ((x - this.bx) / dt - this.vx) * kv;
+    this.vz += ((z - this.bz) / dt - this.vz) * kv;
+    this.bx = x;
+    this.bz = z;
+    this.speed = Math.hypot(this.vx, this.vz);
+    this.air = air;
+    this.skateAmt += (push - this.skateAmt) * (1 - Math.exp(-dt / 0.25));
+    const leanTarget = Math.max(-0.2, Math.min(0.2, turn * this.speed * 0.045));
+    this.lean += (leanTarget - this.lean) * (1 - Math.exp(-dt / 0.15));
+    const amt = this.skateAmt;
+    // the stroke cycle runs while pushing (both legs once per cycle on skates, one kick per cycle on the board)
+    if (amt > 0.02) this.strokePhase = (this.strokePhase + dt * lerp(0.4, style === 'board' ? 1.25 : 1.05, amt)) % 1;
+    const hs = Math.sin(heading);
+    const hc = Math.cos(heading);
+    // a point `fw` ahead and `lat` to the left of (x, z)
+    const at = (foot, fw, lat) => {
+      foot.px = foot.ax = x + hs * fw + hc * lat;
+      foot.pz = foot.az = z + hc * fw - hs * lat;
+    };
+
+    if (style === 'board') {
+      this.yaw = wrap(heading - lerp(Math.PI / 2 - 0.12, 0.3, amt));
+      this.lookYaw = wrap(heading - lerp(0.35, 0.05, amt));
+      this.armOut = lerp(0.34, 0.06, amt);
+      const deck = ground(owner, x, z) + air + lift;
+      // front foot over the front bolts, angled forward; back foot across the tail
+      const front = this.feet[0];
+      at(front, 0.19, 0);
+      front.yaw = heading - lerp(Math.PI / 2 - 0.45, 0.1, amt);
+      front.py = deck;
+      front.ay = deck + ANKLE_H * s;
+      // the back foot: on the board, or kicking along the ground to the right of it
+      const back = this.feet[1];
+      const u = this.strokePhase;
+      let kf;
+      let kick = 0;
+      if (u < 0.6) kf = lerp(0.12, -0.5, smooth(0, 0.6, u));
+      else {
+        const w = (u - 0.6) / 0.4;
+        kf = lerp(-0.5, 0.12, smooth(0, 1, w));
+        kick = Math.sin(Math.PI * w);
+      }
+      at(back, lerp(-0.23, kf * s, amt), lerp(0, -0.19, amt));
+      back.yaw = heading - lerp(Math.PI / 2 + 0.08, 0.05, amt);
+      const groundY = ground(owner, back.ax, back.az) + air;
+      back.py = lerp(deck, groundY, amt);
+      back.ay = back.py + (kick * 0.1 * s + Math.sin(Math.PI * amt) * 0.06) * amt + ANKLE_H * s;
+      // hips between the feet, over the front foot to push; leaning into the turn over the toe or heel edge
+      const cf = lerp(-0.02, 0.1, amt);
+      const cl = lerp(0, -0.06, amt) + this.lean * 0.7 * s;
+      this.x = x + hs * cf + hc * cl;
+      this.z = z + hc * cf - hs * cl;
+      this.sway = 0;
+    } else {
+      this.yaw = heading;
+      this.lookYaw = null;
+      this.armOut = 0.06 + 0.1 * (1 - amt);
+      for (let i = 0; i < 2; i++) {
+        const foot = this.feet[i];
+        const side = SIDES[i];
+        const u = (this.strokePhase + i * 0.5) % 1;
+        let out;
+        let fw;
+        let up = 0;
+        if (u < 0.55) {
+          // pushing: rolling out to the side and back, the skate turned out
+          out = smooth(0, 0.55, u);
+          fw = lerp(0.1, -0.24, out);
+        } else {
+          // recovery: lifted, swung in under the hips and forward again
+          const w = (u - 0.55) / 0.45;
+          const e = smooth(0, 1, w);
+          out = 1 - e;
+          fw = lerp(-0.24, 0.1, e);
+          up = Math.sin(Math.PI * w);
+        }
+        at(foot, (side * 0.07 * (1 - amt) + fw * amt) * s, side * (0.1 + 0.2 * out * amt) * s);
+        foot.yaw = heading + side * (0.04 + 0.32 * out * amt);
+        foot.py = ground(owner, foot.ax, foot.az) + air;
+        foot.ay = foot.py + lift + up * 0.09 * s * amt + ANKLE_H * s;
+      }
+      this.x = x;
+      this.z = z;
+      this.sway = this.lean * 0.7 * s;
+    }
+    for (const foot of this.feet) {
+      foot.swing = false;
+      foot.swingYaw = foot.yaw;
+      foot.pitch = foot.toe = 0;
+      foot.contact = 1;
+      foot.stance = 0;
+    }
+
+    // Pelvis: knees bent, crouched lower pushing; never further from either foot than the leg reaches
+    const left = this.feet[0];
+    const right = this.feet[1];
+    const sinY = Math.sin(this.yaw);
+    const cosY = Math.cos(this.yaw);
+    const zl = (left.ax - this.x) * sinY + (left.az - this.z) * cosY;
+    const zr = (right.ax - this.x) * sinY + (right.az - this.z) * cosY;
+    this.spreadF = (zl - zr) / s;
+    const board = style === 'board';
+    this.gait = board ? 0.7 * amt : 0.3 + 0.7 * amt;
+    this.run = board ? 0 : 0.25 * amt;
+    this.pelvisYaw = board ? 0 : Math.max(-0.13, Math.min(0.13, -0.13 * this.spreadF * this.gait));
+    this.pelvisRoll = 0;
+    this.pelvisTilt = board ? lerp(0.12, 0.22, amt) : 0.14 + 0.2 * amt;
+    this.setPelvisRotation();
+    const bend = board ? lerp(0.93, 0.9, amt) : lerp(0.95, 0.9, amt);
+    let target = Math.min(left.ay, right.ay) + this.legLength * bend + (PELVIS_Y - HIP_Y) * s;
+    const reach = this.legLength * 0.99;
+    for (let i = 0; i < 2; i++) {
+      const foot = this.feet[i];
+      this.hipOffset(i, _v);
+      const hx = this.x + cosY * this.sway + _v.x;
+      const hz = this.z - sinY * this.sway + _v.z;
+      const d = Math.hypot(foot.ax - hx, foot.az - hz);
+      target = Math.min(target, foot.ay + Math.sqrt(Math.max(0, reach * reach - d * d)) - _v.y);
+    }
+    this.pelvisY = target;
+    this.solve();
   }
 
   /**

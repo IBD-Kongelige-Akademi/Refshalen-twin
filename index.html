@@ -75,6 +75,7 @@
   <link rel="modulepreload" href="./js/rigid-meshes.js" />
   <link rel="modulepreload" href="./js/cyclist-network.js" />
   <link rel="modulepreload" href="./js/cyclists.js" />
+  <link rel="modulepreload" href="./js/skate-props.js" />
   <link rel="modulepreload" href="./js/cyclist-appearance.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
   <link rel="modulepreload" href="./js/layout.js" />
@@ -261,6 +262,12 @@
   <!-- Bottom-Center: Third-Person Mode Switcher & Controls Guide -->
   <footer class="hud hud-bottom-center">
     <div id="hud-controls-hint" class="controls-hint"></div>
+    <div id="walk-type-switch" class="bike-type-switch" role="group" aria-label="Walker" hidden>
+      <button class="bike-type-btn active" data-walk-type="man" type="button" aria-pressed="true">Man</button>
+      <button class="bike-type-btn" data-walk-type="woman" type="button" aria-pressed="false">Woman</button>
+      <button class="bike-type-btn" data-walk-type="skater" type="button" aria-pressed="false">Roller skates</button>
+      <button class="bike-type-btn" data-walk-type="skateboarder" type="button" aria-pressed="false">Skateboard</button>
+    </div>
     <div id="bike-type-switch" class="bike-type-switch" role="group" aria-label="Bike type" hidden>
       <button class="bike-type-btn active" data-bike-type="cyclist" type="button" aria-pressed="true">City bike</button>
       <button class="bike-type-btn" data-bike-type="cargobike" type="button" aria-pressed="false">Cargo bike</button>

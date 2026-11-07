@@ -44,6 +44,7 @@ function keyboardHarness(overrides = {}, moduleImports = {}) {
       './tsl-materials.js': {},
       './actor-models.js': {},
       './pedestrians.js': {},
+      './skate-props.js': {},
       './vehicle-lights.js': {},
       './collision-shapes.js': collisionShapesModule,
       './static-colliders.js': staticCollidersModule,
@@ -738,3 +739,35 @@ for (const mode of ['cyclist', 'cargobike']) {
   });
 }
 
+
+test('skaters push up to their top speed, keep rolling when they stop pushing, and brake', () => {
+  for (const avatar of ['skater', 'skateboarder']) {
+    const { controller } = keyboardHarness();
+    const p = { position: { x: 0, y: 0, z: 0 }, heading: 0, speed: 0, verticalVel: 0, avatar };
+    controller.entities = { person: p };
+    controller.getGroundHeight = () => 0;
+    controller.resolveHorizontalCollision = () => {};
+    controller.keys.forward = 1;
+    for (let i = 0; i < 60; i++) controller.updatePerson(0.1);
+    assert.ok(p.speed > 5 && p.speed <= 6.0001, `${avatar} pushed to ${p.speed}`);
+    assert.ok(p.push > 0 || p.speed >= 5.4, `${avatar} pushes while below top speed`);
+    controller.keys.forward = false;
+    const rolling = p.speed;
+    for (let i = 0; i < 10; i++) controller.updatePerson(0.1);
+    assert.ok(p.speed > rolling - 1 && p.speed < rolling, `${avatar} coasts (${rolling} -> ${p.speed})`);
+    assert.equal(p.push, 0);
+    controller.keys.backward = 1;
+    for (let i = 0; i < 20; i++) controller.updatePerson(0.1);
+    assert.ok(p.speed <= 0, `${avatar} braked to ${p.speed}`);
+  }
+});
+
+test('a skater running into a wall loses the speed into it', () => {
+  const { controller } = keyboardHarness();
+  const p = { position: { x: 0, y: 0, z: 0 }, heading: 0, speed: 5, verticalVel: 0, avatar: 'skater' };
+  controller.entities = { person: p };
+  controller.getGroundHeight = () => 0;
+  controller.resolveHorizontalCollision = (pos, r, c, e, prev) => { pos.x = prev.x; pos.z = prev.z; };
+  controller.updatePerson(0.1);
+  assert.equal(p.speed, 0);
+});
