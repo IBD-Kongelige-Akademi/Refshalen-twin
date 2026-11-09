@@ -34,8 +34,8 @@ function setup({ overrideMode = 'off' } = {}) {
   }]));
   const imports = {
     'three/webgpu': { Group },
-    './buildings-real.js': { BUILDING_LEVELS: ['lod2', 'photo', 'generated', 'full'], buildRealBuildings, createBuildingMaterials, createInfoPanel: () => null },
-    './facade-lod.js': { texRequested: () => false, createPhotoBudget: () => null },
+    './buildings-real.js': { BUILDING_LEVELS: ['white', 'lod2', 'photo', 'generated', 'full'], buildRealBuildings, createBuildingMaterials, createInfoPanel: () => null },
+    './facade-lod.js': { PHOTO: {}, PHOTO_UP_CLOSE: {}, texRequested: () => false, createPhotoBudget: () => null },
     './yield-frame.js': { createSharedSlicer: (budget) => { slicer = async () => {}; slicer.budget = budget; return slicer; } },
     './detail-overrides.js': {
       createOverrideBudget: () => overrideApi.createOverrideBudget({ maxTextureBytes: 20, maxMeshes: 2 }),

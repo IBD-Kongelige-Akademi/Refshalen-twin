@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { PHOTO, photoFade, texRequested, selectPhotoSet, wallDistance, lookFile } from '../js/facade-lod.js';
+import { PHOTO, PHOTO_UP_CLOSE, createPhotoBudget, photoFade, texRequested, selectPhotoSet, wallDistance, lookFile } from '../js/facade-lod.js';
 import { createContext, classifyWalls, KIND } from '../js/groundfloor.js';
 import { facadeStyle, MAT, ERA, wallMaterial, wallEra } from '../js/facade-style.js';
 import { texturedWalls } from '../js/appearance.js';
@@ -217,4 +217,17 @@ test('facade style: material from BBR + colour, era from the BBR year', () => {
   assert.equal(wallEra({ year: 1999 }), ERA.modern);
   const shed = facadeStyle({ year: 1890, storeys: 1, eave: 3, ground: 0, wall_material: 'mursten' }, [0.5, 0.25, 0.2]);
   assert.ok(shed.era < ERA.historic, 'sheds get no cornice');
+});
+
+test('the photo-only level keeps a wall photo resident right next to it', () => {
+  // a 20 m wall 10 m from the camera: inside close0 - closeMargin, so the default policy draws and holds no photo
+  const c = { id: 'b', cx: 10, cz: 0, walls: { segs: [10, -10, 10, 10], y0: 0, y1: 12, size: [400, 240] } };
+  assert.equal(selectPhotoSet([c], 0, 0, PHOTO, new Map(), 2).want.length, 0);
+  const up = selectPhotoSet([c], 0, 0, PHOTO_UP_CLOSE, new Map(), 2);
+  assert.deepEqual(up.want, ['b']);
+  assert.ok(up.qualityById.get('b').tier > 0);
+  const budget = createPhotoBudget();
+  assert.equal(budget.params, PHOTO);
+  budget.setParams(PHOTO_UP_CLOSE);
+  assert.equal(budget.params, PHOTO_UP_CLOSE);
 });

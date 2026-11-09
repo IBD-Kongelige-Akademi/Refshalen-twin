@@ -286,7 +286,7 @@ const uploadSlot = () => (uploadChain = uploadChain.then(nextFrame));
  * (data/tex-look, RGBA with window and unobserved masks) is read first, the raw JPEG atlas as fallback. If neither folder
  * is present (both are gitignored) photo mode turns itself off quietly.
  */
-function createTexManager(root, candidates, { fetchImpl = globalThis.fetch, budget = null } = {}) {
+function createTexManager(root, candidates, { fetchImpl = globalThis.fetch, budget = null, closeFade = true } = {}) {
   const state = {
     enabled: true, disposed: false, probed: false, probing: false, failures: 0, resident: new Map(), loading: new Map(), failed: new Set(),
     failedTiers: new Map(), desiredQuality: new Map(), loaded: 0, look: 0, raw: 0
@@ -353,7 +353,7 @@ function createTexManager(root, candidates, { fetchImpl = globalThis.fetch, budg
       g.setIndex(c.walls.index);
       g.computeBoundingSphere();
     }
-    const material = createPhotoMaterial(texture, { hasMask, tone: c.tone, brick: c.brick, layout: c.layout });
+    const material = createPhotoMaterial(texture, { hasMask, tone: c.tone, brick: c.brick, layout: c.layout, closeFade });
     const mesh = new THREE.Mesh(g, material);
     mesh.name = `wall-photos-${c.id}`;
     mesh.userData.photoOverlay = true;
@@ -532,17 +532,21 @@ function createBuildingMaterials() {
   plainRoof.metalnessNode = attribute('roofMat', 'vec2').y;
   // as roofMaterial: vertexColors with a colorNode of the colour applies the tone twice, which the calibrated roof tones expect
   plainRoof.colorNode = attribute('color', 'vec3').mul(roofTileMean());
-  return { masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial, plainWall, plainRoof };
+  // level 0 ('white'): walls and roofs alike in one white, the bare shape of the LoD2 model
+  const whiteShell = new THREE.MeshStandardNodeMaterial({ color: 0xd6d6d2, roughness: 0.9, metalness: 0 });
+  whiteShell.name = 'cph-shell-white';
+  return { masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial, plainWall, plainRoof, whiteShell };
 }
 
 /**
  * The building model levels the HUD switches between (js/buildings-stream.js setLevel), lowest first:
+ *   white      the LoD2 shells in plain white, walls and roofs alike
  *   lod2       the LoD2 shells in their measured tones: no photos, no generated windows / doors / roof details, no detail overrides
- *   photo      LoD2 with the Skraafoto wall photos (the photo atlases over the plain shell)
+ *   photo      LoD2 with the Skraafoto wall photos (the photo atlases over the plain shell, kept in up close)
  *   generated  LoD2 with the photos plus the generated windows, doors, ground floors, roof details and procedural textures
  *   full       everything, including the hero buildings made from drawings (detail overrides)
  */
-const BUILDING_LEVELS = ['lod2', 'photo', 'generated', 'full'];
+const BUILDING_LEVELS = ['white', 'lod2', 'photo', 'generated', 'full'];
 
 /**
  * @param {object} opts
@@ -558,9 +562,10 @@ const BUILDING_LEVELS = ['lod2', 'photo', 'generated', 'full'];
 async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel = true, lod2 = null, tex = texRequested(), observed = true, terrain = null, venues = null, entrances = undefined, shared = null, context = null, doors: wantDoors = true, slice = null, lite = false, compute = null, photoBudget = null, overrides = null, signal = null, level = 'full' } = {}) {
   // the model level (BUILDING_LEVELS): lower levels drop the overrides, the generated detail and the photos
   if (level !== 'full') overrides = null;
-  const plain = level === 'lod2' || level === 'photo';
+  const white = level === 'white';
+  const plain = white || level === 'lod2' || level === 'photo';
   if (plain) wantDoors = false;
-  if (level === 'lod2') { lite = true; tex = false; }
+  if (white || level === 'lod2') { lite = true; tex = false; }
   const abortBuild = () => { throw Object.assign(new Error('Building tile build aborted'), { name: 'AbortError' }); };
   const checkpoint = async () => {
     if (signal?.aborted) abortBuild();
@@ -612,8 +617,8 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
   scene.add(root);
   const materials = shared || createBuildingMaterials();
   const { masonry, liteWall, detailMaterial, doorMaterial } = materials;
-  const glass = plain ? materials.plainWall : materials.glass;
-  const roofMaterial = plain ? materials.plainRoof : materials.roofMaterial;
+  const glass = white ? materials.whiteShell : plain ? materials.plainWall : materials.glass;
+  const roofMaterial = white ? materials.whiteShell : plain ? materials.plainRoof : materials.roofMaterial;
   const heroGroups = [];
   const heroStatus = [];
   const overrideGroups = [];
@@ -633,7 +638,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
   };
 
   try {
-    const wallMaterial = lite ? liteWall : plain ? materials.plainWall : masonry;
+    const wallMaterial = white ? materials.whiteShell : lite ? liteWall : plain ? materials.plainWall : masonry;
 
     // LoD2 roofs (tools/lod2): every building with a measured roofer record gets its pitched roof; the rest keep the flat
     // extrusion. The join is by building id, so the geodata compiler never needs to know about LoD2.
@@ -816,7 +821,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     else batchBuildingCells(root, leaves, pickables);
 
     const neon = { group: null, panels: [], update() {}, stats: { panels: 0 } }; // upstream's Irma sign; no neon signs in Aalborg yet
-    texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget }) : null; // joins the shared budget itself
+    texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget, closeFade: level !== 'photo' }) : null; // joins the shared budget itself
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     panel = withInfoPanel && typeof document !== 'undefined' ? createInfoPanel() : null;

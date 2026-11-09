@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { BUILDING_LEVELS, attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
-import { texRequested, createPhotoBudget } from './facade-lod.js';
+import { PHOTO, PHOTO_UP_CLOSE, texRequested, createPhotoBudget } from './facade-lod.js';
 import { createSharedSlicer } from './yield-frame.js';
 import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from './detail-overrides.js';
 
@@ -18,7 +18,7 @@ import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from '
 
 const LEVEL_KEY = 'aalborg-twin.building-level';
 
-/** The building level to start at: `?buildings=lod2|photo|generated|full`, else the one the HUD last chose, else 'full'. */
+/** The building level to start at: `?buildings=white|lod2|photo|generated|full`, else the one the HUD last chose, else 'full'. */
 export function initialBuildingLevel(search = globalThis.location?.search || '') {
   let level = null;
   try { level = new URLSearchParams(search).get('buildings'); } catch { /* no usable query string */ }
@@ -42,6 +42,8 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   const shared = createBuildingMaterials();
   const slice = createSharedSlicer(5);
   const photoBudget = tex ? createPhotoBudget() : null; // one residency plan for the photo walls of every tile
+  const photoPolicy = () => photoBudget?.setParams?.(level === 'photo' ? PHOTO_UP_CLOSE : PHOTO); // the photo-only level keeps photos up close
+  photoPolicy();
   const ovMode = overridesMode();
   const overrideBudget = ovMode === 'off' ? null : createOverrideBudget();
   const tiles = new Map(); // id -> { active: { instance, holder, ring, overrideLease } | null, pending: build | null, ctx, ring }
@@ -173,6 +175,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
     async setLevel(next) {
       if (!BUILDING_LEVELS.includes(next) || next === level || disposed) return false;
       level = next;
+      photoPolicy();
       for (const fn of levelWatchers) fn(level);
       const builds = [...tiles.entries()].filter(([, state]) => state.ctx && (state.active || state.pending)).map(([id, state]) => api.addTile(id, state.ctx, state.ring).catch((error) => {
         console.warn(`[cph] buildings of tile ${id} not rebuilt at level ${level}:`, error?.message || error);

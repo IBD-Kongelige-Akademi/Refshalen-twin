@@ -32,6 +32,10 @@ const PHOTO = {
   concurrency: 2
 };
 
+// The photo-only building level (js/buildings-real.js BUILDING_LEVELS 'photo'): no procedural facade to hand over to up close, so the photo
+// stays in all the way to the wall and a building is never too near to hold its atlas
+const PHOTO_UP_CLOSE = { ...PHOTO, close0: 0, close1: 0.5, closeMargin: 0 };
+
 /** Shares a small synchronous cold-photo draw budget across every pass in one animation frame. */
 function createPhotoDrawBudget({ now = () => performance.now(), budgetMs = 4 } = {}) {
   const emptyContext = {};
@@ -539,6 +543,17 @@ function createPhotoBudget({ interval = 350, select = selectPhotoSet, p = PHOTO 
     },
     /** The last residency plan (selectPhotoSet), for the headless checks. */
     get lastPlan() { return planned; },
+    /** The policy in force (PHOTO, or PHOTO_UP_CLOSE for the photo-only building level). */
+    get params() { return p; },
+    /** Switches the policy (the building level changed); the next update plans afresh with it. */
+    setParams(next) {
+      if (!next || next === p) return;
+      p = next;
+      lastRun = -Infinity;
+      lastPlan = null;
+      planned = null;
+      backlog = false;
+    },
     /** Called every frame with the camera position (`y` its height: distances are 3D); plans at most every `interval` ms. */
     update(x, z, now = performance.now(), y = undefined) {
       if (now - lastRun < interval) {
@@ -578,4 +593,4 @@ function createPhotoBudget({ interval = 350, select = selectPhotoSet, p = PHOTO 
   };
 }
 
-export { PHOTO, photoFade, texRequested, selectPhotoSet, wallDistance, densityScale, quantiseStep, pixelMetres, createPhotoBudget, createPhotoDrawBudget, createPhotoRenderCallback, applyPhotoPlan, makePhotoRoom, createPhotoStats, logPhoto, photoReservation, lookFile, estimateTextureBytes, scaledTextureSize };
+export { PHOTO, PHOTO_UP_CLOSE, photoFade, texRequested, selectPhotoSet, wallDistance, densityScale, quantiseStep, pixelMetres, createPhotoBudget, createPhotoDrawBudget, createPhotoRenderCallback, applyPhotoPlan, makePhotoRoom, createPhotoStats, logPhoto, photoReservation, lookFile, estimateTextureBytes, scaledTextureSize };

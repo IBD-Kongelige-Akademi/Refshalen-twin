@@ -17,13 +17,15 @@ import { PHOTO } from './facade-lod.js';
 //          (10 cm/px photo texels would be a blur there) and far away, the photo in between
 //   detail the photo gets the real brick module (or plaster grain) back as relief and mortar
 // `hasMask` false = a plain JPEG atlas (no alpha): everything counts as observed wall, no glass.
+// `closeFade` false (the photo-only building level): no procedural facade under it, so the photo stays in up close and gets no brick
+// mortar or plaster grain of its own.
 
 const ALBEDO_GAIN = 0.72;
 const ALBEDO_KNEE = 0.4;
 const ALBEDO_MAX = 0.58;
 const lumW = vec3(0.2126, 0.7152, 0.0722);
 
-function createPhotoMaterial(map, { hasMask = true, tone = [0.4, 0.38, 0.34], brick = true, layout = { floorH: 3, groundH: 3, seed: 0 } } = {}) {
+function createPhotoMaterial(map, { hasMask = true, tone = [0.4, 0.38, 0.34], brick = true, layout = { floorH: 3, groundH: 3, seed: 0 }, closeFade = true } = {}) {
   const mat = new THREE.MeshStandardNodeMaterial({ roughness: 0.86, metalness: 0.0 });
   mat.transparent = true;
   mat.depthWrite = false;
@@ -76,7 +78,7 @@ function createPhotoMaterial(map, { hasMask = true, tone = [0.4, 0.38, 0.34], br
   };
 
   // Close-range detail: real brick module / plaster grain over the photo
-  const nearDetail = float(1).sub(smoothstep(8.0, 26.0, camDist));
+  const nearDetail = closeFade ? float(1).sub(smoothstep(8.0, 26.0, camDist)) : float(0);
   const row = floor(wuv.y.div(BRICK_H));
   const col = wuv.x.div(BRICK_L).add(mod(row, 2.0).mul(0.5));
   const bed = gridLine(wuv.y, BRICK_H, 0.010);
@@ -98,7 +100,8 @@ function createPhotoMaterial(map, { hasMask = true, tone = [0.4, 0.38, 0.34], br
     return bumpNormal(recess.add(relief));
   })();
   mat.emissiveNode = apartmentLight(roomPick).mul(occupied).mul(glass).mul(cityUniforms.uInteriorGlow).mul(0.3);
-  mat.opacityNode = smoothstep(PHOTO.close0, PHOTO.close1, camDist).mul(float(1).sub(smoothstep(PHOTO.near, PHOTO.far, camDist))).mul(observed);
+  const closeIn = closeFade ? smoothstep(PHOTO.close0, PHOTO.close1, camDist) : float(1);
+  mat.opacityNode = closeIn.mul(float(1).sub(smoothstep(PHOTO.near, PHOTO.far, camDist))).mul(observed);
   return mat;
 }
 

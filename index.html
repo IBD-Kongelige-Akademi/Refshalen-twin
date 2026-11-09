@@ -256,9 +256,10 @@
   <!-- Building model level (js/buildings-stream.js setLevel): each level adds to the one above it -->
   <div id="buildings-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-buildings" aria-label="Building model level">
     <div class="pop-title">Building model <kbd>L</kbd></div>
+    <button id="bl-white" class="pop-item tp-btn level-btn" data-building-level="white" type="button" aria-pressed="false"><span class="pop-name">0 · White LoD2</span><span class="pop-sub">Bare white building shells</span></button>
     <button id="bl-lod2" class="pop-item tp-btn level-btn" data-building-level="lod2" type="button" aria-pressed="false"><span class="pop-name">1 · LoD2</span><span class="pop-sub">Measured shells, no textures</span></button>
     <button id="bl-photo" class="pop-item tp-btn level-btn" data-building-level="photo" type="button" aria-pressed="false"><span class="pop-name">2 · LoD2 + Skråfoto</span><span class="pop-sub">Oblique aerial photos on the walls</span></button>
-    <button id="bl-generated" class="pop-item tp-btn level-btn" data-building-level="generated" type="button" aria-pressed="false"><span class="pop-name">3 · + Generated detail</span><span class="pop-sub">Windows, doors, roof details, textures</span></button>
+    <button id="bl-generated" class="pop-item tp-btn level-btn" data-building-level="generated" type="button" aria-pressed="false"><span class="pop-name">3 · LoD2 + Generated detail</span><span class="pop-sub">Windows, doors, roof details, textures</span></button>
     <button id="bl-full" class="pop-item tp-btn level-btn active" data-building-level="full" type="button" aria-pressed="true"><span class="pop-name">4 · Full</span><span class="pop-sub">Hero buildings from drawings</span></button>
     <div id="bl-status" class="pop-status" aria-live="polite"></div>
   </div>
