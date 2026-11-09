@@ -30,7 +30,7 @@ import { tileOfLocal, tileBoundsLocal } from './tile-grid.js';
 import { createBaseGeo, graphFixFits, createTileData } from './tile-data.js';
 import { createTileStreamer } from './tile-streamer.js';
 import { streamConfig, extentOfTiles, distanceToRect } from './tile-rings.js';
-import { createBuildingsLayer } from './buildings-stream.js';
+import { createBuildingsLayer, initialBuildingLevel } from './buildings-stream.js';
 import { createSlicer, nextFrame } from './yield-frame.js';
 import { createGroundLayer } from './ground-stream.js';
 import { createWaterLayer, reflectOptions } from './water-stream.js';
@@ -772,9 +772,17 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     globalThis.__structures = structures;
   }
   // what the override meshes bring for people to walk: `?overrides=0` draws no mesh, so nothing of theirs is underfoot or in the way either
-  const shownOverrides = overridesMode() === 'on' ? (ctx) => ctx.overrides : () => null;
+  // and below the 'full' building level (the HUD's switch, js/buildings-stream.js setLevel) no override is shown either
+  let buildingLevel = initialBuildingLevel();
+  const shownOverrides = overridesMode() === 'on' ? (ctx) => (buildingLevel === 'full' ? ctx.overrides : null) : () => null;
+  const nearOverrideTiles = new Map(); // near tile id -> ctx, to redo its decks and colliders when the level changes
   // a terrace and its stairs (an entry's `walk.decks`) stand in the deck field, each tile's apart from its bridges
-  layers.push({ name: 'override-decks', rings: ['near'], add: (ctx) => deckField.add(`override:${ctx.id}`, overrideDecks(shownOverrides(ctx))), remove: (id) => deckField.remove(`override:${id}`) });
+  const addOverrideDecks = (ctx) => deckField.add(`override:${ctx.id}`, overrideDecks(shownOverrides(ctx)));
+  layers.push({
+    name: 'override-decks', rings: ['near'],
+    add: (ctx) => { nearOverrideTiles.set(ctx.id, ctx); addOverrideDecks(ctx); },
+    remove: (id) => { nearOverrideTiles.delete(id); deckField.remove(`override:${id}`); }
+  });
   let roads = null;
   let walk = null;
   let walkLimits = null; // the carriageways, the water and the railway, where people do not walk (js/walk-limits.js)
@@ -808,17 +816,27 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
   // agent region (<= 560 m) lies inside the near ring, so every actor and the player meet the solids around them.
   const staticIndex = createTiledStaticIndex();
   const colliderGround = terrain.flat ? null : terrain;
+  const colliderTiles = new Map(); // near tile id -> ctx
+  const addBuildingColliders = (ctx) => staticIndex.set(`b:${ctx.id}`, buildStaticColliders({ buildings: overrideFootprints(ctx.ownBuildings, shownOverrides(ctx)) }, { groundHeight: colliderGround }));
   if (!flags.has('nobuildings')) {
     layers.push({
       name: 'colliders', rings: ['near'],
-      add: (ctx) => staticIndex.set(`b:${ctx.id}`, buildStaticColliders({ buildings: overrideFootprints(ctx.ownBuildings, shownOverrides(ctx)) }, { groundHeight: colliderGround })),
-      remove: (id) => staticIndex.remove(`b:${id}`)
+      add: (ctx) => { colliderTiles.set(ctx.id, ctx); addBuildingColliders(ctx); },
+      remove: (id) => { colliderTiles.delete(id); staticIndex.remove(`b:${id}`); }
     });
   }
 
   let buildings = null;
   if (!flags.has('nobuildings')) {
-    buildings = createBuildingsLayer(scene, { terrain: terrain.flat ? null : terrain, lod2, observed: !flags.has('noobserved'), pool, lite: !flags.has('nolite') });
+    buildings = createBuildingsLayer(scene, { terrain: terrain.flat ? null : terrain, lod2, observed: !flags.has('noobserved'), pool, lite: !flags.has('nolite'), level: buildingLevel });
+    // the overrides' terraces and solids come and go with the 'full' level
+    buildings.onLevel((level) => {
+      const before = buildingLevel === 'full';
+      buildingLevel = level;
+      if (before === (level === 'full')) return;
+      for (const ctx of nearOverrideTiles.values()) addOverrideDecks(ctx);
+      for (const ctx of colliderTiles.values()) if (ctx.overrides) addBuildingColliders(ctx);
+    });
     layers.push({ name: 'buildings', rings: ['near', 'mid'], fidelity: true, add: (ctx, ring) => buildings.addTile(ctx.id, ctx, ring), remove: (id) => buildings.removeTile(id) });
   }
 

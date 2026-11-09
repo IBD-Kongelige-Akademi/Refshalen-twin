@@ -1,5 +1,5 @@
 import * as THREE from 'three/webgpu';
-import { attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
+import { BUILDING_LEVELS, attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
 import { texRequested, createPhotoBudget } from './facade-lod.js';
 import { createSharedSlicer } from './yield-frame.js';
 import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from './detail-overrides.js';
@@ -13,8 +13,29 @@ import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from '
 // Detail overrides (js/detail-overrides.js): a near tile builds its `overrides` layer's meshes in place of the generated buildings they cover,
 // within one texture budget over every tile (nearest first); a mid tile never loads them (the generated building with its measured tones),
 // so the swap happens with the near / mid rebuild that already swaps the photo walls. A tile removed while its overrides load aborts them.
+// setLevel() switches the building model level (BUILDING_LEVELS in js/buildings-real.js: plain LoD2, + Skraafoto photos, + generated
+// windows and doors, + hero buildings) and rebuilds every resident tile at it; each tile keeps its old build until the new one is in.
 
-export function createBuildingsLayer(scene, { terrain = null, lod2 = null, observed = true, tex = texRequested(), pool = null, lite = true } = {}) {
+const LEVEL_KEY = 'aalborg-twin.building-level';
+
+/** The building level to start at: `?buildings=lod2|photo|generated|full`, else the one the HUD last chose, else 'full'. */
+export function initialBuildingLevel(search = globalThis.location?.search || '') {
+  let level = null;
+  try { level = new URLSearchParams(search).get('buildings'); } catch { /* no usable query string */ }
+  if (!BUILDING_LEVELS.includes(level)) {
+    try { level = globalThis.localStorage?.getItem(LEVEL_KEY) ?? null; } catch { level = null; }
+  }
+  return BUILDING_LEVELS.includes(level) ? level : 'full';
+}
+
+/** Remembers the HUD's choice for the next visit (best effort: storage may be blocked). */
+export function rememberBuildingLevel(level) {
+  try { globalThis.localStorage?.setItem(LEVEL_KEY, level); } catch { /* private window or blocked storage */ }
+}
+
+export function createBuildingsLayer(scene, { terrain = null, lod2 = null, observed = true, tex = texRequested(), pool = null, lite = true, level = 'full' } = {}) {
+  if (!BUILDING_LEVELS.includes(level)) level = 'full';
+  const levelWatchers = new Set();
   const root = new THREE.Group();
   root.name = 'CopenhagenBuildings';
   scene.add(root);
@@ -23,7 +44,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   const photoBudget = tex ? createPhotoBudget() : null; // one residency plan for the photo walls of every tile
   const ovMode = overridesMode();
   const overrideBudget = ovMode === 'off' ? null : createOverrideBudget();
-  const tiles = new Map(); // id -> { active: { instance, holder, ring, overrideLease } | null, pending: build | null }
+  const tiles = new Map(); // id -> { active: { instance, holder, ring, overrideLease } | null, pending: build | null, ctx, ring }
   let pendingBuilds = 0;
   let disposed = false;
   let resourcesDisposed = false;
@@ -77,12 +98,14 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
       if (disposed) return false;
       let state = tiles.get(id);
       if (!state) tiles.set(id, state = { active: null, pending: null });
+      state.ctx = ctx;
+      state.ring = ring;
       if (state.pending) state.pending.controller?.abort();
       const controller = typeof AbortController === 'function' ? new AbortController() : null;
       const pending = { ring, controller, overrideLease: overrideBudget ? createOverrideBudgetLease(overrideBudget) : null, transferred: false };
       state.pending = pending;
       const near = ring === 'near';
-      const ovLayer = near && overrideBudget ? ctx.overrides : null;
+      const ovLayer = near && overrideBudget && level === 'full' ? ctx.overrides : null;
       const holder = new THREE.Group();
       holder.name = `buildings-${id}`;
       pendingBuilds++;
@@ -92,7 +115,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
           instance = await buildRealBuildings(holder, ctx.buildingGeo, {
             lod2, shared, terrain: terrain?.flat ? null : terrain, observed, withInfoPanel: false, slice, lite: lite && !near, photoBudget, compute: pool ? (job) => pool.run('buildings', job) : null,
             context: { buildings: ctx.geo.buildings, roads: ctx.geo.roads },
-            tex: near ? tex : false, doors: near, signal: controller?.signal || null,
+            tex: near ? tex : false, doors: near, signal: controller?.signal || null, level,
             overrides: ovLayer ? { layer: ovLayer, budget: pending.overrideLease, mode: ovMode, signal: controller?.signal || null, camera: () => (camera ? { x: camera.position.x, z: camera.position.z } : null) } : null,
             ...(near ? { entrances: ctx.entrances, venues: ctx.venues } : { entrances: null, venues: [] })
           });
@@ -140,6 +163,26 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
       disposeActive(id, state.active);
       return true;
     },
+
+    /** The building model level (BUILDING_LEVELS). */
+    get level() { return level; },
+    /**
+     * Switches the building model level and rebuilds every resident tile at it (the old build stays until the new one is in).
+     * @returns {Promise<boolean>} resolves when the rebuilds are done (false: unknown level or no change)
+     */
+    async setLevel(next) {
+      if (!BUILDING_LEVELS.includes(next) || next === level || disposed) return false;
+      level = next;
+      for (const fn of levelWatchers) fn(level);
+      const builds = [...tiles.entries()].filter(([, state]) => state.ctx && (state.active || state.pending)).map(([id, state]) => api.addTile(id, state.ctx, state.ring).catch((error) => {
+        console.warn(`[cph] buildings of tile ${id} not rebuilt at level ${level}:`, error?.message || error);
+        return false;
+      }));
+      await Promise.all(builds);
+      return true;
+    },
+    /** fn(level) whenever the level changes; returns the unsubscribe. */
+    onLevel(fn) { levelWatchers.add(fn); return () => levelWatchers.delete(fn); },
 
     has: (id) => !!tiles.get(id)?.active,
     ringOf: (id) => tiles.get(id)?.active?.ring ?? null,

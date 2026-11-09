@@ -1,7 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { createPreWarBuildingMaterial, createCurtainWallMaterial } from './tsl-materials.js';
 import { attribute } from 'three/tsl';
-import { roofRoughness, roofTileFactor } from './roof-tile-material.js';
+import { roofRoughness, roofTileFactor, roofTileMean } from './roof-tile-material.js';
 import { createAccumulator, addBuilding, groundLow } from './building-geometry.js';
 import { buildingSteps, ringCentre, wallArrays as wallTyped, roofArrays as roofTyped } from './building-compute.js';
 import { describeAppearance, calibrationOn } from './appearance.js';
@@ -521,8 +521,28 @@ function createBuildingMaterials() {
   // the parametric details of the detail overrides (js/detail-overrides.js): openings, cornices, dormers, chimneys in vertex colours
   const detailMaterial = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.6, metalness: 0, side: THREE.DoubleSide });
   detailMaterial.name = 'cph-override-details';
-  return { masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial };
+  // the untextured building levels (BUILDING_LEVELS 'lod2' / 'photo'): the wall's measured tone from the facade frame, no procedural
+  // windows, bricks or doors; the roofs in their colour without the clay tile pattern
+  const plainWall = new THREE.MeshStandardNodeMaterial({ roughness: 0.92, metalness: 0 });
+  plainWall.name = 'cph-wall-plain';
+  plainWall.colorNode = attribute('facadeTone', 'vec4').xyz;
+  const plainRoof = new THREE.MeshStandardNodeMaterial({ vertexColors: true, roughness: 0.88, metalness: 0.02 });
+  plainRoof.name = 'cph-roof-plain';
+  plainRoof.roughnessNode = roofRoughness();
+  plainRoof.metalnessNode = attribute('roofMat', 'vec2').y;
+  // as roofMaterial: vertexColors with a colorNode of the colour applies the tone twice, which the calibrated roof tones expect
+  plainRoof.colorNode = attribute('color', 'vec3').mul(roofTileMean());
+  return { masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial, plainWall, plainRoof };
 }
+
+/**
+ * The building model levels the HUD switches between (js/buildings-stream.js setLevel), lowest first:
+ *   lod2       the LoD2 shells in their measured tones: no photos, no generated windows / doors / roof details, no detail overrides
+ *   photo      LoD2 with the Skraafoto wall photos (the photo atlases over the plain shell)
+ *   generated  LoD2 with the photos plus the generated windows, doors, ground floors, roof details and procedural textures
+ *   full       everything, including the hero buildings made from drawings (detail overrides)
+ */
+const BUILDING_LEVELS = ['lod2', 'photo', 'generated', 'full'];
 
 /**
  * @param {object} opts
@@ -535,7 +555,12 @@ function createBuildingMaterials() {
  *             every building it covers (they are not built at all); one that fails to load falls back to the generated building with its
  *             parametric details
  */
-async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel = true, lod2 = null, tex = texRequested(), observed = true, terrain = null, venues = null, entrances = undefined, shared = null, context = null, doors: wantDoors = true, slice = null, lite = false, compute = null, photoBudget = null, overrides = null, signal = null } = {}) {
+async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel = true, lod2 = null, tex = texRequested(), observed = true, terrain = null, venues = null, entrances = undefined, shared = null, context = null, doors: wantDoors = true, slice = null, lite = false, compute = null, photoBudget = null, overrides = null, signal = null, level = 'full' } = {}) {
+  // the model level (BUILDING_LEVELS): lower levels drop the overrides, the generated detail and the photos
+  if (level !== 'full') overrides = null;
+  const plain = level === 'lod2' || level === 'photo';
+  if (plain) wantDoors = false;
+  if (level === 'lod2') { lite = true; tex = false; }
   const abortBuild = () => { throw Object.assign(new Error('Building tile build aborted'), { name: 'AbortError' }); };
   const checkpoint = async () => {
     if (signal?.aborted) abortBuild();
@@ -585,7 +610,10 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
   const root = new THREE.Group();
   root.name = 'CopenhagenBuildings';
   scene.add(root);
-  const { masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial } = shared || createBuildingMaterials();
+  const materials = shared || createBuildingMaterials();
+  const { masonry, liteWall, detailMaterial, doorMaterial } = materials;
+  const glass = plain ? materials.plainWall : materials.glass;
+  const roofMaterial = plain ? materials.plainRoof : materials.roofMaterial;
   const heroGroups = [];
   const heroStatus = [];
   const overrideGroups = [];
@@ -605,7 +633,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
   };
 
   try {
-    const wallMaterial = lite ? liteWall : masonry;
+    const wallMaterial = lite ? liteWall : plain ? materials.plainWall : masonry;
 
     // LoD2 roofs (tools/lod2): every building with a measured roofer record gets its pitched roof; the rest keep the flat
     // extrusion. The join is by building id, so the geodata compiler never needs to know about LoD2.
@@ -624,7 +652,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     const wantEntrances = !lite && wantDoors ? (entrances === undefined ? await loadEntrances() : entrances) : null;
     if (signal?.aborted) abortBuild();
     const job = {
-      buildings, heroIds: [...skipIds], observed, doors: wantDoors && !lite, lite, wantQuads: !lite && !!tex, calibration: calibrationOn(),
+      buildings, heroIds: [...skipIds], observed, doors: wantDoors && !lite, lite, wantQuads: !lite && !!tex, calibration: calibrationOn(), details: !plain,
       // the neighbourhood the ground floor reads: footprints and the road lines only (the rest of a record stays here)
       context: lite ? null : {
         buildings: (context?.buildings || buildings).map((b) => ({ id: b.id, ring: b.ring, holes: b.holes })),
@@ -717,7 +745,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
       skipIds.delete(b.id);
       const acc = createAccumulator({ lite });
       const ground = lite ? null : createGroundContext({ roads: context?.roads || geo.roads || [], buildings: context?.buildings || buildings, venues: job.venues, entrances: wantEntrances ? createEntranceIndex(wantEntrances) : null });
-      const added = addBuilding(acc, b, { ...(lite ? { lite: true } : { ground }), ...(terrain ? { terrain } : {}), ...(observed ? {} : { observed: false }) });
+      const added = addBuilding(acc, b, { ...(lite ? { lite: true } : { ground }), ...(terrain ? { terrain } : {}), ...(observed ? {} : { observed: false }), ...(plain ? { details: false } : {}) });
       if (added?.doorInfo) doorInfo.set(b.id, added.doorInfo);
       const heroDoors = createDoorAccumulator();
       if (wantDoors && added?.doors?.length) doorCount += addDoors(heroDoors, added.doors, { ground: b.ground, heightAt: terrain && !terrain.flat ? (x, z) => terrain.heightAt(x, z) : null });
@@ -854,7 +882,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
       // hero glTFs own their materials and textures (loadHero builds them per load)
       releaseHeroes();
       disposeTree(root);
-      if (!shared) for (const m of [masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial]) m.dispose();
+      if (!shared) for (const m of Object.values(materials)) m.dispose();
       panel?.element.remove();
       root.clear();
       leaves.length = 0;
@@ -889,10 +917,10 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     texManager?.dispose();
     releaseHeroes();
     disposeTree(root);
-    if (!shared) for (const m of [masonry, glass, roofMaterial, doorMaterial, liteWall, detailMaterial]) m.dispose();
+    if (!shared) for (const m of Object.values(materials)) m.dispose();
     panel?.element.remove();
     throw error;
   }
 }
 
-export { attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel, describeBuilding, rangeAt, setAddressLoader, titleFor };
+export { BUILDING_LEVELS, attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel, describeBuilding, rangeAt, setAddressLoader, titleFor };

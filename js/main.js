@@ -7,6 +7,7 @@ import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
 import { isTypingInField, TELEPORT_LOCATIONS } from './city-config.js';
 import { CITY_TELEPORT_LOCATIONS } from './city-teleports.js';
 import { buildWorld } from './world.js';
+import { rememberBuildingLevel } from './buildings-stream.js';
 import { ThirdPersonControllerManager } from './controllers.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
@@ -549,10 +550,40 @@ async function initApp() {
   // the bars, pubs and nightclubs (tools/geodata/nightlife.py): neon, coloured spill and beats after dark (js/nightlife*.js)
   const nightlifeScene = createNightlifeScene(scene, nightlife, { groundHeight: world.groundHeight, furniture: world.furniture });
   world.fetchCityJson?.('nightlife.json').then((doc) => nightlife.setVenues(doc.venues)).catch((e) => console.info('[nightlife] no data/city/nightlife.json:', e?.message || e));
+  // Building model level (js/buildings-stream.js setLevel): plain LoD2 -> + Skraafoto photos -> + generated windows / doors -> + hero buildings
+  const levelButtons = [...document.querySelectorAll('[data-building-level]')];
+  const levelStatus = document.getElementById('bl-status');
+  const buildingLayer = world.buildings?.setLevel ? world.buildings : null;
+  const levelIds = levelButtons.map((btn) => btn.getAttribute('data-building-level'));
+  let levelRun = 0;
+  function showBuildingLevel(level) {
+    levelButtons.forEach((btn) => {
+      const selected = btn.getAttribute('data-building-level') === level;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', String(selected));
+    });
+  }
+  function selectBuildingLevel(level) {
+    if (!buildingLayer || level === buildingLayer.level) return;
+    showBuildingLevel(level);
+    rememberBuildingLevel(level);
+    const run = ++levelRun;
+    if (levelStatus) levelStatus.textContent = 'Rebuilding the buildings…';
+    buildingLayer.setLevel(level).finally(() => {
+      if (run === levelRun && levelStatus) levelStatus.textContent = '';
+    });
+  }
+  if (buildingLayer) {
+    showBuildingLevel(buildingLayer.level);
+    levelButtons.forEach((btn) => btn.addEventListener('click', () => selectBuildingLevel(btn.getAttribute('data-building-level'))));
+  } else {
+    document.getElementById('btn-buildings')?.setAttribute('hidden', '');
+  }
+
   const openMapBtn = document.getElementById('btn-open-map');
   if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
 
-  // Global keyboard shortcuts for modes (1-4), cameras (V / 6-0), and HUD (H)
+  // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
   window.addEventListener('keydown', (e) => {
     if (isTypingInField(e)) return;
     switch (e.code) {
@@ -591,6 +622,12 @@ async function initApp() {
         break;
       case 'KeyH':
         if (hudToggleBtn) hudToggleBtn.click();
+        break;
+      case 'KeyL':
+        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && buildingLayer) {
+          const i = levelIds.indexOf(buildingLayer.level);
+          selectBuildingLevel(levelIds[(i + (e.shiftKey ? -1 : 1) + levelIds.length) % levelIds.length]);
+        }
         break;
       case 'KeyN':
         if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) audioSystem.setEnabled(!audioSystem.enabled);

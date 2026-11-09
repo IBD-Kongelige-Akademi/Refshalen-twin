@@ -631,6 +631,25 @@ body.hud-minimized .icon-show {
   color: var(--text-3);
 }
 
+.pop-item.active .pop-sub {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+.pop-title kbd {
+  margin-left: 6px;
+}
+
+/* building model level: "rebuilding" while the resident tiles are rebuilt at the new level */
+.pop-status {
+  padding: 4px 10px 2px;
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.pop-status:empty {
+  display: none;
+}
+
 /* ------------------------------------------------------------------------------------------------------------------
    Bottom left: street-name plate
    ------------------------------------------------------------------------------------------------------------------ */

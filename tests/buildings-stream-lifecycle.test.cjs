@@ -34,7 +34,7 @@ function setup({ overrideMode = 'off' } = {}) {
   }]));
   const imports = {
     'three/webgpu': { Group },
-    './buildings-real.js': { buildRealBuildings, createBuildingMaterials, createInfoPanel: () => null },
+    './buildings-real.js': { BUILDING_LEVELS: ['lod2', 'photo', 'generated', 'full'], buildRealBuildings, createBuildingMaterials, createInfoPanel: () => null },
     './facade-lod.js': { texRequested: () => false, createPhotoBudget: () => null },
     './yield-frame.js': { createSharedSlicer: (budget) => { slicer = async () => {}; slicer.budget = budget; return slicer; } },
     './detail-overrides.js': {
@@ -216,4 +216,32 @@ test('failed and removed late builds release only their build-local override res
   assert.equal(late.disposeCount, 1);
   assert.equal(h.layer.overrideBudget.memory().meshes, 0);
   assert.equal(active.disposeCount, 1);
+});
+
+test('setLevel rebuilds each resident tile at its ring with the new level, keeping the old build until then', async () => {
+  const h = setup({ overrideMode: 'on' });
+  const old = await buildActive(h, 'old', 'near');
+  assert.equal(h.layer.level, 'full');
+  assert.equal(h.calls.at(-1).options.level, 'full');
+  assert.ok(h.calls.at(-1).options.overrides, 'the full level builds the overrides');
+  const seen = [];
+  h.layer.onLevel((level) => seen.push(level));
+
+  const switching = h.layer.setLevel('photo');
+  const call = h.calls.at(-1);
+  assert.equal(h.calls.length, 2);
+  assert.equal(call.options.level, 'photo');
+  assert.equal(call.options.overrides, null, 'below full no override is loaded');
+  assert.equal(call.options.doors, true, 'the ring still decides; buildRealBuildings drops the doors for the level');
+  assert.deepEqual(seen, ['photo']);
+  assert.equal(h.layer.byId.get('old').id, 'old', 'the old build stays until the new one is in');
+
+  call.resolve(h.instance('next'));
+  assert.equal(await switching, true);
+  assert.equal(h.layer.ringOf('tile'), 'near');
+  assert.equal(h.layer.byId.get('next').id, 'next');
+  assert.equal(old.disposeCount, 1);
+  assert.equal(await h.layer.setLevel('photo'), false, 'no change, no rebuild');
+  assert.equal(await h.layer.setLevel('nonsense'), false);
+  assert.equal(h.calls.length, 2);
 });

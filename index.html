@@ -156,6 +156,7 @@
       <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M5.5 18.5 7 17M17 7l1.5-1.5"/></symbol>
       <symbol id="i-twilight" viewBox="0 0 24 24"><path d="M3 15.5h18M7.5 19h9M8 15.5a4 4 0 0 1 8 0M17.5 4v3.2M15.9 5.6h3.2M7 7.4v1.8M6.1 8.3h1.8"/></symbol>
       <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.6A7.8 7.8 0 0 1 9.4 4.5a7.8 7.8 0 1 0 10.1 10.1z"/></symbol>
+      <symbol id="i-building" viewBox="0 0 24 24"><path d="M3.5 20.5h17M5.5 20.5V9.2L12 4l6.5 5.2v11.3M9.5 20.5v-4.6h5v4.6M8.6 11.4h.01M12 11.4h.01M15.4 11.4h.01"/></symbol>
       <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21.2s-6.6-5.7-6.6-11.2a6.6 6.6 0 0 1 13.2 0c0 5.5-6.6 11.2-6.6 11.2z"/><circle cx="12" cy="10" r="2.4"/></symbol>
       <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></symbol>
       <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3.5 3.5l17 17M10.6 5.6c.5-.1.9-.1 1.4-.1 6 0 9.5 6.5 9.5 6.5a16 16 0 0 1-2.4 3.2M6.6 6.6A15.6 15.6 0 0 0 2.5 12s3.5 6.5 9.5 6.5c1.6 0 3.1-.4 4.4-1.1M9.9 9.9a2.8 2.8 0 0 0 4.2 4.2"/></symbol>
@@ -227,6 +228,9 @@
       <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
         <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Teleport</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
+      <button id="btn-buildings" class="tool-btn" type="button" popovertarget="buildings-popover" title="Building model level [L cycles]">
+        <svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span class="tool-label">Buildings</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </button>
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="btn-sound" class="tool-btn icon-only" type="button" title="Mute sound [N]" aria-label="Mute sound" aria-pressed="true">
         <svg class="icon" aria-hidden="true"><use href="#i-sound"/></svg>
@@ -247,6 +251,16 @@
     <button id="tp-limfjord" class="pop-item tp-btn" data-teleport="limfjord" type="button"><span class="pop-name">Limfjordsbroen</span><span class="pop-sub">Harbour front · the bridge</span></button>
     <button id="tp-utzon" class="pop-item tp-btn" data-teleport="utzon" type="button"><span class="pop-name">Utzon Center</span><span class="pop-sub">Harbour front · Limfjord</span></button>
     <div id="tp-city-title" class="pop-title" hidden>Citywide</div>
+  </div>
+
+  <!-- Building model level (js/buildings-stream.js setLevel): each level adds to the one above it -->
+  <div id="buildings-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-buildings" aria-label="Building model level">
+    <div class="pop-title">Building model <kbd>L</kbd></div>
+    <button id="bl-lod2" class="pop-item tp-btn level-btn" data-building-level="lod2" type="button" aria-pressed="false"><span class="pop-name">1 · LoD2</span><span class="pop-sub">Measured shells, no textures</span></button>
+    <button id="bl-photo" class="pop-item tp-btn level-btn" data-building-level="photo" type="button" aria-pressed="false"><span class="pop-name">2 · LoD2 + Skråfoto</span><span class="pop-sub">Oblique aerial photos on the walls</span></button>
+    <button id="bl-generated" class="pop-item tp-btn level-btn" data-building-level="generated" type="button" aria-pressed="false"><span class="pop-name">3 · + Generated detail</span><span class="pop-sub">Windows, doors, roof details, textures</span></button>
+    <button id="bl-full" class="pop-item tp-btn level-btn active" data-building-level="full" type="button" aria-pressed="true"><span class="pop-name">4 · Full</span><span class="pop-sub">Hero buildings from drawings</span></button>
+    <div id="bl-status" class="pop-status" aria-live="polite"></div>
   </div>
 
   <!-- Bottom-Left: Street-Name Sign & Live Radar Minimap -->

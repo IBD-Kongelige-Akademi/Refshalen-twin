@@ -16,6 +16,13 @@ export const roofTiled = () => step(float(ROOF_TILE_FLAG - 0.5), attribute('roof
 /** The roof's roughness without the mark. */
 export const roofRoughness = () => attribute('roofMat', 'vec2').x.sub(roofTiled().mul(ROOF_TILE_FLAG));
 
+/** The tile pattern's mean alone (the plain building levels): what a distant pitched tiled roof takes, else 1. */
+export const roofTileMean = Fn(() => {
+  const n = normalize(normalWorld);
+  const pitched = float(1).sub(smoothstep(0.96, 0.995, n.y));
+  return mix(float(1), float(PATTERN_MEAN), roofTiled().mul(pitched));
+});
+
 /** The factor on a roof's tone: the tile pattern on a pitched face of a tiled roof, else 1. */
 export const roofTileFactor = Fn(() => {
   const wp = positionWorld;

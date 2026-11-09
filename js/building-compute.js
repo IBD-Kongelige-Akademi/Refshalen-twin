@@ -75,11 +75,12 @@ export function transferablesOf(result) {
  *   lod2          Map id -> parsed LoD2 record (js/lod2-geometry.js)
  *   lows          Map id -> lowest ground under the footprint (groundLow), when the build has no terrain
  *   observed, wantQuads (photo walls), doors, lite (tone-only walls, no facade frame, no doors, no details), calibration
+ *   details       false: no generated roof details (dormers, chimneys, cornices; the plain building levels)
  * @returns {{ leaves: object[], glass: object|null, doorInfo: Array, doors: Array, texCandidates: object[], stats: object }}
  *   leaves[i] = { centre, radius, wall, roof, roofRanges, wallRanges, detailParts, doors: [{ id, ground, doors }] }
  */
 export function* buildingSteps(job) {
-  const { buildings = [], heroIds = [], context = null, venues = [], entrances = null, lod2 = null, lows = null, observed = true, wantQuads = false, doors: wantDoors = true, lite = false, calibration } = job;
+  const { buildings = [], heroIds = [], context = null, venues = [], entrances = null, lod2 = null, lows = null, observed = true, wantQuads = false, doors: wantDoors = true, lite = false, details = true, calibration } = job;
   if (calibration !== undefined) setCalibration(calibration);
   const heroSet = new Set(heroIds);
   const lod2Records = lod2 instanceof Map ? lod2 : new Map(Object.entries(lod2 || {}));
@@ -120,7 +121,7 @@ export function* buildingSteps(job) {
       const added = addBuilding(acc, b, {
         ...(lite ? { lite: true } : { ground }), ...(glassy ? { wallAcc: glassAcc } : {}),
         ...(lod2Records.has(b.id) && !Number.isFinite(b.base) ? { lod2: lod2Records.get(b.id) } : {}), ...(quads ? { quads } : {}),
-        ...(observed ? {} : { observed: false }), ...(low !== undefined ? { low } : {})
+        ...(observed ? {} : { observed: false }), ...(low !== undefined ? { low } : {}), ...(details ? {} : { details: false })
       });
       if (added) triangles += added.wallTriangles + added.roofTriangles;
       if (added?.doorInfo) doorInfo.push([b.id, added.doorInfo]);
