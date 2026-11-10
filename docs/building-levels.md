@@ -8,7 +8,7 @@ The HUD's **Buildings** menu (top right; `L` steps forward, `Shift+L` back) show
 | 1 · LoD2 (`lod2`) | The measured LoD2 shells (extrusions where no LoD2 record exists) in their measured tones. No photos, windows, doors, roof details or tile pattern. Every ring is built tone-only (`lite`). | `liteWall`, `plainRoof` |
 | 2 · LoD2 + Skråfoto (`photo`) | Level 1 plus the Skraafoto wall photos (the photo atlases) on the near ring, kept all the way up to the wall (see below). The plain tone shows where the photo is missing: walls the aerial photos did not see, and beyond the photos' far fade (115-150 m). | `plainWall`, `plainRoof`, photo manager |
 | 3 · LoD2 + Generated detail (`generated`) | Level 2 plus the generated facade: procedural windows and bricks, entrance doors, ground floors and shopfronts, roof details (dormers, chimneys, cornices), clay tile on tegl roofs. This was the twin without its detail overrides. | `masonry`, `roofMaterial` |
-| 4 · Full (`full`) | Level 3 plus the detail overrides, the hero buildings made from drawings (Budolfi, Ansgars Kirke, Hotel Hvide Hus) or, with no drawings, from the LoD2 shells and photos (Aalborg Kongres & Kultur Center). The default. | `js/detail-overrides.js` |
+| 4 · Full (`full`) | Level 3 plus the detail overrides, the hero buildings made from drawings (Budolfi, Ansgars Kirke, Hotel Hvide Hus) or, with no drawings, from the LoD2 shells and photos (Aalborg Kongres & Kultur Center, Musikkens Hus). The default. | `js/detail-overrides.js` |
 
 `?buildings=white|lod2|photo|generated|full` picks the level at boot. Otherwise the twin starts at the level last chosen in the HUD, which is saved in `localStorage` (`aalborg-twin.building-level`).
 
