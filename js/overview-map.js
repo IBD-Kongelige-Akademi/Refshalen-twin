@@ -14,6 +14,8 @@ const MIN_ZOOM = 0.08; // full map, pixels per metre: the district and its surro
 const MAX_ZOOM = 6.0; // single doors
 const RADAR_SCALE = 0.9; // radar pixels per metre on the ground (zooms out with altitude)
 const STREET_ZOOM = 1.6; // "street view around you"
+const MAP_PAD_PAN = 600; // gamepad pan, screen pixels a second at full stick
+const MAP_PAD_ZOOM = 3; // gamepad zoom, times a second at a full trigger
 const ROUTE_EVERY_MS = 400; // the GPS route is recomputed at most this often, and only when the player has moved
 const RADAR_EVERY_MS = 66; // the radar's moving parts are redrawn ~15 times a second; its ground layers come from a cache
 
@@ -607,6 +609,7 @@ class OverviewMap {
     if (!this.fullCanvas) return;
     this.fullCanvas.style.touchAction = 'none';
     this.fullCanvas.addEventListener('pointerdown', (e) => {
+      this.setPadCursor(false);
       if (e.button !== 0 || !this.isFullMapOpen || this.panPointerId !== null) return;
       e.preventDefault();
       this.panPointerId = e.pointerId;
@@ -699,6 +702,53 @@ class OverviewMap {
     const label = this.locate(x, z) || '';
     const i = label.indexOf(' · ');
     return i >= 0 ? label.slice(i + 3) : label || 'Aalborg';
+  }
+
+  /** The gamepad's crosshair at the centre of the full map (a mouse press hides it again) */
+  setPadCursor(on) {
+    if (this.padCursor === Boolean(on)) return;
+    this.padCursor = Boolean(on);
+    this.fullCanvasWrap?.classList.toggle('pad-cursor', this.padCursor);
+  }
+
+  /** The place under the crosshair, inside the map's extent */
+  centerWorld() {
+    return this.clampToData({ x: this.viewCenterX, z: this.viewCenterZ });
+  }
+
+  /**
+   * Gamepad on the full map: the stick pans (`panX`, `panY` in -1..1, MAP_PAD_PAN screen pixels a second at full tilt, so the same
+   * on-screen speed at any zoom) and `zoom` (-1..1) zooms about the centre, MAP_PAD_ZOOM times a second at full press. The crosshair
+   * shows from the first pad input; the hover line names the place under it.
+   */
+  gamepadInput(panX, panY, zoom, dt) {
+    if (!this.isFullMapOpen || !(dt > 0)) return;
+    if (!panX && !panY && !zoom) return;
+    this.setPadCursor(true);
+    this.viewCenterX += (panX * MAP_PAD_PAN * dt) / this.viewZoom;
+    this.viewCenterZ += (panY * MAP_PAD_PAN * dt) / this.viewZoom;
+    if (zoom) this.viewZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.viewZoom * MAP_PAD_ZOOM ** (zoom * dt)));
+    const b = this.bounds;
+    if (b) {
+      this.viewCenterX = Math.max(b.minX, Math.min(b.maxX, this.viewCenterX));
+      this.viewCenterZ = Math.max(b.minZ, Math.min(b.maxZ, this.viewCenterZ));
+    }
+    const p = this.centerWorld();
+    if (this.elHoverInfo) this.elHoverInfo.textContent = `${this.placeName(p.x, p.z)} · A to teleport · X to route`;
+    this.renderFullMap();
+  }
+
+  teleportToCenter() {
+    if (!this.isFullMapOpen) return;
+    const p = this.centerWorld();
+    this.onTeleport?.(p.x, p.z);
+    this.renderFullMap();
+  }
+
+  waypointAtCenter() {
+    if (!this.isFullMapOpen) return;
+    const p = this.centerWorld();
+    this.setWaypoint(p.x, p.z);
   }
 
   setWaypoint(x, z, name = this.placeName(x, z)) {
@@ -798,7 +848,10 @@ class OverviewMap {
 
   toggleFullMap(open) {
     this.isFullMapOpen = Boolean(open);
-    if (!this.isFullMapOpen) this.cancelPan();
+    if (!this.isFullMapOpen) {
+      this.cancelPan();
+      this.setPadCursor(false);
+    }
     if (this.onToggle) this.onToggle(this.isFullMapOpen);
     if (!this.modal) return;
     this.modal.classList.toggle('hidden', !this.isFullMapOpen);

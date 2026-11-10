@@ -247,7 +247,8 @@ function createInfoPanel() {
 /**
  * The info panel opens on a click (a press and release within 5 px with the main button, so orbiting with a drag
  * does not open it) on a building; a click on the open building or on no building closes it. Hovering shows nothing.
- * `pick(ndcX, ndcY)` -> hit | null, `show(id, hit)` fills and opens the panel.
+ * `pick(ndcX, ndcY)` -> hit | null, `show(id, hit)` fills and opens the panel. Returns `toggleAt(ndcX, ndcY)`, the same
+ * open-or-close for a point given without a pointer (the gamepad inspects the building at the centre of the screen).
  */
 function attachBuildingClicks(domElement, panel, pick, show) {
   let open = null;
@@ -261,7 +262,10 @@ function attachBuildingClicks(domElement, panel, pick, show) {
   domElement.addEventListener('pointerup', (e) => {
     if (!down || e.button !== 0 || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 5) return;
     down = null;
-    const hit = pick(...toNdc(e));
+    toggleAt(...toNdc(e));
+  });
+  function toggleAt(ndcX, ndcY) {
+    const hit = pick(ndcX, ndcY);
     if (hit && hit.id !== open) {
       open = hit.id;
       show(hit.id, hit);
@@ -269,7 +273,9 @@ function attachBuildingClicks(domElement, panel, pick, show) {
       open = null;
       panel.hide();
     }
-  });
+    return hit;
+  }
+  return toggleAt;
 }
 
 // One photo atlas is handed to the GPU per animation frame: several decoded together would all be uploaded (and get their mipmaps) by
@@ -898,8 +904,11 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     function attach({ camera: cam, domElement }) {
       camera = cam;
       if (!panel) return;
-      attachBuildingClicks(domElement, panel, pick, (id, hit) => showBuilding(id, true, hit));
+      toggleAt = attachBuildingClicks(domElement, panel, pick, (id, hit) => showBuilding(id, true, hit));
     }
+    let toggleAt = null;
+    /** Opens the info panel for the building at a screen point, or closes it (as a click there would). */
+    const toggleInfoAt = (ndcX, ndcY) => toggleAt?.(ndcX, ndcY) ?? null;
 
     let meshCount = 0;
     root.traverse((object) => { if (object.isMesh) meshCount++; });
@@ -911,7 +920,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
 
     const setCamera = (cam) => { camera = cam; };
 
-    return { group: root, leaves, update, pick, attach, setCamera, showBuilding, infoFor, dispose, stats, byId, heroGroups, heroStatus, texManager, neon, overrideGroups, overrideIds: () => [...ovShown.keys()] };
+    return { group: root, leaves, update, pick, attach, setCamera, showBuilding, toggleInfoAt, infoFor, dispose, stats, byId, heroGroups, heroStatus, texManager, neon, overrideGroups, overrideIds: () => [...ovShown.keys()] };
   } catch (error) {
     buildFailed = true;
     for (const group of pendingOverrideGroups) releaseOverride(group);

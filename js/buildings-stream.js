@@ -52,6 +52,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   let resourcesDisposed = false;
   let camera = null;
   let panel = null;
+  let toggleAt = null; // the info panel's open-or-close at a screen point (attachBuildingClicks), once attached
   const owner = new Map(); // building id -> tile id (for the panel)
 
   const activeTiles = () => [...tiles.values()].filter((tile) => tile.active);
@@ -220,7 +221,12 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
       for (const { active } of tiles.values()) active?.instance.setCamera(cam);
       if (typeof document === 'undefined' || !domElement) return;
       panel = createInfoPanel();
-      attachBuildingClicks(domElement, panel, (x, y) => api.pick(x, y), (id, hit) => api.showBuilding(id, true, hit));
+      toggleAt = attachBuildingClicks(domElement, panel, (x, y) => api.pick(x, y), (id, hit) => api.showBuilding(id, true, hit));
+    },
+
+    /** Opens the info panel for the building at a screen point, or closes it (as a click there would). */
+    toggleInfoAt(ndcX, ndcY) {
+      return toggleAt ? toggleAt(ndcX, ndcY) : null;
     },
 
     get stats() { return totals(); },

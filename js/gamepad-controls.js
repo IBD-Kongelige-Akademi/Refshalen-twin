@@ -2,6 +2,13 @@ import { isTypingInField } from './city-config.js';
 
 const DEAD_ZONE = 0.15;
 const BUTTON_COUNT = 17;
+const LONG_PRESS = 600; // ms of wall-clock time (the frame dt is capped, so it runs slow at low frame rates): View held this long toggles the sound instead of the HUD
+
+// Standard-mapping buttons (Xbox names; PlayStation: A = Cross, B = Circle, X = Square, Y = Triangle, View = Share / Create)
+const A = 0, B = 1, X = 2, Y = 3, LB = 4, RB = 5, LT = 6, RT = 7, VIEW = 8, MENU = 9, L3 = 10, R3 = 11;
+const UP = 12, DOWN = 13, LEFT = 14, RIGHT = 15;
+// Buttons that keep working while the full map is open (everything else is suppressed there)
+const MAP_BUTTONS = new Set([A, B, X, MENU]);
 
 function axis(value) {
   return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
@@ -36,6 +43,8 @@ class GamepadControls {
     this.suppressedButtons = [];
     this.syncButtons = true;
     this.revision = 0;
+    this.viewDownAt = null; // performance.now() when View went down; a release before LONG_PRESS is a tap
+    this.viewFired = false;
     this.focused = typeof document.hasFocus !== 'function' || document.hasFocus();
 
     window.addEventListener('blur', () => {
@@ -69,6 +78,7 @@ class GamepadControls {
 
   reset() {
     this.revision++;
+    this.viewDownAt = null;
     this.controller.clearGamepadInput();
     const pad = this.readPad();
     if (pad && pad.index === this.padIndex && pad.id === this.padId) {
@@ -111,16 +121,19 @@ class GamepadControls {
     const edge = (i) => pressed[i] && !this.previousButtons[i] && !this.suppressedButtons[i];
     const held = (i) => pressed[i] && !this.suppressedButtons[i];
     // Capture edges before callbacks: changing mode or opening the map may synchronously call reset().
-    const toggleMap = edge(9), closeMap = edge(1);
-    const cycleMode = Number(Boolean(edge(5))) - Number(Boolean(edge(4)));
-    const cycleCamera = edge(3), recenter = edge(11);
-    const interact = edge(0) && this.controller.getGoBoatInteraction?.();
+    const toggleMap = edge(MENU), closeMap = edge(B), confirm = edge(A), route = edge(X);
+    const cycleMode = Number(Boolean(edge(RB))) - Number(Boolean(edge(LB)));
+    const cycleLevel = Number(Boolean(edge(RIGHT))) - Number(Boolean(edge(LEFT)));
+    const cycleCamera = edge(Y), recenter = edge(R3), horn = edge(L3), inspect = closeMap;
+    const interact = confirm && this.controller.getGoBoatInteraction?.();
     this.previousButtons = pressed;
+    const step = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
 
     const target = document.activeElement;
     const typing = isTypingInField({ target }) || target?.tagName === 'TEXTAREA' || target?.isContentEditable;
     if (!this.focused || document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus()) || typing) {
       this.suppressedButtons = pressed.slice();
+      this.viewDownAt = null;
       this.controller.clearGamepadInput();
       return;
     }
@@ -132,11 +145,36 @@ class GamepadControls {
       return;
     }
     if (!this.enabled) {
+      // The full map: the left stick pans, the triggers (or the D-pad) zoom, A teleports to the crosshair, X routes there, B closes
       this.controller.clearGamepadInput();
-      for (let i = 0; i < BUTTON_COUNT; i++) if (i !== 1 && i !== 9) this.suppressedButtons[i] = pressed[i];
-      if (closeMap) this.callbacks.onCloseMap?.();
+      this.viewDownAt = null;
+      for (let i = 0; i < BUTTON_COUNT; i++) if (!MAP_BUTTONS.has(i)) this.suppressedButtons[i] = pressed[i];
+      if (closeMap) { this.callbacks.onCloseMap?.(); return; }
+      if (confirm) { this.callbacks.onMapTeleport?.(); return; }
+      if (route) this.callbacks.onMapWaypoint?.();
+      const pan = stick(pad, 0);
+      const zoom = buttonValue(pad, RT) - buttonValue(pad, LT) + Number(Boolean(pressed[UP])) - Number(Boolean(pressed[DOWN]));
+      this.callbacks.onMapInput?.(pan.x, pan.y, Math.max(-1, Math.min(1, zoom)), step);
       return;
     }
+
+    // View: a tap toggles the HUD, a long press toggles the sound (once per press)
+    let viewTap = false, viewLong = false;
+    if (held(VIEW)) {
+      const now = performance.now();
+      this.viewDownAt ??= now;
+      if (!this.viewFired && now - this.viewDownAt >= LONG_PRESS) viewLong = this.viewFired = true;
+    } else {
+      viewTap = this.viewDownAt !== null && !this.viewFired;
+      this.viewDownAt = null;
+      this.viewFired = false;
+    }
+    if (viewTap) this.callbacks.onToggleHud?.();
+    if (viewLong) this.callbacks.onToggleSound?.();
+    if (horn) this.callbacks.onHorn?.();
+    if (cycleLevel) this.callbacks.onCycleLevel?.(cycleLevel);
+    if (inspect) this.callbacks.onInspect?.();
+    if (revision !== this.revision) return;
     if (interact) { this.callbacks.onInteract?.(); return; }
     if (cycleMode) this.callbacks.onCycleMode?.(cycleMode);
     if (revision !== this.revision) return;
@@ -149,19 +187,19 @@ class GamepadControls {
     let drive = -movement.y;
     let vertical = 0;
     if (mode === 'car' || mode === 'bus' || mode === 'cyclist' || mode === 'cargobike') {
-      drive = Math.max(0, drive, buttonValue(pad, 7)) - Math.max(0, -drive, buttonValue(pad, 6));
+      drive = Math.max(0, drive, buttonValue(pad, RT)) - Math.max(0, -drive, buttonValue(pad, LT));
     } else if (mode === 'drone') {
-      vertical = buttonValue(pad, 7) - buttonValue(pad, 6);
+      vertical = buttonValue(pad, RT) - buttonValue(pad, LT);
     }
     this.controller.setGamepadInput('forward', Math.max(0, drive));
     this.controller.setGamepadInput('backward', Math.max(0, -drive));
     this.controller.setGamepadInput('left', Math.max(0, -movement.x));
     this.controller.setGamepadInput('right', Math.max(0, movement.x));
-    this.controller.setGamepadInput('up', mode === 'person' ? Number(Boolean(held(0))) : Math.max(0, vertical));
+    this.controller.setGamepadInput('up', mode === 'person' ? Number(Boolean(held(A))) : Math.max(0, vertical));
     this.controller.setGamepadInput('down', Math.max(0, -vertical));
-    this.controller.setGamepadInput('boost', Number(Boolean(held(2))));
-    const zoom = Number(Boolean(held(13))) - Number(Boolean(held(12)));
-    this.camera.applyGamepadInput(look.x, look.y, zoom, Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0);
+    this.controller.setGamepadInput('boost', Number(Boolean(held(X))));
+    const zoom = Number(Boolean(held(DOWN))) - Number(Boolean(held(UP)));
+    this.camera.applyGamepadInput(look.x, look.y, zoom, step);
   }
 }
 

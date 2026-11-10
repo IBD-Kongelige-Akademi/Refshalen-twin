@@ -275,3 +275,25 @@ test('searching Jomfru Ane Gade frames the street on the built road graph', { sk
   assert.ok(x >= label.minX && x <= label.maxX && z >= label.minZ && z <= label.maxZ, 'the view is centred on the street');
   assert.ok(h.map.searchHit && h.map.searchHit.name === 'Jomfru Ane Gade', 'Enter would route there');
 });
+
+test('gamepad on the full map: the stick pans at a steady screen speed, the triggers zoom, A and X act at the crosshair', () => {
+  const h = mapHarness();
+  h.map.gamepadInput(0, 0, 0, 0.1);
+  assert.equal(h.wrapper.classList.contains('pad-cursor'), false, 'no crosshair before any pad input');
+  h.map.gamepadInput(1, -0.5, 0, 0.5);
+  assert.equal(h.wrapper.classList.contains('pad-cursor'), true);
+  assert.deepEqual([h.map.viewCenterX, h.map.viewCenterZ], [1300, 1850], '600 px/s at 1 px/m');
+  h.map.gamepadInput(0, 0, 1, 1);
+  assert.equal(h.map.viewZoom, 3);
+  h.map.gamepadInput(1, 0, 0, 0.5);
+  assert.equal(h.map.viewCenterX, 1400, 'the same screen speed when zoomed in');
+  h.map.teleportToCenter();
+  assert.deepEqual(h.teleports, [[1400, 1850]]);
+  h.map.waypointAtCenter();
+  assert.deepEqual([h.map.waypoint.x, h.map.waypoint.z], [1400, 1850]);
+  h.pointer(h.canvas, 'pointerdown', 1, 110, 120, 'mouse');
+  assert.equal(h.wrapper.classList.contains('pad-cursor'), false, 'a mouse press hides the crosshair');
+  h.map.gamepadInput(0, 1, 0, 0.1);
+  h.map.toggleFullMap(false);
+  assert.equal(h.wrapper.classList.contains('pad-cursor'), false);
+});

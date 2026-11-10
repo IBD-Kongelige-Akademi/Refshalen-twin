@@ -260,7 +260,16 @@ async function initApp() {
     },
     onCycleCamera: cycleCamera,
     onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
-    onCloseMap: () => mapSystem.toggleFullMap(false)
+    onCloseMap: () => mapSystem.toggleFullMap(false),
+    onMapInput: (panX, panY, zoom, dt) => mapSystem.gamepadInput(panX, panY, zoom, dt),
+    onMapTeleport: () => mapSystem.teleportToCenter(),
+    onMapWaypoint: () => mapSystem.waypointAtCenter(),
+    onHorn: () => audioSystem.honk(controllerManager.getActiveEntity()),
+    onToggleHud: () => hudToggleBtn?.click(),
+    onToggleSound: () => audioSystem.setEnabled(!audioSystem.enabled),
+    onCycleLevel: (step) => cycleBuildingLevel(step),
+    // the building in the middle of the screen (the chase camera looks over the player at it)
+    onInspect: () => world.buildings?.toggleInfoAt?.(0, 0)
   });
 
   // Keyboard guide for each mode: [keys, action]
@@ -583,6 +592,13 @@ async function initApp() {
   const openMapBtn = document.getElementById('btn-open-map');
   if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
 
+  // The next (step 1) or previous (-1) building model level, wrapping around: [L] / [Shift+L] and the gamepad's D-pad
+  function cycleBuildingLevel(step) {
+    if (!buildingLayer || !levelIds.length) return;
+    const i = levelIds.indexOf(buildingLayer.level);
+    selectBuildingLevel(levelIds[(i + step + levelIds.length) % levelIds.length]);
+  }
+
   // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
   window.addEventListener('keydown', (e) => {
     if (isTypingInField(e)) return;
@@ -624,10 +640,7 @@ async function initApp() {
         if (hudToggleBtn) hudToggleBtn.click();
         break;
       case 'KeyL':
-        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && buildingLayer) {
-          const i = levelIds.indexOf(buildingLayer.level);
-          selectBuildingLevel(levelIds[(i + (e.shiftKey ? -1 : 1) + levelIds.length) % levelIds.length]);
-        }
+        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) cycleBuildingLevel(e.shiftKey ? -1 : 1);
         break;
       case 'KeyN':
         if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) audioSystem.setEnabled(!audioSystem.enabled);
