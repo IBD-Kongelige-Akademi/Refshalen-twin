@@ -28,6 +28,11 @@ const BUDOLFI_ID = 'gdk:1019258625'; // tools/overrides/budolfi.py
 // Vesterbro southbound past AKKC in the right-hand lane: just after the signals at (-654, 370), so the queue at the red light
 // is behind; the next signals are 350 m on (-729, 742)
 const VESTERBRO = { x: -668.2, z: 399.3, heading: -0.32 };
+// ...and beside it on the west side: the cycle track (OSM cycleway (-667.5, 386.7) to (-680.8, 425.0)) and, outside that, the pavement
+const VESTERBRO_CYCLE_TRACK = { x: -671.5, z: 398.2, heading: -0.33 };
+const VESTERBRO_PAVEMENT = { x: -674.1, z: 399.4, heading: -0.34 };
+// the visitor's start: Europa Plads in front of AKKC (TELEPORT_LOCATIONS.akkc)
+const EUROPA_PLADS = { x: -663.7, z: 467.9, heading: 0.70 };
 const GOLDEN = [{ time: 'golden' }, { sky: 'clear', wet: null }];
 // The director's opening: high over the Limfjord looking across the old town, down to AKKC and Vesterbro
 const CITY_ORBIT = { orbit: [-250, 0], radius: 700, height: 340, lookY: 0, from: Math.PI, speed: 0.05 };
@@ -42,10 +47,10 @@ const TOUR_STOPS = [
       { hold: 12, caption: 'Welcome to Kortdage. This is Aalborg as a digital twin, built from open Danish map data.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { shot: CITY_ORBIT }] },
       { express: true, guidedOnly: true, hold: 10, caption: 'Aalborg from above: 3,340 buildings at their measured heights, the Limfjord, the streets and the parks.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { shot: DESCENT }] },
       { express: true, guidedOnly: true, hold: 6, caption: 'Drive it: cars on the real street network, here down Vesterbro past AKKC.', do: [{ mode: 'car' }, { place: VESTERBRO }, { camera: 'chase' }, { input: { forward: 0.55 } }] },
-      { express: true, guidedOnly: true, hold: 5, caption: 'Cycle it, on a city bike or a cargo bike.', do: [{ mode: 'cyclist' }, { place: VESTERBRO }, { camera: 'action' }, { input: { forward: 1 } }] },
+      { express: true, guidedOnly: true, hold: 5, caption: 'Cycle it, on a city bike or a cargo bike.', do: [{ mode: 'cyclist' }, { place: VESTERBRO_CYCLE_TRACK }, { camera: 'action' }, { input: { forward: 1 } }] },
       { express: true, guidedOnly: true, hold: 6, caption: 'Or drive the Plusbus: the 24.7 m articulated electric bus of line 2.', do: [{ mode: 'bus' }, { place: VESTERBRO }, { camera: 'chase' }, { input: { forward: 0.85 } }, { honk: true }] },
-      { guidedOnly: true, hold: 7, caption: 'Skate, walk or fly the drone too. Keys 1 to 5 switch, or LB / RB on a gamepad.', do: [{ mode: 'person' }, { avatar: 'skater' }, { place: VESTERBRO }, { camera: 'action' }, { input: { forward: 1 } }] },
-      { express: true, hold: 7, caption: 'Welcome to the Kongres & Kultur Center: AKKC itself is a detail model, rebuilt from the Skråfoto oblique aerial photos.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { camera: 'akkc' }] },
+      { guidedOnly: true, hold: 7, caption: 'Skate, walk or fly the drone too. Keys 1 to 5 switch, or LB / RB on a gamepad.', do: [{ mode: 'person' }, { avatar: 'skater' }, { place: VESTERBRO_PAVEMENT }, { camera: 'action' }, { input: { forward: 1 } }] },
+      { express: true, hold: 7, caption: 'Welcome to the Kongres & Kultur Center: AKKC itself is a detail model, rebuilt from the Skråfoto oblique aerial photos.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { place: EUROPA_PLADS }, { camera: 'akkc' }] },
       { express: true, hold: 6, caption: 'Click any building for its data: address, year, heights, roof and where each value comes from.', do: [{ building: AKKC_ID }] },
       { hold: 12, caption: 'Every building comes from GeoDanmark footprints, LoD2 roofs and DHM heights, dressed in its own Skråfoto facade colours.', do: [{ camera: 'akkc' }] }
     ]
@@ -77,8 +82,8 @@ const TOUR_STOPS = [
     title: 'Utzon Center',
     sub: 'Harbour front · Limfjorden',
     beats: [
-      { express: true, hold: 10, caption: 'The Utzon Center on the harbour front, rebuilt from Skråfoto, with the Limfjord and its bridges behind.', do: [...GOLDEN, { mode: 'person' }, { shot: { orbit: [202.4, -172.2], radius: 140, height: 55, lookY: 8, from: -0.5, speed: 0.07 } }] },
-      { hold: 13, caption: 'Up close: its brick walls and lantern windows.', do: [{ camera: 'utzon' }] },
+      { express: true, hold: 10, caption: 'The Utzon Center from the Limfjord: the harbour front, rebuilt from Skråfoto.', do: [...GOLDEN, { mode: 'person' }, { shot: { orbit: [202.4, -172.2], radius: 170, height: 38, lookY: 9, from: 2.2, speed: 0.08 } }] },
+      { hold: 13, caption: 'Up close: its brick walls and lantern windows.', do: [{ shot: { orbit: [202.4, -172.2], radius: 115, height: 18, lookY: 10, from: 2.95, speed: -0.04 } }] },
       { hold: 18, caption: 'Take the drone up yourself (key 4): it climbs to 120 m and lands on any roof.', do: [{ mode: 'drone' }, { camera: 'chase' }, { input: { up: 0.7 } }] }
     ]
   },
@@ -87,8 +92,8 @@ const TOUR_STOPS = [
     title: 'Musikkens Hus',
     sub: 'The concert hall',
     beats: [
-      { express: true, hold: 10, caption: 'Musikkens Hus, the concert hall on the harbour front, with its plaza down to the Limfjord.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { shot: { orbit: [600, 27.4], radius: 130, height: 45, lookY: 12, from: 0.4, speed: -0.06 } }] },
-      { hold: 16, caption: 'The city is busy: cars, cyclists and pedestrians follow the road network, the signals and each other.', do: [{ camera: 'musikkens' }] },
+      { express: true, hold: 10, caption: 'Musikkens Hus from the Limfjord: the concert hall and its plaza down to the water.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { shot: { orbit: [600, 27.4], radius: 190, height: 35, lookY: 14, from: 2.75, speed: 0.06 } }] },
+      { hold: 16, caption: 'The city is busy: cars, cyclists and pedestrians follow the road network, the signals and each other.', do: [{ camera: 'action' }] },
       { hold: 14, caption: 'AI Plusbuses run line 2 in their real colours, stopping at its stops. The traffic gives way to you, mostly.', do: [{ camera: 'chase' }] }
     ]
   },
@@ -122,4 +127,4 @@ const TOUR_STOPS = [
   }
 ];
 
-export { TOUR_STOPS, AKKC_ID, BUDOLFI_ID, VESTERBRO };
+export { TOUR_STOPS, AKKC_ID, BUDOLFI_ID, VESTERBRO, VESTERBRO_CYCLE_TRACK, VESTERBRO_PAVEMENT };

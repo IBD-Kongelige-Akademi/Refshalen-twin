@@ -140,6 +140,21 @@ export function createOverrideBudgetLease(budget) {
  * still admits (it reserves them). Returns { show: [entry], refused: [entry] } (refused: too far or over budget; they keep the generated
  * building and draw their parametric details when they have any).
  */
+/**
+ * Whether a tile built with `refused` override meshes should be built again now that the camera is at (x, z): one of them is
+ * well within p.maxDistance (READMIT_SHARE of it, so a camera on the edge does not rebuild the tile over and over) and the
+ * budget has room for its textures. A tile is only admitted when it is built, so without this a landmark refused while the
+ * camera was far (its tile entering the near ring from 1 km away) stays generated when the player teleports next to it.
+ */
+export const READMIT_SHARE = 0.85;
+export function wantsReadmit(refused, cam, budget, p = budget?.p || OVERRIDE) {
+  if (!refused?.length || !cam) return false;
+  const mem = budget?.memory?.();
+  return refused.some((e) => e.centre && e.mesh
+    && Math.hypot(e.centre[0] - cam.x, e.centre[1] - cam.z) <= p.maxDistance * READMIT_SHARE
+    && (!mem || mem.residentBytes + (e.mesh.textureBytes || 0) <= mem.budgetBytes));
+}
+
 export function admitOverrides(layer, cam, budget, p = budget?.p || OVERRIDE) {
   const show = [];
   const refused = [];

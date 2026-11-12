@@ -97,8 +97,8 @@ test('a guided tour teleports to each stop in order and puts the visitor back at
   runFor(tour, tourDuration('express') + 30);
   assert.equal(tour.active, false, 'the tour finished by itself');
   const order = TOUR_STOPS.map((s) => s.id);
-  // the stops, then home again on the restore
-  assert.deepEqual(teleports(twin.calls), [...order, 'akkc']);
+  // the stops (the welcome beat puts the walker back on Europa Plads after the Vesterbro showcase), then home on the restore
+  assert.deepEqual(teleports(twin.calls), [order[0], 'akkc', ...order.slice(1), 'akkc']);
   assert.equal(twin.controllerManager.activeMode, 'cyclist', 'mode restored');
   assert.equal(twin.lightingSystem.activePresetId, 'midday', 'time restored');
   assert.equal(twin.lightingSystem.skyMode, 'clear');
@@ -261,4 +261,30 @@ test('the Utzon Center is in the middle of its director shot', () => {
   const { shot } = beatsFor(utzon, 'express')[0].do.find((a) => a.shot);
   const pin = TELEPORT_LOCATIONS.utzon.pin;
   assert.deepEqual(shot.orbit, [pin.x, pin.z]);
+});
+
+test('the bike starts on the cycle track and the skater on the pavement, beside the car lane', async () => {
+  const { VESTERBRO, VESTERBRO_CYCLE_TRACK, VESTERBRO_PAVEMENT } = await import('../js/tour-script.js');
+  const start = TOUR_STOPS[0].beats;
+  const placeOf = (mode) => start.find((b) => b.do.some((a) => a.mode === mode) && b.do.some((a) => a.place))?.do.find((a) => a.place).place;
+  assert.equal(placeOf('cyclist'), VESTERBRO_CYCLE_TRACK);
+  assert.equal(placeOf('person'), VESTERBRO_PAVEMENT);
+  assert.equal(placeOf('car'), VESTERBRO);
+  // west of the southbound lane (its right), the pavement outside the cycle track
+  const right = (p) => -(p.x - VESTERBRO.x) * Math.cos(VESTERBRO.heading) + (p.z - VESTERBRO.z) * Math.sin(VESTERBRO.heading);
+  assert.ok(right(VESTERBRO_CYCLE_TRACK) > 1.5 && right(VESTERBRO_PAVEMENT) > right(VESTERBRO_CYCLE_TRACK) + 1);
+});
+
+test('the Utzon Center and Musikkens Hus are filmed from the fjord side (north)', () => {
+  for (const id of ['utzon', 'musikkens']) {
+    const stop = TOUR_STOPS.find((s) => s.id === id);
+    for (const beat of stop.beats) {
+      const shot = beat.do.find((a) => a.shot)?.shot;
+      if (!shot) continue;
+      for (const t of [0, beat.hold / 2, beat.hold]) {
+        const { pos, look } = shotPose(shot, t);
+        assert.ok(pos[2] < look[2] - 80, `${id}: the camera is north of the building, over the water (t=${t})`);
+      }
+    }
+  }
 });

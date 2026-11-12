@@ -920,7 +920,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
 
     const setCamera = (cam) => { camera = cam; };
 
-    return { group: root, leaves, update, pick, attach, setCamera, showBuilding, toggleInfoAt, infoFor, dispose, stats, byId, heroGroups, heroStatus, texManager, neon, overrideGroups, overrideIds: () => [...ovShown.keys()] };
+    return { group: root, leaves, update, pick, attach, setCamera, showBuilding, toggleInfoAt, infoFor, dispose, stats, byId, heroGroups, heroStatus, texManager, neon, overrideGroups, overrideIds: () => [...ovShown.keys()], overrideRefused: ovRefused };
   } catch (error) {
     buildFailed = true;
     for (const group of pendingOverrideGroups) releaseOverride(group);

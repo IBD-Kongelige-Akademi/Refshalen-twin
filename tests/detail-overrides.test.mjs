@@ -279,3 +279,19 @@ test('build_packs: an override set becomes the tile\'s overrides layer and a chu
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('a landmark refused while the camera was far is re-admitted once the camera comes close and the budget has room', async () => {
+  const { wantsReadmit, createOverrideBudget, OVERRIDE, READMIT_SHARE } = await import('../js/detail-overrides.js');
+  const budget = createOverrideBudget();
+  const utzon = { id: 'gdk:1', centre: [202, -172], mesh: { textureBytes: 1.4e6 } };
+  // refused from AKKC, 1.08 km away: nothing to do there
+  assert.equal(wantsReadmit([utzon], { x: -664, z: 468 }, budget), false);
+  // just inside maxDistance is not enough (no rebuild loop for a camera on the edge)
+  assert.equal(wantsReadmit([utzon], { x: 202 - OVERRIDE.maxDistance * 0.95, z: -172 }, budget), false);
+  assert.equal(wantsReadmit([utzon], { x: 202 - OVERRIDE.maxDistance * READMIT_SHARE + 5, z: -172 }, budget), true);
+  assert.equal(wantsReadmit([utzon], { x: 160, z: -166 }, budget), true);
+  // no room in the budget: it would only be refused again
+  assert.ok(budget.reserve('other', OVERRIDE.maxTextureBytes - 1e6));
+  assert.equal(wantsReadmit([utzon], { x: 160, z: -166 }, budget), false);
+  assert.equal(wantsReadmit([], { x: 160, z: -166 }, budget), false);
+});

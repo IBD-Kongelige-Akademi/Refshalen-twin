@@ -2,7 +2,7 @@ import * as THREE from 'three/webgpu';
 import { BUILDING_LEVELS, attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
 import { PHOTO, PHOTO_UP_CLOSE, texRequested, createPhotoBudget } from './facade-lod.js';
 import { createSharedSlicer } from './yield-frame.js';
-import { createOverrideBudget, createOverrideBudgetLease, overridesMode } from './detail-overrides.js';
+import { createOverrideBudget, createOverrideBudgetLease, overridesMode, wantsReadmit } from './detail-overrides.js';
 
 // js/buildings-stream.js
 // The buildings of the streamed city: one buildRealBuildings() instance per tile (its own quadtree cells, photo manager and
@@ -48,6 +48,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   const overrideBudget = ovMode === 'off' ? null : createOverrideBudget();
   const tiles = new Map(); // id -> { active: { instance, holder, ring, overrideLease } | null, pending: build | null, ctx, ring }
   let pendingBuilds = 0;
+  let nextReadmit = 0; // performance.now() of the next check for refused overrides the camera has come close to
   let disposed = false;
   let resourcesDisposed = false;
   let camera = null;
@@ -194,6 +195,18 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
 
     update(x, z, night = 0) {
       for (const { active } of tiles.values()) active?.instance.update(x, z, night);
+      // a near tile whose landmark was refused while the camera was far is built again once the camera comes close (one per second)
+      const now = performance.now();
+      if (overrideBudget && level === 'full' && camera && now >= nextReadmit) {
+        nextReadmit = now + 1000;
+        const cam = { x: camera.position.x, z: camera.position.z };
+        for (const [id, state] of tiles) {
+          const active = state.active;
+          if (!active || state.pending || active.ring !== 'near' || !wantsReadmit(active.instance.overrideRefused, cam, overrideBudget)) continue;
+          api.addTile(id, state.ctx, state.ring).catch((error) => console.warn(`[cph] overrides of tile ${id} not re-admitted:`, error?.message || error));
+          break;
+        }
+      }
       photoBudget?.update(camera ? camera.position.x : x, camera ? camera.position.z : z, performance.now(), camera?.position.y);
     },
 

@@ -27,7 +27,8 @@ const smooth = (u) => { const s = Math.max(0, Math.min(1, u)); return s * s * (3
 const lerp = (a, b, u) => a + (b - a) * u;
 
 /**
- * A director's camera shot at `t` seconds into it, as { pos: [x, y, z], look: [x, y, z] } (heights over the ground there):
+ * A director's camera shot at `t` seconds into it, as { pos: [x, y, z], look: [x, y, z] }; an orbit's heights are over the ground at
+ * the point it circles (out over the fjord the ground under the camera is the seabed), a glide's over the ground under each view:
  *   { orbit: [x, z], radius, height, lookY, from, speed }   circles the point, starting at angle `from` (0: south of it,
  *                                                           PI: north of it), turning `speed` rad/s
  *   { glide: [[pos, look], [pos, look]], duration }         eases from the first view to the second
@@ -39,6 +40,10 @@ function shotPose(shot, t, groundAt = () => 0) {
     const a = (shot.from || 0) + (shot.speed || 0) * t;
     pos = [cx + Math.sin(a) * shot.radius, shot.height, cz + Math.cos(a) * shot.radius];
     look = [cx, shot.lookY || 0, cz];
+    const base = groundAt(cx, cz);
+    pos[1] += base;
+    look[1] += base;
+    return { pos, look };
   } else if (shot.glide) {
     const [[p0, l0], [p1, l1]] = shot.glide;
     const u = smooth(t / (shot.duration || 1));
