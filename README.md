@@ -6,7 +6,7 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 - Real streets from OpenStreetMap with GeoDanmark kerbs and cycle strips, signals, cars, buses, cyclists and pedestrians on the real road graph; AI Plusbuses on line 2's real route, stopping at its stops.
 - The Limfjord at sea level with quay walls along the harbour front, the city's lakes, streams and parks.
 - Bridges on piers at their measured deck heights (Limfjordsbroen, Østre Allé, the foot bridges) and the railway tracks.
-- Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); six teleports and scenic cameras.
+- Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); seven teleports and scenic cameras (the start is the Kortdage venue, Aalborg Kongres & Kultur Center).
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
 - Nightlife after dark: the bars, pubs and nightclubs of Jomfru Ane Gade (and every other strip of bars) light their fronts with neon and coloured, beat-flashing spill, play muffled beats you hear as you pass, and draw an evening crowd; quiet at Midday, building at Blue Hour, full at Night ([docs/nightlife.md](docs/nightlife.md)).
 

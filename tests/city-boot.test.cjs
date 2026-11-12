@@ -68,7 +68,7 @@ test('the Aalborg frame matches docs/cph-geodata-schema.md', async () => {
   const back = toEtrs(p.x, p.z, p.y);
   assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
   assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -900, 1000, 1100]);
-  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['torv', 'budolfi', 'jomfru', 'aalborghus', 'limfjord', 'utzon']);
+  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['akkc', 'budolfi', 'jomfru', 'utzon', 'musikkens', 'karolinelund', 'hvidehus']);
 });
 
 test('the city config is the Aalborg one', async () => {
@@ -76,7 +76,7 @@ test('the city config is the Aalborg one', async () => {
   assert.equal(config.ISLAND_BOUNDS.maxX, 1000);
   assert.equal(config.isTypingInField({ target: { tagName: 'INPUT' } }), true);
   assert.equal(config.isTypingInField({ target: { tagName: 'DIV' } }), false);
-  assert.equal(config.TELEPORT_LOCATIONS.torv.name, 'Gammel Torv', 'start at Gammel Torv, by the frame origin');
+  assert.equal(config.TELEPORT_LOCATIONS.akkc.name, 'Aalborg Kongres & Kultur Center', 'start at the Kortdage venue');
 });
 
 test('geodata is optional: absent data boots the empty plane, present data is exposed', async () => {

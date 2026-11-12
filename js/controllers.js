@@ -30,8 +30,8 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 // 3. City Bike and Long-John Cargo Bike (Procedural Frames with Skinned Riders)
 // 4. Drone (X-frame quadcopter, see actor-models.js createDroneModel)
 
-// Spawn by Gammel Torv; the vehicles are staggered around it
-const SPAWN_Z = TELEPORT_LOCATIONS.torv.z;
+// Spawn by the Kortdage venue (Aalborg Kongres & Kultur Center); main.js places every mode at TELEPORT_LOCATIONS.akkc on boot
+const SPAWN_Z = TELEPORT_LOCATIONS.akkc.z;
 const groundCollider = { type: 'ground' };
 
 // The drone: 60 km/h, 75 km/h in sport (Shift); at most 120 m above the ground (the EU open-category limit); teleports arrive 40 m up
@@ -392,7 +392,26 @@ class ThirdPersonControllerManager {
   setMode(mode) {
     if (!this.entities[mode]) return false;
     this.activeMode = mode;
+    if (this.hideInactive) this.showActiveOnly();
     return true;
+  }
+
+  // Only the active mode stands in the world: a mode switch carries the player over (js/main.js selectMode), so the modes left
+  // behind are hidden, which also takes them out of the collisions and the teleport clearance (both skip a hidden mesh).
+  // main.js turns this on after the boot warm-up, so every mode's shaders are compiled behind the loading screen.
+  showActiveOnly() {
+    this.hideInactive = true;
+    for (const [mode, ent] of Object.entries(this.entities)) {
+      const on = mode === this.activeMode;
+      const parts = [ent.mesh, ent.helmet, ...(ent.crowd?.meshes || []), ...(ent.riderCrowd?.meshes || []),
+        ...(ent.modules || []).map((m) => m.group), ...(ent.bellows || []).map((b) => b.mesh)];
+      for (const part of parts) if (part) part.visible = on;
+      if (ent.skates) {
+        const ride = PERSON_AVATARS[ent.avatar]?.ride;
+        for (const skate of ent.skates) skate.root.visible = on && ride === 'skates';
+        ent.board.root.visible = on && ride === 'board';
+      }
+    }
   }
 
   getActiveEntity() {

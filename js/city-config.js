@@ -63,13 +63,16 @@ export const getCityBounds = () => [ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLA
 // Teleport presets (local frame; forward is (sin h, cos h), so heading PI faces north towards the Limfjord). Each lies on a link of
 // the road graph (data/city/roadgraph.json) next to the landmark's OSM position; streets face along the street, the bridge north
 // across the fjord, the buildings' presets face the building. The scenic cameras (cameras.js) frame the same places.
+// pin: the building's footprint centre, where the map puts its marker (default: the arrival point x, z).
+// akkc is where the player starts: the Kortdage conference venue, seen from Europa Plads with the entrance ahead
 const TELEPORT_LOCATIONS = {
-  torv: { name: 'Gammel Torv', sub: 'Old town · start', x: -186.2, z: -24.9, heading: -1.79 },
-  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -222.1, z: -16.1, heading: -0.04 },
+  akkc: { name: 'Aalborg Kongres & Kultur Center', sub: 'Europa Plads · start', x: -663.7, z: 467.9, heading: 0.70, pin: { x: -585.8, z: 505.1 } },
+  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -308.1, z: -1.7, heading: 1.23, pin: { x: -219.5, z: 7.0 } },
   jomfru: { name: 'Jomfru Ane Gade', sub: 'Old town · nightlife street', x: -256.4, z: -236.5, heading: 2.94 },
-  aalborghus: { name: 'Aalborghus', sub: 'Harbour front · the castle', x: 109.8, z: -126.4, heading: -2.64 },
-  limfjord: { name: 'Limfjordsbroen', sub: 'Harbour front · the bridge', x: -313.2, z: -566.7, heading: 2.62 },
-  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 157.9, z: -165.7, heading: 2.17 }
+  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 157.9, z: -165.7, heading: 2.17, pin: { x: 202.4, z: -172.2 } },
+  musikkens: { name: 'Musikkens Hus', sub: 'Harbour front · the concert hall', x: 594.1, z: -82.0, heading: 0.0, pin: { x: 600.0, z: 27.4 } },
+  karolinelund: { name: 'Karolinelund', sub: 'Park · the old amusement park', x: 584.3, z: 421.9, heading: 3.14 },
+  hvidehus: { name: 'Hotel Det Hvide Hus', sub: 'Vesterbro · the hotel tower', x: -737.0, z: 759.0, heading: 2.57, pin: { x: -672.9, z: 652.8 } }
 };
 
 function isTypingInField(event) {

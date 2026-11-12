@@ -70,7 +70,7 @@ test('the citywide presets are finite, hidden until a tile covers them, and lie 
 const ROADGRAPH = join(__dirname, '..', 'data/city/roadgraph.json');
 test('street teleports land on the street they name', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json (built in phase 2-3)' }, () => {
   const graph = JSON.parse(readFileSync(ROADGRAPH, 'utf8'));
-  const streets = { jomfru: 'Jomfru Ane Gade', limfjord: 'Limfjordsbroen' };
+  const streets = { jomfru: 'Jomfru Ane Gade' };
   for (const [key, street] of Object.entries(streets)) {
     const p = TELEPORT_LOCATIONS[key];
     assert.ok(distanceToStreet({ roadGraph: graph }, street, p.x, p.z) < 12, `${key} is within 12 m of ${street}`);

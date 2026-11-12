@@ -449,7 +449,7 @@ const overlaps = (boxes, b) => boxes.some((o) => b[0] < o[2] && b[2] > o[0] && b
 class OverviewMap {
   /**
    * @param roadGraph  the citywide road graph ({ nodes, links, names, classes }) or null
-   * @param places     { key: { name, sub, x, z } } (the teleports): white pins, searchable
+   * @param places     { key: { name, sub, x, z, pin? } } (the teleports): white pins at `pin` (the building's centre) or else x, z, searchable
    * @param locate     (x, z) -> 'Aalborg · <street>' (world.locationLabel)
    */
   constructor({ controllerManager, cameraSystem, trafficSystem = null, roadGraph = null, places = {}, locate = () => '', onTeleport, onToggle }) {
@@ -459,7 +459,7 @@ class OverviewMap {
     this.onTeleport = onTeleport;
     this.onToggle = onToggle;
     this.locate = locate;
-    this.places = Object.values(places).map((p) => ({ ...p, lower: fold(p.name) }));
+    this.places = Object.values(places).map((p) => ({ ...p, x: p.pin?.x ?? p.x, z: p.pin?.z ?? p.z, lower: fold(p.name) }));
     this.layers = null;
     this.mapLabels = [];
     this.bounds = null;

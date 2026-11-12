@@ -78,15 +78,12 @@ async function initApp() {
 
   // 3. Build the city from the Copenhagen geodata
   // Tile streaming: `?stream=<near radius in m>` overrides the default rings (near 750 m, mid 1250 m, js/tile-rings.js); the city
-  // streams in around where the player was last seen (or the start point)
+  // streams in around the start point: every visit begins at the Kortdage venue (TELEPORT_LOCATIONS.akkc), so a reload at the
+  // conference stand puts the next visitor back in front of it
   const streamParam = Number(query.get('stream'));
   const streamMid = Number(query.get('streammid')); // optional override for a custom near ring
-  let start = { x: 0, z: 0 };
-  try {
-    const saved = JSON.parse(localStorage.getItem('cph-player-state'));
-    const p = saved?.version === 1 ? saved.entities?.[saved.activeMode] : null;
-    if (p && Number.isFinite(p.x) && Number.isFinite(p.z)) start = { x: p.x, z: p.z };
-  } catch { /* no saved position */ }
+  const startPoint = TELEPORT_LOCATIONS.akkc;
+  const start = { x: startPoint.x, z: startPoint.z };
   const world = await buildWorld(scene, {
     treeDate: lightingSystem.currentSunDateTime,
     markInit,
@@ -106,19 +103,19 @@ async function initApp() {
   controllerManager.groundField = world.groundHeight || null;
   controllerManager.roofHeightAt = world.roofHeightAt || null;
   if (world.staticIndex) controllerManager.staticIndex = world.staticIndex; // streamed city: per-tile colliders
-  // Reuse teleport placement so saved players return at rest, close to their last positions.
+  // Every visit starts at rest at the venue; only the last mode used is remembered. The active mode is placed first, on the start
+  // point itself; the others find clear spots around it and stay visible until the boot warm-up has compiled their shaders
+  // (then controllerManager.showActiveOnly() hides them, and a mode switch carries the player over, see selectMode).
+  let startMode = 'car';
   try {
     const saved = JSON.parse(localStorage.getItem('cph-player-state'));
-    if (saved?.version === 1) {
-      for (const mode of Object.keys(controllerManager.entities)) {
-        const p = saved.entities?.[mode];
-        if (!p || ![p.x, p.y, p.z, p.heading].every(Number.isFinite)) continue;
-        controllerManager.setMode(mode);
-        controllerManager.teleportActiveTo(p.x, p.z, p.heading, p.y);
-      }
-      controllerManager.setMode(Object.hasOwn(controllerManager.entities, saved.activeMode) ? saved.activeMode : 'car');
-    }
+    if (saved?.version === 1 && Object.hasOwn(controllerManager.entities, saved.activeMode)) startMode = saved.activeMode;
   } catch { /* Missing or unavailable storage does not prevent playing. */ }
+  for (const mode of [startMode, ...Object.keys(controllerManager.entities).filter((m) => m !== startMode)]) {
+    controllerManager.setMode(mode);
+    controllerManager.teleportActiveTo(startPoint.x, startPoint.z, startPoint.heading);
+  }
+  controllerManager.setMode(startMode);
 
   function savePlayerState() {
     try {
@@ -311,10 +308,21 @@ async function initApp() {
     modeSwitch.style.setProperty('--ind-w', `${active.offsetWidth}px`);
   }
 
+  // The new mode takes over where the old one was, facing the same way, so switching keeps the viewpoint: the drone takes off
+  // just above it, and leaving the drone lands on the ground under it (teleport placement finds the nearest clear spot).
+  function carryPlayer(from, fromMode) {
+    const air = controllerManager.activeMode === 'drone';
+    const altitude = air && fromMode !== 'drone' ? from.position.y + 3 : from.position.y;
+    controllerManager.teleportActiveTo(from.position.x, from.position.z, from.heading, altitude);
+  }
+
   function selectMode(mode, options = {}) {
     if (mode === 'cyclist' && lastBikeMode === 'cargobike') mode = lastBikeMode;
+    const fromMode = controllerManager.activeMode;
+    const from = controllerManager.getActiveEntity();
     controllerManager.setMode(mode);
     const activeMode = controllerManager.activeMode;
+    if (activeMode !== fromMode && from) carryPlayer(from, fromMode);
     const bikeActive = activeMode === 'cyclist' || activeMode === 'cargobike';
     if (bikeActive) lastBikeMode = activeMode;
     const primaryMode = activeMode === 'cargobike' ? 'cyclist' : activeMode;
@@ -625,10 +633,10 @@ async function initApp() {
         selectCamera('pov', true);
         break;
       case 'Digit8':
-        selectCamera('limfjord', true);
+        selectCamera('akkc', true);
         break;
       case 'Digit9':
-        selectCamera('torv', true);
+        selectCamera('musikkens', true);
         break;
       case 'Digit0':
         selectCamera('utzon', true);
@@ -849,6 +857,7 @@ async function initApp() {
     }
     if (!warmedUp) {
       warmedUp = true;
+      controllerManager.showActiveOnly(); // every mode's shaders are compiled now
       markInit('firstFrame');
       // The loading screen stays up until the GPU has got through the first frame (and the pipelines its warm-up
       // compiled), i.e. until the city is actually on screen
