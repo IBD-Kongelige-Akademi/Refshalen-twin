@@ -74,7 +74,7 @@ model's edges, projected with each 2021 oblique camera, fall on the roofs, gable
 - **Openings.** Where the sheets disagree with each other (the south front's porch and chancel), the windows are placed by the footprint. Their widths and
   heights are as drawn.
 - **Blind recesses** in the gables are shaded panels on the gable's face. They do not have depth.
-- **Licence.** As with the other drawings, the licence of the building-file sheets is unknown, and this needs settling before the twin is published.
+- **Source.** The building-file sheets are from Aalborg Kommune's building archive (byggesagsarkiv), downloaded from weblager.dk (recorded 2026-11-12); only measurements taken from them are in the model.
 
 ![The east end, its gable round the cut corners](budolfi/eastclose.jpg)
 

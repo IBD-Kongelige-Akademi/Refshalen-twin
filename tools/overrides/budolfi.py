@@ -512,8 +512,8 @@ MATERIALS = {
     'painted': dict(tile=None, roughness=0.6),
 }
 ATTRIBUTION = {
-    'budolfi-tegning-2000': {'text': 'Sankt Budolfi - Aalborg Domkirke, hovedrenovering 1. afsnit: facades towards west, north, east and south, Arkitekter Dall & Lindhardtsen A/S, 2000 (after the survey of 1986, Brøgger arkitektfirma)', 'licence': 'municipal building file', 'url': ''},
-    'budolfi-spir-1934': {'text': 'Budolfi Kirke: opmaaling af spiret, 1934 (building commission case on the partial renewal of the spire)', 'licence': 'historic building file', 'url': ''},
+    'budolfi-tegning-2000': {'text': 'Sankt Budolfi - Aalborg Domkirke, hovedrenovering 1. afsnit: facades towards west, north, east and south, Arkitekter Dall & Lindhardtsen A/S, 2000 (after the survey of 1986, Brøgger arkitektfirma)', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
+    'budolfi-spir-1934': {'text': 'Budolfi Kirke: opmaaling af spiret, 1934 (building commission case on the partial renewal of the spire)', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
     'skraafoto-2021': {'text': 'Skråfoto 2021, Klimadatastyrelsen (colours, checks)', 'licence': 'CC BY 4.0 terms for free geographic data', 'url': 'https://dataforsyningen.dk'},
     'geodanmark': {'text': 'GeoDanmark Bygning (placement)', 'licence': 'CC BY 4.0', 'url': 'https://www.geodanmark.dk'},
 }

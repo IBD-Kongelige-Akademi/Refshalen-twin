@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aalborg Twin – Credits</title>
+  <style>
+    :root { --bg: #f6f5f1; --ink: #1d1c19; --muted: #5d5a52; --line: #dedad0; --accent: #ffc21a; --accent-ink: #17140a; --link: #1d4fa3; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #121315; --ink: #ecebe6; --muted: #a3a097; --line: #2c2d31; --link: #8fb4ff; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .mark { background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 13px; border-radius: 50%; width: 40px; height: 40px; display: grid; place-items: center; flex: none; }
+    h1 { font-size: 26px; margin: 0; }
+    h2 { font-size: 17px; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
+    h3 { font-size: 15px; margin: 18px 0 4px; }
+    p, li { color: var(--ink); }
+    ul { padding-left: 20px; margin: 6px 0; }
+    li { margin: 4px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    a { color: var(--link); overflow-wrap: anywhere; }
+    .back { display: inline-block; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <header><span class="mark" aria-hidden="true">AAL</span><h1>Aalborg Twin – credits</h1></header>
+  <p class="muted">A playable model of central Aalborg built from open Danish geodata. <a class="back" href="./">← Back to the city</a></p>
+
+  <h2>Software</h2>
+  <ul>
+    <li><a href="https://github.com/mrdoob/slop-newyork/">Slop New York</a> by mrdoob (MIT): renderer, post-processing, controls, cameras, audio, traffic and pedestrians.</li>
+    <li><a href="https://github.com/martincollignon/copenhagen-twin">copenhagen-twin</a> by Martin Collignon (MIT): the geodata pipeline and streaming city engine this project is forked from.</li>
+    <li><a href="https://threejs.org/">three.js</a> (MIT): WebGPU renderer and TSL shaders.</li>
+  </ul>
+
+  <h2>Map and building data</h2>
+  <p><strong>Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur</strong>, under the
+    <a href="https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf">terms for free geographic data (CC BY 4.0)</a>:</p>
+  <ul>
+    <li>GeoDanmark: buildings, roads, lakes, coast, harbour, trees, masts, parking, woods and parks.</li>
+    <li>DAR (addresses), BBR (building register) and DAGI (administrative areas).</li>
+    <li>DHM, Danmarks Højdemodel: terrain, building heights and vegetation heights.</li>
+    <li>Skråfoto 2021 (oblique aerial photos): building facade textures and roof colours.</li>
+  </ul>
+  <p class="muted">Vector data read through <a href="https://datagrundlag.dk/om/">datagrundlag.dk</a> (MapCentia's mirror of the public data).</p>
+  <ul>
+    <li>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, Open Database License (ODbL): roads, traffic signals, lamps, water, parks, bridges, railways, nightlife venues and bus lines.</li>
+    <li>LoD2 roof shapes: CityJSON building model by Ramboll, made with <a href="https://github.com/geoflow3d/geoflow-bundle">Geoflow</a> (MIT).</li>
+  </ul>
+
+  <h2>Landmark buildings</h2>
+  <p>Six buildings are modelled by hand. Placement and footprints come from GeoDanmark Bygning, and colours and measurements from Skråfoto 2021 (both above).
+    The drawings named below are from Aalborg Kommune's building archive (byggesagsarkiv) on <a href="https://weblager.dk">weblager.dk</a>; only measurements taken from them are in the models.</p>
+
+  <h3>Aalborg Kongres &amp; Kultur Center</h3>
+  <ul>
+    <li>Roof levels, eaves and ridges from the DHM point cloud.</li>
+    <li>Reference photos (not used as textures): Leonhard Lenz, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres-_og_Kulturcenter_2022-08-16_01.jpg">CC0</a>; Drlady, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center_01.jpg">CC BY-SA 4.0</a>; Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center,_seen_from_Prinsensgade,_Photo_1,Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Musikkens Hus</h3>
+  <ul>
+    <li>Roof levels from the DHM point cloud and surface model.</li>
+    <li>Reference photo (not used as a texture): Marc Søgaard, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Musikkens_Hus_-_front.JPG">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Utzon Center</h3>
+  <ul>
+    <li>Roof levels from the Skråfoto surface model.</li>
+    <li>Reference photos for the brick infill and lanterns (not used as textures): Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Utzon_Center,_Eastern_side,_Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Budolfi Domkirke</h3>
+  <ul>
+    <li>Drawings from the building archive: <em>Sankt Budolfi – Aalborg Domkirke, hovedrenovering 1. afsnit</em>, Arkitekter Dall &amp; Lindhardtsen A/S, 2000 (after the survey of 1986, Brøgger arkitektfirma), and <em>Budolfi Kirke: opmaaling af spiret</em>, 1934.</li>
+  </ul>
+
+  <h3>Ansgars Kirke</h3>
+  <ul>
+    <li>Drawings from the building archive: <em>Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg</em>, facade drawings, 1925.</li>
+  </ul>
+
+  <h3>Hotel Det Hvide Hus</h3>
+  <ul>
+    <li>Drawings from the building archive: <em>Hotel ved Kilden, Aalborg</em>, K. Friis og E. Moltke Nielsen, arkitekter, 1967; <em>Hotel Hvide Hus: udskiftning af facadepartier</em>, Jørgen Braad A/S, 2005; <em>opholdsterrasse mod Kildeparken</em>, Peter Sørensen, landskabsarkitekt, 2002.</li>
+  </ul>
+
+  <h2>Licence</h2>
+  <p>The code is available under the MIT License. Data derived from OpenStreetMap stays under the ODbL, and the rest of the data keeps the licence of its source.</p>
+</main>
+</body>
+</html>

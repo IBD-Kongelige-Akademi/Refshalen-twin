@@ -691,9 +691,9 @@ MATERIALS = {
     'painted': dict(tile=None, roughness=0.6),
 }
 ATTRIBUTION = {
-    'hvide-hus-tegning-1967': {'text': 'Hotel ved Kilden, Aalborg: facades 8-13, K. Friis og E. Moltke Nielsen, arkitekter, 1967', 'licence': 'historic building file', 'url': ''},
-    'hvide-hus-tegning-2005': {'text': 'Hotel Hvide Hus: udskiftning af facadepartier, plan and facades, Jørgen Braad A/S, 2005', 'licence': 'municipal building file', 'url': ''},
-    'hvide-hus-terrasse-2002': {'text': 'Hotel Hvide Hus: opholdsterrasse mod Kildeparken, LA.02-LA.06, Peter Sørensen, landskabsarkitekt, 2002', 'licence': 'municipal building file', 'url': ''},
+    'hvide-hus-tegning-1967': {'text': 'Hotel ved Kilden, Aalborg: facades 8-13, K. Friis og E. Moltke Nielsen, arkitekter, 1967', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
+    'hvide-hus-tegning-2005': {'text': 'Hotel Hvide Hus: udskiftning af facadepartier, plan and facades, Jørgen Braad A/S, 2005', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
+    'hvide-hus-terrasse-2002': {'text': 'Hotel Hvide Hus: opholdsterrasse mod Kildeparken, LA.02-LA.06, Peter Sørensen, landskabsarkitekt, 2002', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
     'skraafoto-2021': {'text': 'Skråfoto 2021, Klimadatastyrelsen (colours only)', 'licence': 'CC BY 4.0 terms for free geographic data', 'url': 'https://dataforsyningen.dk'},
     'geodanmark': {'text': 'GeoDanmark Bygning (placement)', 'licence': 'CC BY 4.0', 'url': 'https://www.geodanmark.dk'},
 }

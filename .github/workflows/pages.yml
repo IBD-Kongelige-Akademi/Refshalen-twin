@@ -36,7 +36,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp index.html _site/
+          cp index.html credits.html _site/
           cp -R css js _site/
           # Pages serves code only: the engine reads everything through js/data-config.js; point its data base at DATA_URL
           sed -i "s|^export const BUILD_DATA_BASE = .*|export const BUILD_DATA_BASE = '${DATA_URL%/}';|" _site/js/data-config.js

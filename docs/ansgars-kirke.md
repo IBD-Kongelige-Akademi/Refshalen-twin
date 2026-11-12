@@ -86,5 +86,4 @@ this, but a 48 m one does. Fixed in `overrides_lib.py`, and tested in `tools/geo
 
 ## Open
 
-The licence of the drawings is not known. They are from a historic building file, and only measurements taken from them are in the model, but this should be
-settled before the twin is published (phase 7).
+The drawings are from Aalborg Kommune's building archive (byggesagsarkiv), downloaded from weblager.dk (recorded 2026-11-12). Only measurements taken from them are in the model, and the credits page (credits.html) names each sheet.

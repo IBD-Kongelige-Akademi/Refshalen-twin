@@ -80,8 +80,9 @@ The app (index.html, css, js) is deployed by GitHub Pages; the tile data is too 
 
 1. `python3 tools/hosting/build_packs.py [--out .context/packs/<v>]` packs data/tiles, data/city and the facade atlases.
 2. `python3 tools/hosting/upload_packs.py --dir .context/packs/<v>` uploads to R2 (packs first, the manifest last, existing packs skipped); `tools/hosting/serve_range.py` serves a pack directory locally and `tools/hosting/measure_visit.py` counts a visit's requests.
+3. Apply `tools/hosting/cors.json` to the bucket once (Cloudflare dashboard, R2 bucket settings, CORS policy), after replacing `YOUR-GITHUB-USERNAME` with the Pages origin. The Aalborg packed data costs about 40 requests and 15 MB for boot plus the full Kortdage tour (rehearsed locally on 2026-11-12).
 
-`.github/workflows/pages.yml` publishes index.html, css and js and points `BUILD_DATA_BASE` (`js/data-config.js`) at `DATA_URL`; it does not deploy until that variable is set. Put a custom domain on the bucket: r2.dev is rate limited and not CDN-cached.
+`.github/workflows/pages.yml` publishes index.html, credits.html (the in-game Credits link), css and js and points `BUILD_DATA_BASE` (`js/data-config.js`) at `DATA_URL`; it does not deploy until that variable is set. Put a custom domain on the bucket: r2.dev is rate limited and not CDN-cached.
 
 ## Detail overrides
 
@@ -95,6 +96,7 @@ The generated Aalborg data carries the licences of its sources:
 
 - Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur: GeoDanmark (Bygning, Vejkant, Vejmidte, Sø, Kyst, Havn, Bassin, Træ, Trægruppe, Mast, Parkering, Skov, Rekreativt område, Begravelsesområde), DAR, BBR, DAGI and DHM, under the [terms for free geographic data](https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf) (CC BY 4.0), read through [datagrundlag.dk](https://datagrundlag.dk/om/) (MapCentia's mirror, no licence of its own).
 - © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), Open Database License (ODbL): roads, signals, lamps, water, parks. Anything derived from them stays under the ODbL.
-- The LoD2.2 building model is a user-supplied Geoflow CityJSON; its source and licence are still to be recorded (docs/aalborg-phase2.md).
+- The LoD2.2 building model is a CityJSON made by Ramboll with Geoflow, under the MIT License (docs/aalborg-phase2.md).
+- The drawings behind the Ansgars Kirke, Budolfi and Hotel Hvide Hus overrides are from Aalborg Kommune's building archive (byggesagsarkiv) on [weblager.dk](https://weblager.dk); only measurements taken from them are in the models.
 
 The repository also holds upstream's Copenhagen district data as test fixtures (`tests/fixtures/cph/`), under the licences of its sources: GeoDanmark, BBR and DHM (as above), © OpenStreetMap contributors (ODbL), and Københavns Kommune open data (CC BY 4.0 / Open Data DK licens: trae_basis, cykelsti, cykelstativ, trafiksignal_oversigt, fortovsmatrikel, parkregister, dp_belaegninger, afmaerkning_total, blaa_cykelfelt).

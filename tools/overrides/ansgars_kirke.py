@@ -590,7 +590,7 @@ PBR = {'tile': dict(roughness=0.8), 'wall': dict(roughness=0.9), 'stone': dict(r
        'glass': dict(roughness=0.12, metallic=0.5), 'painted': dict(roughness=0.55)}
 
 ATTRIBUTION = {
-    'ansgars-tegning-1925': {'text': 'Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg: facade drawings, Aalborg, 1925', 'licence': 'historic building file', 'url': ''},
+    'ansgars-tegning-1925': {'text': 'Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg: facade drawings, Aalborg, 1925', 'licence': 'Aalborg Kommune building archive (byggesagsarkiv), weblager.dk', 'url': 'https://weblager.dk'},
     'skraafoto-2021': {'text': 'Skråfoto 2021, Klimadatastyrelsen (colours only)', 'licence': 'CC BY 4.0 terms for free geographic data', 'url': 'https://dataforsyningen.dk'},
     'geodanmark': {'text': 'GeoDanmark Bygning (placement)', 'licence': 'CC BY 4.0', 'url': 'https://www.geodanmark.dk'},
 }

@@ -75,7 +75,7 @@ def renamed(feature: dict, bid: str, gid: str) -> dict:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("src", type=Path)
-    ap.add_argument("--source", default="Geoflow LoD2.2 CityJSON (user supplied)", help="recorded in each cell manifest")
+    ap.add_argument("--source", default="LoD2.2 CityJSON by Ramboll, made with Geoflow (MIT)", help="recorded in each cell manifest")
     a = ap.parse_args()
 
     tiles = [t["id"] for t in json.loads((CITY_DIR / "tiles.json").read_text())["tiles"]]
