@@ -1527,3 +1527,128 @@ body.touch-enabled .pop-item { min-height: 44px; }
 body.touch-enabled .radar { display: none; }
 body.touch-enabled .fullmap-header { top: max(var(--edge), env(safe-area-inset-top)); left: max(var(--edge), env(safe-area-inset-left)); right: max(var(--edge), env(safe-area-inset-right)); }
 body.touch-enabled .map-controls .icon-btn { width: 44px; height: 44px; }
+
+/* ------------------------------------------------------------------------------------------------------------------
+   The Kortdage tour (js/tour.js): the caption card, the black fade between stops, the HUD out of the way
+   ------------------------------------------------------------------------------------------------------------------ */
+#tour-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 94;
+  background: #050506;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease; /* FADE in js/tour.js */
+}
+
+#tour-fade.is-on { opacity: 1; }
+
+#tour-card {
+  position: fixed;
+  top: var(--edge);
+  left: 50%;
+  z-index: 95;
+  width: min(560px, calc(100vw - 2 * var(--edge)));
+  transform: translateX(-50%);
+  padding: 14px 18px 12px;
+  color: var(--text);
+}
+
+#tour-card[hidden] { display: none; }
+
+.tour-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.tour-counter {
+  padding: 1px 7px;
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tour-title {
+  margin-top: 6px;
+  font-family: var(--font-sign);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tour-caption {
+  margin-top: 6px;
+  min-height: 2.9em;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--text-2);
+}
+
+.tour-progress {
+  height: 3px;
+  margin-top: 10px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--divider);
+}
+
+.tour-progress-fill {
+  height: 100%;
+  background: var(--accent);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tour-hint {
+  flex: 1;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.tour-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-ctl);
+  background: var(--hover);
+  color: var(--text);
+  font: 600 13px var(--font-sans);
+  cursor: pointer;
+}
+
+.tour-btn:hover { background: rgba(255, 255, 255, 0.16); }
+#tour-card[data-kind='drive'] .tour-guided-only,
+#tour-card:not([data-kind='drive']) .tour-drive-only,
+#tour-card.is-loop .tour-btn { display: none; }
+
+/* A guided tour: only the card (and a building panel the tour opens) stays on screen */
+body.touring .hud {
+  opacity: 0;
+  pointer-events: none;
+}
+
+body.touring .hud > * { pointer-events: none; }
+
+@media (max-width: 640px) {
+  .tour-title { font-size: 18px; }
+  .tour-caption { font-size: 13px; }
+}

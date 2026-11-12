@@ -7,6 +7,7 @@ A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Li
 - The Limfjord at sea level with quay walls along the harbour front, the city's lakes, streams and parks.
 - Bridges on piers at their measured deck heights (Limfjordsbroen, Østre Allé, the foot bridges) and the railway tracks.
 - Five ways to move: on foot, by car, by bicycle (city or cargo bike), by drone (up to 120 m over the ground, lands on roofs) and by Plusbus (a 24.7 m double-articulated electric bus whose doors open at a stop); seven teleports and scenic cameras (the start is the Kortdage venue, Aalborg Kongres & Kultur Center).
+- The Kortdage tour (Tour button): from AKKC round the seven landmarks and back, one feature at each stop. Express (2 min) and Full (6 min) are hands-off; on the drive tour the GPS routes you stop to stop. After 60 s without input the Express tour starts by itself and loops, as an attract mode for the conference stand ([docs/tour.md](docs/tour.md)).
 - A radar minimap and a full map ([M]) with street search, click-to-teleport and a GPS route along the streets.
 - Nightlife after dark: the bars, pubs and nightclubs of Jomfru Ane Gade (and every other strip of bars) light their fronts with neon and coloured, beat-flashing spill, play muffled beats you hear as you pass, and draw an evening crowd; quiet at Midday, building at Blue Hour, full at Night ([docs/nightlife.md](docs/nightlife.md)).
 
@@ -33,6 +34,8 @@ python3 tools/hosting/serve_range.py --port 8010   # then open http://127.0.0.1:
 | `?water=simple` | Sky reflection only, no planar reflection pass. |
 | `?date=2026-06-21`, `?time=12:00` | Scene date and solar clock time (Europe/Copenhagen, the Danish time zone; CET/CEST handled). |
 | `?sky=overcast`, `?wet=0.7` | Broken overcast clouds; ground wetness 0–1. |
+| `?tour=express`, `full`, `drive`, `loop` | Starts that tour at once (`loop`: the looping Express tour). |
+| `?idle=<s>` | Seconds without input before the attract loop starts (default 60; `0` turns it off). |
 | `?ao=1` | Half-resolution GTAO (opt-in). |
 | `?data=<url>` | Reads the data from another base (packed or unpacked). |
 

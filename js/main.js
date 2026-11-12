@@ -19,6 +19,7 @@ import { nightlife, nightlifeLevel } from './nightlife.js';
 import { createNightlifeScene } from './nightlife-scene.js';
 import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.js';
 import { OverviewMap } from './overview-map.js';
+import { createTour } from './tour.js';
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
@@ -266,8 +267,12 @@ async function initApp() {
     onToggleSound: () => audioSystem.setEnabled(!audioSystem.enabled),
     onCycleLevel: (step) => cycleBuildingLevel(step),
     // the building in the middle of the screen (the chase camera looks over the player at it)
-    onInspect: () => world.buildings?.toggleInfoAt?.(0, 0)
+    onInspect: () => world.buildings?.toggleInfoAt?.(0, 0),
+    // the Kortdage tour (js/tour.js): any press counts as activity, A / B / D-pad step through a guided tour
+    onActivity: () => tour?.noteInput(),
+    onTour: (cmd) => tour?.command(cmd)
   });
+  let tour = null; // created once the map and the building levels exist (below)
 
   // Keyboard guide for each mode: [keys, action]
   const controlHints = {
@@ -607,9 +612,73 @@ async function initApp() {
     selectBuildingLevel(levelIds[(i + step + levelIds.length) % levelIds.length]);
   }
 
+  // The Kortdage tour (js/tour.js, js/tour-script.js, docs/tour.md): guided express / full tours, the drive tour on the GPS,
+  // and the attract loop that starts after `?idle=` seconds (default 60, 0 = off) without input
+  const tourCard = document.getElementById('tour-card');
+  const tourFade = document.getElementById('tour-fade');
+  const tourEls = tourCard ? {
+    counter: tourCard.querySelector('.tour-counter'),
+    title: tourCard.querySelector('.tour-title'),
+    sub: tourCard.querySelector('.tour-sub'),
+    caption: tourCard.querySelector('.tour-caption'),
+    bar: tourCard.querySelector('.tour-progress-fill'),
+    hint: tourCard.querySelector('.tour-hint')
+  } : null;
+  const setText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+  const tourUi = {
+    fade: (on) => tourFade?.classList.toggle('is-on', on),
+    showCard(info) {
+      if (!tourCard) return;
+      tourCard.hidden = false;
+      tourCard.dataset.kind = info.kind;
+      tourCard.dataset.phase = info.phase || '';
+      tourCard.classList.toggle('is-loop', info.loop);
+      setText(tourEls.counter, info.counter);
+      setText(tourEls.title, info.title);
+      setText(tourEls.sub, info.sub || '');
+      setText(tourEls.caption, info.caption);
+      setText(tourEls.hint, info.loop ? 'Press any key or tap to explore Aalborg yourself' : '');
+      if (tourEls.bar) tourEls.bar.style.transform = `scaleX(${info.progress || 0})`;
+    },
+    hideCard: () => { if (tourCard) tourCard.hidden = true; },
+    setTouring: (on) => document.body.classList.toggle('touring', on),
+    hideBuilding: () => { const panel = document.getElementById('building-info'); if (panel) panel.style.display = 'none'; },
+    closePopovers
+  };
+  const idleParam = query.has('idle') ? Number(query.get('idle')) : 60;
+  tour = createTour({
+    teleportTo, selectMode, selectCamera, selectTime, selectBuildingLevel,
+    controllerManager, cameraSystem, mapSystem, lightingSystem, audioSystem, buildings: buildingLayer,
+    ui: tourUi,
+    idleSeconds: Number.isFinite(idleParam) ? idleParam : 60,
+    // the black hold after a teleport waits for the tiles that are still fetching or building (js/tile-streamer.js)
+    isLoading: () => { const s = world.stream?.snapshot?.(); return s ? s.fetching + s.building > 0 : false; },
+    // the director's shots hold the camera on a fixed view (cameras.js debugView); the tiles keep streaming round the player
+    setView: (pose) => { cameraSystem.debugView = pose; },
+    groundAt: (x, z) => world.groundHeight?.heightAt?.(x, z) ?? 0
+  });
+  document.querySelectorAll('[data-tour]').forEach((btn) => btn.addEventListener('click', () => tour.start(btn.getAttribute('data-tour'))));
+  document.querySelectorAll('[data-tour-cmd]').forEach((btn) => btn.addEventListener('click', () => tour.command(btn.getAttribute('data-tour-cmd'))));
+  // Activity: a press, click, touch or scroll ends the attract loop; a mouse move only keeps it from starting
+  for (const type of ['pointerdown', 'wheel', 'touchstart']) {
+    window.addEventListener(type, () => tour.noteInput(), { capture: true, passive: true });
+  }
+  window.addEventListener('pointermove', () => tour.noteInput({ end: false }), { passive: true });
+
   // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
   window.addEventListener('keydown', (e) => {
     if (isTypingInField(e)) return;
+    if (tour.noteInput()) return; // the key ended the attract loop: nothing else
+    if (tour.guided) {
+      // a guided tour plays: → / Space next, ← back, Esc ends; the HUD (H) and sound (N) keys still work, nothing else
+      const cmd = e.code === 'ArrowRight' || e.code === 'Space' ? 'next' : e.code === 'ArrowLeft' ? 'prev' : e.code === 'Escape' ? 'end' : null;
+      if (cmd) {
+        e.preventDefault();
+        tour.command(cmd);
+        return;
+      }
+      if (e.code !== 'KeyH' && e.code !== 'KeyN') return;
+    }
     switch (e.code) {
       case 'Digit1':
         selectMode('person');
@@ -769,7 +838,7 @@ async function initApp() {
   if (elFps) elFps.textContent = '60';
 
   // Handle for the headless verification scripts and the console (not used by the engine)
-  globalThis.__twin = { scene, renderer, cameraSystem, controllerManager, lightingSystem, world, aoEnabled, aoPass };
+  globalThis.__twin = { scene, renderer, cameraSystem, controllerManager, lightingSystem, world, aoEnabled, aoPass, tour };
   // `?hooks` exposes the running twin to headless checks (tools/m3-check.py): a free camera and the live systems
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
@@ -800,7 +869,9 @@ async function initApp() {
 
     // Update 3rd-person controllers, camera, signals, traffic & vehicle collisions, building LODs, and dynamic shadow focus
     const T0 = frameProbe ? performance.now() : 0;
+    gamepadControls.tourMode = tour.guided;
     gamepadControls.update(dt);
+    tour.update(rawDt); // wall time: the tour keeps its pace at low frame rates; it holds the player still on a guided tour
     controllerManager.update(dt, elapsed);
     cameraSystem.update(dt, elapsed);
     trafficSystem.update(
@@ -869,6 +940,11 @@ async function initApp() {
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
         audioSystem.ready = true;
         setLoadingProgress(1);
+        // `?tour=express|full|drive|loop` starts a tour at once (loop: the express tour, looping, as after the idle time)
+        tour.setReady();
+        const tourParam = query.get('tour');
+        if (tourParam === 'loop') tour.start('express', { loop: true });
+        else if (tourParam) tour.start(tourParam);
       });
     }
 

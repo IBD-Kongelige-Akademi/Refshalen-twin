@@ -78,6 +78,8 @@
   <link rel="modulepreload" href="./js/skate-props.js" />
   <link rel="modulepreload" href="./js/cyclist-appearance.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
+  <link rel="modulepreload" href="./js/tour.js" />
+  <link rel="modulepreload" href="./js/tour-script.js" />
   <link rel="modulepreload" href="./js/layout.js" />
   <link rel="modulepreload" href="./js/lighting.js" />
   <link rel="modulepreload" href="./js/sun-shadow.js" />
@@ -167,6 +169,7 @@
       <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9.5 6.5 5.5 5.5-5.5 5.5"/></symbol>
       <symbol id="i-camera" viewBox="0 0 24 24"><rect x="2.8" y="6.5" width="12.4" height="11" rx="2.4"/><path d="m15.2 10.4 6-3.4v10l-6-3.4"/></symbol>
       <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"/></symbol>
+      <symbol id="i-tour" viewBox="0 0 24 24"><path d="M5 21V4M5 4.5h11.5l-2.3 3.7 2.3 3.8H5"/></symbol>
       <symbol id="i-map" viewBox="0 0 24 24"><path d="M9 4.5 3.5 6.6v13l5.5-2.1 6 2.1 5.5-2.1v-13L15 6.6 9 4.5zM9 4.5v13M15 6.6v13"/></symbol>
       <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13"/></symbol>
       <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5.5 12h13"/></symbol>
@@ -228,6 +231,9 @@
       <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
         <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Teleport</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
+      <button id="btn-tour" class="tool-btn" type="button" popovertarget="tour-popover" title="Tour Aalborg from AKKC">
+        <svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg><span class="tool-label">Tour</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
+      </button>
       <button id="btn-buildings" class="tool-btn" type="button" popovertarget="buildings-popover" title="Building model level [L cycles]">
         <svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><span class="tool-label">Buildings</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
@@ -254,6 +260,14 @@
     <div id="tp-city-title" class="pop-title" hidden>Citywide</div>
   </div>
 
+  <!-- The Kortdage tour (js/tour.js): from AKKC round the landmarks and back -->
+  <div id="tour-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-tour" aria-label="Tour Aalborg">
+    <div class="pop-title">Tour Aalborg from AKKC</div>
+    <button id="tour-express" class="pop-item tp-btn" data-tour="express" type="button"><span class="pop-name">Express tour · 2 min</span><span class="pop-sub">An aerial opening, the drive modes, then seven landmarks, hands-off</span></button>
+    <button id="tour-full" class="pop-item tp-btn" data-tour="full" type="button"><span class="pop-name">Full tour · 6 min</span><span class="pop-sub">Every feature: building levels, night, drone, Plusbus, weather</span></button>
+    <button id="tour-drive" class="pop-item tp-btn" data-tour="drive" type="button"><span class="pop-name">Drive the tour</span><span class="pop-sub">You drive, the GPS routes you stop to stop (drone starts in the car)</span></button>
+  </div>
+
   <!-- Building model level (js/buildings-stream.js setLevel): each level adds to the one above it -->
   <div id="buildings-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-buildings" aria-label="Building model level">
     <div class="pop-title">Building model <kbd>L</kbd></div>
@@ -264,6 +278,22 @@
     <button id="bl-full" class="pop-item tp-btn level-btn active" data-building-level="full" type="button" aria-pressed="true"><span class="pop-name">4 · Full</span><span class="pop-sub">Hero buildings from drawings</span></button>
     <div id="bl-status" class="pop-status" aria-live="polite"></div>
   </div>
+
+  <!-- The tour: black fade between stops, and the caption card (js/main.js tourUi) -->
+  <div id="tour-fade" aria-hidden="true"></div>
+  <section id="tour-card" class="panel" aria-live="polite" aria-label="Tour" hidden>
+    <div class="tour-head"><span class="tour-counter"></span><span class="tour-sub"></span></div>
+    <h2 class="tour-title"></h2>
+    <p class="tour-caption"></p>
+    <div class="tour-progress" aria-hidden="true"><div class="tour-progress-fill"></div></div>
+    <div class="tour-actions">
+      <span class="tour-hint"></span>
+      <button class="tour-btn tour-guided-only" data-tour-cmd="prev" type="button" title="Back [←]" aria-label="Back"><svg class="icon" aria-hidden="true"><use href="#i-chevron-left"/></svg></button>
+      <button class="tour-btn tour-guided-only" data-tour-cmd="next" type="button" title="Next [→ / Space]" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
+      <button class="tour-btn tour-drive-only" data-tour-cmd="next" type="button" title="Teleport to the next stop">Skip leg</button>
+      <button class="tour-btn" data-tour-cmd="end" type="button" title="End the tour [Esc]">End tour</button>
+    </div>
+  </section>
 
   <!-- Bottom-Left: Street-Name Sign & Live Radar Minimap -->
   <div class="hud hud-bottom-left">

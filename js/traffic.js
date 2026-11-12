@@ -1529,6 +1529,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       v.cs += ds;
       if (v.cs >= v.conn.len) leave(v);
     }
+    if (!v.edge) return; // retired off a road that leads out of the district: placed afresh, nothing to steer along
     steer(v, dt);
   }
 

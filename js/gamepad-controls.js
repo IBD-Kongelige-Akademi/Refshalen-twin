@@ -124,6 +124,7 @@ class GamepadControls {
     const toggleMap = edge(MENU), closeMap = edge(B), confirm = edge(A), route = edge(X);
     const cycleMode = Number(Boolean(edge(RB))) - Number(Boolean(edge(LB)));
     const cycleLevel = Number(Boolean(edge(RIGHT))) - Number(Boolean(edge(LEFT)));
+    const anyPress = pressed.some((_, i) => edge(i));
     const cycleCamera = edge(Y), recenter = edge(R3), horn = edge(L3), inspect = closeMap;
     const interact = confirm && this.controller.getGoBoatInteraction?.();
     this.previousButtons = pressed;
@@ -135,6 +136,19 @@ class GamepadControls {
       this.suppressedButtons = pressed.slice();
       this.viewDownAt = null;
       this.controller.clearGamepadInput();
+      return;
+    }
+
+    // Any fresh press or a stick off centre is activity (the tour's idle timer and attract loop, js/tour.js)
+    const sticksMoved = stick(pad, 0).x || stick(pad, 0).y || stick(pad, 2).x || stick(pad, 2).y;
+    if (sticksMoved || anyPress) this.callbacks.onActivity?.();
+    if (this.tourMode) {
+      // A guided tour plays: A / D-pad right next, D-pad left back, B ends it; nothing drives the player
+      this.controller.clearGamepadInput();
+      this.viewDownAt = null;
+      if (closeMap) this.callbacks.onTour?.('end');
+      else if (confirm || cycleLevel > 0) this.callbacks.onTour?.('next');
+      else if (cycleLevel < 0) this.callbacks.onTour?.('prev');
       return;
     }
 
