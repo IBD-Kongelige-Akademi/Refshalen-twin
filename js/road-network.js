@@ -741,7 +741,9 @@ function buildRoadNetwork(signalIntersections = [], options = {}) {
     parkPaths: options.parkPaths || null,
     walkable: options.walkable,
     onSidewalk: options.onSidewalk,
-    isRoadClear: () => true
+    // Is (x, z) on a carriageway? (Where a driver swerving out of the player's way may go, js/traffic.js swerveRoom:
+    // not the pavement, a cycle track or a bridge deck, which roadAt leaves out.) Everywhere, without the walk limits.
+    isRoadClear: options.roadAt ? (x, z) => !!options.roadAt(x, z) : () => true
   };
 }
 

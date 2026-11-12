@@ -47,12 +47,21 @@ const JAM_WAIT = 100; // s
 const PINNED_WAIT = 3;
 const PINNED_DEPTH = 0.1; // m of overlap with a solid that counts as wedged (a graze along a parked car does not)
 
-// Intelligent Driver Model: max acceleration, comfortable braking, time headway, standstill gap; and the sideways
-// acceleration drivers accept in bends, which sets how fast they take each turn or lane shift
-const CAR_DRIVER = { a: 2.0, b: 3.0, T: 1.2, s0: 2.0, aLat: 3.5 };
-const BUS_DRIVER = { a: 1.1, b: 2.5, T: 1.5, s0: 2.5, aLat: 2.0 };
-const PLUS_DRIVER = { a: 1.0, b: 2.2, T: 1.6, s0: 3.0, aLat: 1.6 };
+// Intelligent Driver Model: max acceleration, comfortable braking, time headway, standstill gap; the sideways
+// acceleration drivers accept in bends, which sets how fast they take each turn or lane shift; and how hard they brake
+// in an emergency. At the wheel (see steer): the sideways acceleration the tyres grip up to, how far the front wheels
+// turn (radians), and how fast the driver turns them at speed (rad/s, ~250°/s at the steering wheel; up to three times
+// as fast at walking pace, 2.5 times as fast in a panic). (Ported from mrdoob/slop-newyork 17c0973.)
+const CAR_DRIVER = { a: 2.0, b: 3.0, T: 1.2, s0: 2.0, aLat: 3.5, bMax: 8, grip: 8, lock: 0.6, steerRate: 0.3 };
+const BUS_DRIVER = { a: 1.1, b: 2.5, T: 1.5, s0: 2.5, aLat: 2.0, bMax: 6, grip: 5, lock: 0.9, steerRate: 0.3 };
+const PLUS_DRIVER = { a: 1.0, b: 2.2, T: 1.6, s0: 3.0, aLat: 1.6, bMax: 5, grip: 4, lock: 0.9, steerRate: 0.3 };
 const LOOKAHEAD = 70; // metres a driver looks ahead for vehicles, stop lines and signals
+// Dodging the player (see react): seconds before the player would hit it that a driver notices, and the least it keeps
+// up its manoeuvre once it reacts
+const AVOID_NOTICE = 1.8;
+const AVOID_HOLD = 1.2;
+const LOCK_MAX = 1.3; // radians: the furthest the simulated front wheels turn for a junction curve tighter than full lock
+const NOSE_MAX = 0.35; // radians: the furthest a driver heads off its path, but in a swerve or a spin (see steer)
 
 // Retire distant actors even when looking their way: keeping them indefinitely starves upcoming streets.
 // Replacements may enter the far view, but nearby visible roads and sidewalks are protected from pop-in.
@@ -158,7 +167,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       move: null, out: 0, conn: null, cs: 0, trail: null, commit: null, claimed: false, yielding: false, yieldAt: 0,
       wait: 0, laneTimer: Math.random() * 0.5,
       dl: 0, dlv: 0, blink: 0, blinkPhase: Math.random() * 0.8,
-      x: 0, z: 0, prevX: 0, prevZ: 0, tx: 0, tz: 1, nose: 0, yaw: 0, yawRate: 0, steer: 0,
+      evade: 0, alarm: 0, panicUntil: 0, panicAcc: 0, reaction: 0.6 + Math.random() * 0.4,
+      x: 0, z: 0, prevX: 0, prevZ: 0, tx: 0, tz: 1, nose: 0, yaw: 0, yawRate: 0, steer: 0, delta: 0,
       pitch: 0, roll: 0, pitchVel: 0, rollVel: 0, vx: 0, vz: 0, yawOffset: 0, yawVel: 0,
       pAhead: Infinity, pRight: 0, pSpeed: 0, wheelSpin: Math.random() * Math.PI * 2
     };
@@ -405,18 +415,20 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       radius: v.plus ? spec.length / 2 : Math.max(v.halfWidth, v.half),
       mass: v.plus ? 28000 : v.bus ? 6500 : Math.max(950, 1400 / Math.max(spec.massRatio || 0.5, 0.2)),
       x: 0, y: 0, z: 0, prevX: 0, prevY: 0, prevZ: 0, _wasPlaced: false,
+      // (driving along its heading, which may be off its path: see steer)
       getVelocity(out) {
-        out.x = v.tx * v.speed + v.vx;
-        out.z = v.tz * v.speed + v.vz;
+        out.x = Math.sin(v.yaw) * v.speed + v.vx;
+        out.z = Math.cos(v.yaw) * v.speed + v.vz;
         return out;
       },
       applyVelocity(dx, dz) {
-        const nextX = v.tx * v.speed + v.vx + dx;
-        const nextZ = v.tz * v.speed + v.vz + dz;
-        const pathSpeed = Math.max(0, nextX * v.tx + nextZ * v.tz);
-        v.speed = pathSpeed;
-        v.vx = nextX - v.tx * pathSpeed;
-        v.vz = nextZ - v.tz * pathSpeed;
+        const hx = Math.sin(v.yaw), hz = Math.cos(v.yaw);
+        const nextX = hx * v.speed + v.vx + dx;
+        const nextZ = hz * v.speed + v.vz + dz;
+        const speed = Math.max(0, nextX * hx + nextZ * hz);
+        v.speed = speed;
+        v.vx = nextX - hx * speed;
+        v.vz = nextZ - hz * speed;
       },
       move(dx, dz) {
         shove(v, dx, dz);
@@ -1174,10 +1186,11 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
 
   // Overtake into an adjacent lane when it is clearly quicker (MOBIL), or work towards a lane the planned turn
   // can be made from; either only if neither v nor its new follower has to brake hard for it. Not while still
-  // pulling out of an intersection, nor in the last 12 m before the next.
+  // pulling out of an intersection or dodging the player, nor in the last 12 m before the next.
   function changeLanes(v) {
     const e = v.edge;
-    if (!v.move || v.conn || v.commit || Math.abs(v.dl) > 0.5 || v.s < v.half || e.len - v.s - v.half < 12) return;
+    if (!v.move || v.conn || v.commit || clock < v.panicUntil) return;
+    if (Math.abs(v.dl) > 0.5 || v.s < v.half || e.len - v.s - v.half < 12) return;
     let target = -1;
     if (v.move.out[v.lane] < 0) {
       const t = v.lane + Math.sign(nearestLane(v.move, v.lane) - v.lane);
@@ -1289,7 +1302,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     // a Plusbus pulls up with its front doors at the next stop
     if (v.plus && v.stopD < LOOKAHEAD) worst = Math.min(worst, stopAt(v, Math.max(0, v.stopD) + 1));
     const pg = playerGap(v, 0);
-    if (pg < LOOKAHEAD) {
+    if (pg > 0 && pg < LOOKAHEAD) { // (a player alongside, not yet clear ahead, isn't one to follow)
       worst = Math.min(worst, brake(v, pg, v.pSpeed));
       if (pg < v.gap) {
         v.gap = pg;
@@ -1298,6 +1311,101 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     }
     const acc = Math.min(freeAcc(v) + worst, (cap - v.speed) * 2);
     v.acc = clamp(acc, -9, v.driver.a);
+    // dodging the player: braking (as hard as it can, unless that would stop it before it has swerved out of the way),
+    // or flooring it (unless it must brake for something ahead)
+    if (clock < v.panicUntil) {
+      if (v.panicAcc < 0) v.acc = Math.min(v.acc, v.evade ? -v.driver.b : -v.driver.bMax);
+      else if (v.acc > -v.driver.b && v.speed < 1.5 * v.v0) v.acc = Math.max(v.acc, 1.5 * v.driver.a);
+    }
+  }
+
+  // Dodging the player, as people do: late, and without second thoughts. A driver who sees the player about to hit it
+  // (within AVOID_NOTICE seconds, both keeping on as they go) reacts only once that has lasted its reaction time, by
+  // when it is almost too late. Then it commits to one manoeuvre: braking if the player would hit its front half (hard,
+  // unless it swerves too: a car that stops can't get out of the way), flooring it if its rear half (braking would only
+  // make that worse), and swerving to one side if the road is clear there: away from the player (behind a player crossing
+  // its way, to the right if the player comes straight at it), unless there is more room the other way.
+  // It keeps that up for AVOID_HOLD seconds at least, and for as long as the player is still about to hit it.
+  function react(v, dt) {
+    const t = player.active ? threatTime(v) : Infinity;
+    if (v.panicUntil && clock >= v.panicUntil) v.evade = v.panicUntil = v.panicAcc = v.alarm = 0; // over
+    if (v.panicUntil) {
+      if (t < AVOID_NOTICE) v.panicUntil = Math.max(v.panicUntil, clock + 0.5);
+      return;
+    }
+    if (t >= AVOID_NOTICE) {
+      v.alarm = 0;
+      return;
+    }
+    v.alarm += dt;
+    if (v.alarm < v.reaction) return;
+    v.panicUntil = clock + AVOID_HOLD;
+    v.panicAcc = threat.ahead < 0 ? 1 : -1;
+    if (v.speed < 2) return;
+    // where the player will be across v's way a moment after it would hit: v swerves away from there, or the other way
+    // if there is more room on that side
+    const later = threat.aside + threat.across * 0.5;
+    const side = Math.abs(later) < 0.3 ? 1 : -Math.sign(later);
+    const room = swerveRoom(v, side);
+    const other = swerveRoom(v, -side);
+    v.evade = other > room ? -side * other : side * room;
+  }
+
+  // Seconds until the player would hit v (with a little margin), both keeping on straight as they go; Infinity if not
+  // within AVOID_NOTICE. Where it would hit goes in `threat`: the player's position ahead of v and to its right then,
+  // and its speed across v's heading.
+  const threat = { ahead: 0, aside: 0, across: 0 };
+  function threatTime(v) {
+    const dx = player.x - v.x;
+    const dz = player.z - v.z;
+    if (Math.abs(dx) > 90 || Math.abs(dz) > 90) return Infinity;
+    const hx = Math.sin(v.yaw);
+    const hz = Math.cos(v.yaw);
+    const ahead = dx * hx + dz * hz;
+    const aside = dz * hx - dx * hz;
+    const along = player.vx * hx + player.vz * hz - v.speed;
+    const across = player.vz * hx - player.vx * hz;
+    // the player's half extents along and across v's heading, as it is turned
+    const c = Math.abs(player.fx * hx + player.fz * hz);
+    const s = Math.abs(player.fz * hx - player.fx * hz);
+    const reachAhead = v.half + player.halfL * c + player.halfW * s + 0.3;
+    const reachAside = v.halfWidth + player.halfL * s + player.halfW * c + 0.3;
+    let enter = 0;
+    let exit = AVOID_NOTICE;
+    for (let k = 0; k < 2; k++) {
+      const p = k ? aside : ahead;
+      const m = k ? across : along;
+      const r = k ? reachAside : reachAhead;
+      if (Math.abs(m) < 1e-6) {
+        if (Math.abs(p) >= r) return Infinity;
+        continue;
+      }
+      const t0 = (-r - p) / m;
+      const t1 = (r - p) / m;
+      enter = Math.max(enter, Math.min(t0, t1));
+      exit = Math.min(exit, Math.max(t0, t1));
+    }
+    if (enter >= exit) return Infinity;
+    threat.ahead = ahead + along * enter;
+    threat.aside = aside + across * enter;
+    threat.across = across;
+    return enter;
+  }
+
+  // How far right (side 1) or left (-1) of its lane centre v can swerve: well over, a little, or not at all, as far as
+  // the carriageway is clear beside it there and a little way ahead
+  function swerveRoom(v, side) {
+    const rx = -v.tz;
+    const rz = v.tx;
+    for (const r of [2.2, 1.2]) {
+      const off = side * (r + v.halfWidth) - v.dl;
+      let clear = true;
+      for (const a of [0, v.half + v.speed * 0.6]) {
+        if (!network.isRoadClear(v.x + rx * off + v.tx * a, v.z + rz * off + v.tz * a, 0.2)) clear = false;
+      }
+      if (clear) return r;
+    }
+    return 0;
   }
 
   // Front bumper at the stop line: cross if allowed, or if going too fast to stop; otherwise wait there
@@ -1388,7 +1496,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     accelerate(v);
     const speed = v.speed;
     v.speed = Math.max(0, v.speed + v.acc * dt);
-    let ds = v.speed * dt;
+    let ds = v.speed * Math.cos(v.nose) * dt; // (along its path, heading off it as it may be)
     if (ds > v.gap - 0.3) {
       // never into the vehicle ahead
       ds = Math.max(0, v.gap - 0.3);
@@ -1421,14 +1529,66 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       v.cs += ds;
       if (v.cs >= v.conn.len) leave(v);
     }
-    // ease sideways onto the lane centre (after lane changes and knocks), steering the front bumper towards it so the
-    // nose doesn't swing on into the next lane, and no faster than the wheels can steer it, though even stopped half
-    // way into a lane change a driver edges over
-    const maxLat = Math.min(1.7, 0.3 + (v.bus ? 0.1 : 0.22) * v.speed);
-    const rate = Math.min(1.8, Math.max(v.speed, 1.5) / (v.axle + v.half));
-    const target = clamp(-rate * v.dl, -maxLat, maxLat);
-    v.dlv += clamp(target - v.dlv, -2.5 * dt, 2.5 * dt);
+    steer(v, dt);
+  }
+
+  // The driver at the wheel. It steers for the bend in its path a moment ahead (on through the intersection ahead the
+  // way it plans to cross it), to head along its path, and back onto it: onto its lane centre after lane changes and
+  // knocks, or right of it by however far it swerves out of the player's way (Stanley steering). It turns the front
+  // wheels no faster than a person does and no further than it is comfortable with (or, in a panic, than the tyres
+  // grip). The car turns only as fast as its front wheels turn it, the tyres sliding at their grip; a knock's spin
+  // turns it too, the tyres scrubbing that off. Heading off its path, it drifts across it.
+  const bendA = { x: 0, z: 0, dx: 0, dz: 1 };
+  const bendB = { x: 0, z: 0, dx: 0, dz: 1 };
+  function steer(v, dt) {
+    const panic = !!v.evade;
+    const wheelbase = 2 * v.axle;
+    const c = v.conn ? v.cs : v.s;
+    // the bend a moment ahead, as the wheel takes a while to turn: its curvature (to the left) over 2 m
+    const ahead = v.axle + 0.5 * v.speed;
+    previewPoint(v, c + ahead, bendA);
+    previewPoint(v, c + ahead + 2, bendB);
+    let bend = Math.atan2(bendB.dx, bendB.dz) - Math.atan2(bendA.dx, bendA.dz);
+    bend -= Math.round(bend / (Math.PI * 2)) * Math.PI * 2;
+    // ...plus how far right of its path it heads, and how far right of where it should be it is (nose and dl - evade)
+    const off = v.dl - (v.evade || 0);
+    const want = Math.atan((wheelbase * bend) / 2) + v.nose + Math.atan(((panic ? 3 : 1.2) * off) / (1 + v.speed));
+    const lateral = panic ? v.driver.grip : 1.3 * v.driver.aLat; // the sideways acceleration it steers up to
+    // Aalborg's junction curves are often tighter than a car turns at full lock (a radius under 1 m where the lanes end
+    // near the node): there it turns the wheels as far as the curve needs, or it would swing out across the junction
+    const need = Math.min(LOCK_MAX, 1.15 * Math.abs(Math.atan((wheelbase * bend) / 2)));
+    const most = Math.min(Math.max(v.driver.lock, need), Math.atan((lateral * wheelbase) / Math.max(v.speed * v.speed, 1e-3)));
+    const rate = v.driver.steerRate * (panic ? 2.5 : clamp(8 / Math.max(v.speed, 1), 1, 3)) * dt;
+    v.delta += clamp(clamp(want, -most, most) - v.delta, -rate, rate);
+    const slide = v.driver.grip / Math.max(v.speed, 0.1);
+    v.yawRate = clamp((v.speed * Math.tan(v.delta)) / wheelbase, -slide, slide);
+    v.yaw += (v.yawRate + v.yawVel) * dt;
+    v.yaw -= Math.round(v.yaw / (Math.PI * 2)) * Math.PI * 2;
+    v.yawVel *= Math.exp(-4 * dt);
+    if (Math.abs(v.yawVel) < 1e-3) v.yawVel = 0;
+    // across its path, heading off it (nose: how far right of its path it heads)
+    const pathYaw = Math.atan2(v.tx, v.tz);
+    let nose = pathYaw - v.yaw;
+    nose -= Math.round(nose / (Math.PI * 2)) * Math.PI * 2;
+    // ...but no further than NOSE_MAX unless swerving or spun by a knock: where a path turns faster than any car can
+    // (a lane-to-lane link of a metre or two turning 90°), the car is turned with it instead of ending up sideways
+    if (!panic && v.yawVel === 0 && Math.abs(nose) > NOSE_MAX) {
+      nose = Math.sign(nose) * NOSE_MAX;
+      v.yaw = pathYaw - nose;
+    }
+    v.dlv = v.speed * Math.sin(nose);
     v.dl += v.dlv * dt;
+  }
+
+  // Point and direction c metres along v's path, as pathPoint, but on through the intersection ahead the way v plans
+  // to cross it
+  function previewPoint(v, c, out) {
+    const e = v.edge;
+    const j = v.conn || c <= e.len || !v.move ? -1 : v.move.out[v.lane];
+    if (!(j >= 0)) return pathPoint(v, c, out);
+    const k = connector(e, v.lane, v.move.to, j);
+    if (c - e.len <= k.len) return curvePoint(k, c - e.len, out);
+    return lanePoint(v.move.to, j, c - e.len - k.len, out);
   }
 
   // Point and direction at distance c along v's path: its lane, the curve through the intersection, and the
@@ -1451,21 +1611,18 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     return lanePoint(e, v.lane, c, out);
   }
 
-  // World position and heading from where v's axles are along its path: the rear axle dl to the right of it, and the
-  // body turned `nose` to the right about the rear axle, into a lane change (so the rear axle never slides sideways)
-  const front = { x: 0, z: 0, dx: 0, dz: 0 };
-  const rear = { x: 0, z: 0, dx: 0, dz: 0 };
+  // World position from where v is along its path (dl to the right of it), the path's direction there, and how far
+  // right of it v heads (nose)
+  const front = { x: 0, z: 0, dx: 0, dz: 0 }; // (a Plusbus's front bumper, see trackLine)
+  const at = { x: 0, z: 0, dx: 0, dz: 0 };
   function locate(v) {
-    const c = v.conn ? v.cs : v.s;
-    pathPoint(v, c + v.axle, front);
-    pathPoint(v, c - v.axle, rear);
-    const l = Math.hypot(front.x - rear.x, front.z - rear.z) || 1;
-    v.tx = (front.x - rear.x) / l;
-    v.tz = (front.z - rear.z) / l;
-    v.nose = Math.atan2(v.dlv, Math.max(v.speed, 1.5));
-    const off = v.dl + v.axle * Math.sin(v.nose);
-    v.x = (front.x + rear.x) / 2 - v.tz * off;
-    v.z = (front.z + rear.z) / 2 + v.tx * off;
+    pathPoint(v, v.conn ? v.cs : v.s, at);
+    v.tx = at.dx;
+    v.tz = at.dz;
+    v.x = at.x - at.dz * v.dl;
+    v.z = at.z + at.dx * v.dl;
+    const nose = Math.atan2(at.dx, at.dz) - v.yaw;
+    v.nose = nose - Math.round(nose / (Math.PI * 2)) * Math.PI * 2;
   }
 
   // Move v along and across its path by (dx, dz), as far as the road allows
@@ -1477,20 +1634,14 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     locate(v);
   }
 
-  // Heading, steering, turn signals, and body pitch & roll from acceleration & turning
+  // Steering shown on the front wheels, turn signals, and body pitch & roll from acceleration & turning (the heading
+  // itself is the driver's doing, see steer)
   function pose(v, dt) {
-    const yaw = Math.atan2(v.tx, v.tz) - v.nose;
-    let dYaw = yaw - v.yaw;
-    dYaw -= Math.round(dYaw / (Math.PI * 2)) * Math.PI * 2;
-    v.yaw = yaw;
-    const safeDt = Math.max(dt, 1e-3);
-    v.yawRate += (dYaw / safeDt - v.yawRate) * Math.min(1, dt * 8);
-    const wheelbase = 2 * v.axle;
-    const steer = clamp(Math.atan((wheelbase * v.yawRate) / Math.max(v.speed, 0.5)), -0.6, 0.6);
-    v.steer += (steer - v.steer) * Math.min(1, dt * 10);
+    v.steer = clamp(v.delta, -v.driver.lock, v.driver.lock); // (drawn no further than a real wheel turns, see steer)
 
     const turn = v.move ? v.move.turn : 'S';
-    if (Math.abs(v.dl) > 0.3 && Math.abs(v.dlv) > 0.05) v.blink = v.dl > 0 ? -1 : 1;
+    if (v.evade) v.blink = 0; // no time to signal a swerve
+    else if (Math.abs(v.dl) > 0.3 && Math.abs(v.dlv) > 0.05) v.blink = v.dl > 0 ? -1 : 1;
     else if (turn !== 'S' && (v.conn || v.edge.len - v.s < 35)) v.blink = turn === 'R' ? 1 : -1;
     else v.blink = 0;
 
@@ -1498,9 +1649,6 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     v.pitch = clamp(v.pitch + v.pitchVel * dt, -0.22, 0.22);
     v.rollVel += ((0.01 * v.speed * v.yawRate - v.roll) * 68.0 - v.rollVel * 10.8) * dt;
     v.roll = clamp(v.roll + v.rollVel * dt, -0.26, 0.26);
-    v.yawOffset += v.yawVel * dt;
-    v.yawVel += (-v.yawOffset * 18.0 - v.yawVel * 6.8) * dt;
-    v.yawOffset = clamp(v.yawOffset * Math.exp(-4.5 * dt), -0.85, 0.85);
   }
 
   // Knock velocity from collisions carries v along and across its path, and dies down
@@ -1534,6 +1682,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     v.speed = v.v0 * 0.5;
     v.acc = 0;
     v.dl = v.dlv = 0;
+    v.evade = v.alarm = v.panicUntil = v.panicAcc = 0;
     v.vx = v.vz = v.yawOffset = v.yawVel = v.pitch = v.pitchVel = v.roll = v.rollVel = 0;
     locate(v);
     // on a road under a bridge it stands under it, on the bridge on it: walked out from the edge's end that is off the decks
@@ -1542,8 +1691,8 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     v.gs = v.gy;
     v.prevX = v.x;
     v.prevZ = v.z;
-    v.yaw = Math.atan2(v.tx, v.tz);
-    v.yawRate = v.steer = 0;
+    v.yaw = Math.atan2(v.tx, v.tz); // (placed heading down its lane)
+    v.nose = v.yawRate = v.steer = v.delta = 0;
     v.move = chooseMove(v, false);
     occupy(e.occ[lane], v, s);
   }
@@ -2081,6 +2230,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
       v.prevX = v.x;
       v.prevZ = v.z;
       relateToPlayer(v);
+      if (dt > 0) react(v, dt);
       if (dt > 0) drive(v, dt);
       else v.acc = 0;
       if (!v.edge) continue;
@@ -2107,8 +2257,6 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     // Corrections from the contact pass now feed the body, wheel, light, pedestrian and shadow batches.
     for (const v of vehicles) {
       if (!v.edge) continue;
-      // Route corrections can change the tangent; pack the same yaw used by the collision adapter.
-      v.yaw = Math.atan2(v.tx, v.tz) - v.nose;
       if (v.plus) renderPlus(v);
       else if (v.bus) renderBus(v);
       else renderCar(v);
