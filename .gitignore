@@ -27,3 +27,6 @@ data/tiles/
 data/city/
 .context/
 data/overrides/
+
+# wrangler (tools/hosting/upload_packs.py) local cache
+.wrangler/

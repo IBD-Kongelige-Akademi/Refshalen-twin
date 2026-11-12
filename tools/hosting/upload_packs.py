@@ -15,12 +15,13 @@ manifest.json with `Cache-Control: no-cache` and the packs with `public, max-age
 wrangler runs with XDG_CONFIG_HOME=--wrangler-config (default ~/.config/wrangler-personal: the Cloudflare account that owns
 the bucket; never the default login). Bucket, account id and public URL default to R2_BUCKET, R2_ACCOUNT_ID and R2_PUBLIC_URL. The old unpacked layout keeps its own uploader (tools/hosting/upload_r2.py).
 """
-import argparse, concurrent.futures as cf, json, os, subprocess, threading, time, urllib.parse, urllib.request
+import argparse, concurrent.futures as cf, json, os, shutil, subprocess, threading, time, urllib.parse, urllib.request
 
 IMMUTABLE = 'public, max-age=31536000, immutable'
 REVALIDATE = 'no-cache'
 DEFAULT_PUBLIC = os.environ.get('R2_PUBLIC_URL', '')  # a custom domain on the bucket: r2.dev is rate limited and not CDN-cached
 DEFAULT_ACCOUNT = os.environ.get('R2_ACCOUNT_ID', '')  # the Cloudflare account that owns the bucket
+WRANGLER = shutil.which('wrangler') or 'wrangler'  # on Windows npm installs wrangler.cmd, which subprocess only finds by its full path
 lock = threading.RLock()
 
 
@@ -31,7 +32,7 @@ def log(*a):
 
 def list_bucket(account, bucket, prefix, env):
     """{key: size} of the bucket through the Cloudflare REST API with wrangler's OAuth token (refreshed by `wrangler whoami`)."""
-    subprocess.run(['wrangler', 'whoami'], env=env, capture_output=True, text=True)
+    subprocess.run([WRANGLER, 'whoami'], env=env, capture_output=True, text=True)
     cfg = os.path.join(env['XDG_CONFIG_HOME'], '.wrangler', 'config', 'default.toml')
     token = next(l.split('=', 1)[1].strip().strip('"') for l in open(cfg) if l.startswith('oauth_token'))
     out, cursor = {}, ''
@@ -49,7 +50,7 @@ def list_bucket(account, bucket, prefix, env):
 
 
 def put(bucket, key, path, ctype, cache, env, dry):
-    cmd = ['wrangler', 'r2', 'object', 'put', f'{bucket}/{key}', '--file', path, '--content-type', ctype, '--cache-control', cache, '--remote']
+    cmd = [WRANGLER, 'r2', 'object', 'put', f'{bucket}/{key}', '--file', path, '--content-type', ctype, '--cache-control', cache, '--remote']
     if dry:
         return True
     for attempt in range(5):
