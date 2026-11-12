@@ -3,7 +3,7 @@
     {
       "allowed": {
         "origins": [
-          "https://YOUR-GITHUB-USERNAME.github.io",
+          "https://askonring.github.io",
           "http://localhost:8000",
           "http://127.0.0.1:8000",
           "http://localhost:8010",

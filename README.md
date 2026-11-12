@@ -80,7 +80,7 @@ The app (index.html, css, js) is deployed by GitHub Pages; the tile data is too 
 
 1. `python3 tools/hosting/build_packs.py [--out .context/packs/<v>]` packs data/tiles, data/city and the facade atlases.
 2. `python3 tools/hosting/upload_packs.py --dir .context/packs/<v>` uploads to R2 (packs first, the manifest last, existing packs skipped); `tools/hosting/serve_range.py` serves a pack directory locally and `tools/hosting/measure_visit.py` counts a visit's requests.
-3. Apply `tools/hosting/cors.json` to the bucket once (Cloudflare dashboard, R2 bucket settings, CORS policy), after replacing `YOUR-GITHUB-USERNAME` with the Pages origin. The Aalborg packed data costs about 40 requests and 15 MB for boot plus the full Kortdage tour (rehearsed locally on 2026-11-12).
+3. Apply `tools/hosting/cors.json` to the bucket once (Cloudflare dashboard, R2 bucket settings, CORS policy); it allows the Pages origin `https://askonring.github.io` and the local dev ports. The Aalborg packed data costs about 40 requests and 15 MB for boot plus the full Kortdage tour (rehearsed locally on 2026-11-12).
 
 `.github/workflows/pages.yml` publishes index.html, credits.html (the in-game Credits link), css and js and points `BUILD_DATA_BASE` (`js/data-config.js`) at `DATA_URL`; it does not deploy until that variable is set. Put a custom domain on the bucket: r2.dev is rate limited and not CDN-cached.
 
