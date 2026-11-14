@@ -20,6 +20,8 @@ import { createNightlifeScene } from './nightlife-scene.js';
 import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.js';
 import { OverviewMap } from './overview-map.js';
 import { createTour } from './tour.js';
+import { createRace, finishSegments } from './race.js';
+import { MODE_LABEL, MODE_ICON, formatTime, raceMode } from './race-scores.js';
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
@@ -273,6 +275,7 @@ async function initApp() {
     onTour: (cmd) => tour?.command(cmd)
   });
   let tour = null; // created once the map and the building levels exist (below)
+  let race = null; // the Kortdage race (js/race.js), created after the tour
 
   // Keyboard guide for each mode: [keys, action]
   const controlHints = {
@@ -322,6 +325,7 @@ async function initApp() {
   }
 
   function selectMode(mode, options = {}) {
+    if (race?.blocking && !options.force) return; // the race keeps the vehicle it started with
     if (mode === 'cyclist' && lastBikeMode === 'cargobike') mode = lastBikeMode;
     const fromMode = controllerManager.activeMode;
     const from = controllerManager.getActiveEntity();
@@ -529,7 +533,7 @@ async function initApp() {
     btn.hidden = !presetFor(btn.getAttribute('data-teleport'));
     btn.addEventListener('click', () => {
       const loc = presetFor(btn.getAttribute('data-teleport'));
-      if (loc) {
+      if (loc && !race?.blocking) {
         teleportTo(loc.x, loc.z, loc.heading);
       }
       closePopovers();
@@ -564,7 +568,7 @@ async function initApp() {
       const mapHint = document.getElementById('fullmap-hover-info');
       if (open && touchControls.available && mapHint) mapHint.textContent = 'Tap to teleport · Drag to pan · Use + / − to zoom';
     },
-    onTeleport: (x, z) => teleportTo(x, z)
+    onTeleport: (x, z) => { if (!race?.blocking) teleportTo(x, z); }
   });
   world.fetchCityJson?.('map.json').then((doc) => mapSystem.setData(doc)).catch((e) => console.info('[map] no data/city/map.json:', e?.message || e));
   // line 2's route for the AI Plusbuses (tools/geodata/bus_lines.py)
@@ -657,13 +661,165 @@ async function initApp() {
     setView: (pose) => { cameraSystem.debugView = pose; },
     groundAt: (x, z) => world.groundHeight?.heightAt?.(x, z) ?? 0
   });
-  document.querySelectorAll('[data-tour]').forEach((btn) => btn.addEventListener('click', () => tour.start(btn.getAttribute('data-tour'))));
+  document.querySelectorAll('[data-tour]').forEach((btn) => btn.addEventListener('click', () => { if (!race?.blocking) tour.start(btn.getAttribute('data-tour')); }));
   document.querySelectorAll('[data-tour-cmd]').forEach((btn) => btn.addEventListener('click', () => tour.command(btn.getAttribute('data-tour-cmd'))));
   // Activity: a press, click, touch or scroll ends the attract loop; a mouse move only keeps it from starting
   for (const type of ['pointerdown', 'wheel', 'touchstart']) {
     window.addEventListener(type, () => tour.noteInput(), { capture: true, passive: true });
   }
   window.addEventListener('pointermove', () => tour.noteInput({ end: false }), { passive: true });
+
+  // The Kortdage race (js/race.js, js/race-scores.js, docs/race.md): AKKC to Jomfru Ane Gade against the clock, one handicapped
+  // highscore list per kiosk. `?race=1` starts one after the boot, `?raceReset=1` clears the list (after a confirm).
+  const raceEls = {
+    hud: document.getElementById('race-hud'),
+    time: document.querySelector('#race-hud .race-time'),
+    dist: document.querySelector('#race-hud .race-dist'),
+    count: document.getElementById('race-count'),
+    result: document.getElementById('race-result'),
+    mode: document.querySelector('#race-result .race-result-mode'),
+    title: document.querySelector('#race-result .race-result-title'),
+    sub: document.querySelector('#race-result .race-result-sub'),
+    form: document.getElementById('race-form'),
+    name: document.getElementById('race-name'),
+    company: document.getElementById('race-company'),
+    msg: document.querySelector('#race-form .race-form-msg'),
+    board: document.getElementById('race-board'),
+    boardPop: document.getElementById('race-board-pop'),
+    startMode: document.getElementById('race-start-mode')
+  };
+  const metres = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 10) * 10} m`);
+  function renderRaceBoard(list, entries, highlight = null) {
+    if (!list) return;
+    if (!entries.length) {
+      const empty = document.createElement('li');
+      empty.className = 'race-board-empty';
+      empty.textContent = 'No times yet. Be the first!';
+      empty.style.display = 'block';
+      list.replaceChildren(empty);
+      return;
+    }
+    list.replaceChildren(...entries.map((e) => {
+      const li = document.createElement('li');
+      if (e === highlight) li.className = 'is-new';
+      li.title = `${MODE_LABEL[e.mode] || e.mode}: ${formatTime(e.time)} (handicapped ${formatTime(e.adjusted)})`;
+      const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      icon.setAttribute('class', 'icon');
+      const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+      use.setAttribute('href', `#i-${MODE_ICON[e.mode] || 'car'}`);
+      icon.appendChild(use);
+      const who = document.createElement('span');
+      who.className = 'race-who';
+      who.textContent = e.name;
+      if (e.company) {
+        const company = document.createElement('small');
+        company.textContent = e.company;
+        who.appendChild(company);
+      }
+      const score = document.createElement('span');
+      score.className = 'race-score';
+      score.textContent = formatTime(e.adjusted);
+      const raw = document.createElement('small');
+      raw.textContent = `${MODE_LABEL[e.mode] || e.mode} ${formatTime(e.time)}`;
+      score.appendChild(raw);
+      li.append(icon, who, score);
+      return li;
+    }));
+  }
+  let raceMsgTimer = 0;
+  const raceUi = {
+    closePopovers,
+    setRacing: (on) => document.body.classList.toggle('racing', on),
+    showHud(info) {
+      if (raceEls.hud) raceEls.hud.hidden = false;
+      setText(raceEls.time, formatTime(info.time));
+      setText(raceEls.dist, info.phase === 'running' ? `${metres(info.distance)} to go` : 'Get ready');
+      if (!raceEls.count) return;
+      const text = info.phase === 'countdown' ? String(Math.max(1, info.count)) : info.go ? 'GO!' : '';
+      raceEls.count.classList.remove('is-msg');
+      raceEls.count.hidden = !text;
+      setText(raceEls.count, text);
+    },
+    hideHud() {
+      if (raceEls.hud) raceEls.hud.hidden = true;
+      if (raceEls.count && !raceEls.count.classList.contains('is-msg')) raceEls.count.hidden = true;
+    },
+    aborted(reason) {
+      if (!raceEls.count) return;
+      const why = { mode: 'You changed vehicle', teleport: 'You teleported', idle: 'No input for a while' }[reason];
+      raceEls.count.textContent = why ? `Race cancelled · ${why}` : 'Race cancelled';
+      raceEls.count.classList.add('is-msg');
+      raceEls.count.hidden = false;
+      clearTimeout(raceMsgTimer);
+      raceMsgTimer = setTimeout(() => { raceEls.count.hidden = true; raceEls.count.classList.remove('is-msg'); }, 2500);
+    },
+    showResult(result, top) {
+      if (!raceEls.result) return;
+      raceEls.result.hidden = false;
+      raceEls.result.classList.toggle('is-done', result.rejected); // Race again / Close once there is nothing to save
+      setText(raceEls.mode, `${MODE_LABEL[result.mode] || result.mode} · ${metres(result.length)} route`);
+      setText(raceEls.title, formatTime(result.time));
+      if (result.rejected) {
+        setText(raceEls.sub, 'That was faster than this vehicle can go: no score this time. Did something glitch?');
+      } else {
+        const pace = result.mode === 'car' ? '' : ` Handicapped to car time: ${formatTime(result.adjusted)}.`;
+        setText(raceEls.sub, `You reached Jomfru Ane Gade!${pace} That puts you #${result.rank} on the list.`);
+      }
+      raceEls.form.hidden = result.rejected;
+      setText(raceEls.msg, '');
+      raceEls.name.value = '';
+      raceEls.company.value = '';
+      if (result.rejected) renderRaceBoard(raceEls.board, top);
+      else raceEls.board.replaceChildren();
+      controllerManager.resetInput();
+      if (!result.rejected) setTimeout(() => raceEls.name.focus(), 50);
+    },
+    showBoard(top, entry, rank) {
+      raceEls.form.hidden = true;
+      raceEls.result.classList.add('is-done');
+      setText(raceEls.sub, rank <= top.length ? `Saved: you are #${rank}!` : `Saved: you are #${rank}. Top ${top.length}:`);
+      renderRaceBoard(raceEls.board, top, entry);
+    },
+    hideResult() {
+      if (raceEls.result) raceEls.result.hidden = true;
+      document.activeElement?.blur?.();
+    }
+  };
+  race = createRace({
+    controllerManager, mapSystem, teleportTo,
+    finish: finishSegments(world.geo?.roadGraph),
+    ui: raceUi
+  });
+  function startRace() {
+    if (race.blocking) return;
+    if (tour.active) tour.stop({ restore: false });
+    race.begin();
+  }
+  document.getElementById('race-start')?.addEventListener('click', startRace);
+  document.getElementById('race-giveup')?.addEventListener('click', () => race.abort('user'));
+  document.getElementById('race-again')?.addEventListener('click', startRace);
+  document.getElementById('race-close')?.addEventListener('click', () => { race.dismiss(); raceUi.hideResult(); });
+  document.getElementById('race-skip')?.addEventListener('click', () => { race.dismiss(); raceUi.hideResult(); });
+  raceEls.form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!race.submit(raceEls.name.value, raceEls.company.value)) setText(raceEls.msg, 'Please enter a (polite) name');
+    else document.activeElement?.blur?.();
+  });
+  // typing a name is activity too (the global key handler skips text fields)
+  raceEls.form?.addEventListener('input', () => tour.noteInput({ end: false }));
+  document.getElementById('race-popover')?.addEventListener('beforetoggle', (e) => {
+    if (e.newState !== 'open') return;
+    const mode = raceMode(controllerManager.activeMode, controllerManager.entities.person.avatar);
+    setText(raceEls.startMode, `Racing as: ${MODE_LABEL[mode]} · switch vehicle first to race another way`);
+    renderRaceBoard(raceEls.boardPop, race.scores.top(10));
+  });
+  document.getElementById('race-export')?.addEventListener('click', () => {
+    const url = URL.createObjectURL(new Blob([race.scores.toCsv()], { type: 'text/csv' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `kortdage-race-${new Date().toISOString().slice(0, 10)}.csv` });
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  if (query.get('raceReset') === '1' && race.scores.size && window.confirm(`Clear all ${race.scores.size} race highscores on this machine?`)) race.scores.clear();
 
   // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
   window.addEventListener('keydown', (e) => {
@@ -677,9 +833,16 @@ async function initApp() {
         tour.command(cmd);
         return;
       }
-      if (e.code !== 'KeyH' && e.code !== 'KeyN') return;
+      if (e.code !== 'KeyH' && e.code !== 'KeyN' && e.code !== 'KeyR') return;
+    }
+    if (e.code === 'Escape' && race.blocking && !mapSystem.isFullMapOpen) {
+      race.abort('user');
+      return;
     }
     switch (e.code) {
+      case 'KeyR':
+        if (!e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey) startRace();
+        break;
       case 'Digit1':
         selectMode('person');
         break;
@@ -838,7 +1001,7 @@ async function initApp() {
   if (elFps) elFps.textContent = '60';
 
   // Handle for the headless verification scripts and the console (not used by the engine)
-  globalThis.__twin = { scene, renderer, cameraSystem, controllerManager, lightingSystem, world, aoEnabled, aoPass, tour };
+  globalThis.__twin = { scene, renderer, cameraSystem, controllerManager, lightingSystem, world, aoEnabled, aoPass, tour, race };
   // `?hooks` exposes the running twin to headless checks (tools/m3-check.py): a free camera and the live systems
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
@@ -871,7 +1034,13 @@ async function initApp() {
     const T0 = frameProbe ? performance.now() : 0;
     gamepadControls.tourMode = tour.guided;
     gamepadControls.update(dt);
+    if (race.blocking && Math.abs(controllerManager.getActiveEntity().speed || 0) > 0.5) tour.noteInput({ end: false }); // racing (even on a gamepad stick) is activity
     tour.update(rawDt); // wall time: the tour keeps its pace at low frame rates; it holds the player still on a guided tour
+    // the attract loop started (60 s without input): it ends a race, or closes its result card
+    if (tour.active && race.active) {
+      if (!race.abort('idle')) { race.dismiss(); raceUi.hideResult(); }
+    }
+    race.update(rawDt); // wall time too: the clock is a stopwatch; it holds the player on the line during the countdown
     controllerManager.update(dt, elapsed);
     cameraSystem.update(dt, elapsed);
     trafficSystem.update(
@@ -945,6 +1114,7 @@ async function initApp() {
         const tourParam = query.get('tour');
         if (tourParam === 'loop') tour.start('express', { loop: true });
         else if (tourParam) tour.start(tourParam);
+        else if (query.get('race') === '1') startRace();
       });
     }
 

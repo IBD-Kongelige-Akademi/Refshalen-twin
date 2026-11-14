@@ -117,7 +117,8 @@ test('preset teleports share arrival resets', () => {
       hidden: true,
       addEventListener: (_event, handler) => handlers.set(key, handler)
     })),
-    closePopovers: () => {}
+    closePopovers: () => {},
+    race: null // the Kortdage race: no race running
   };
   vm.runInNewContext(main.slice(start, end), environment);
   for (const [name, point] of Object.entries({ ...TELEPORT_LOCATIONS, ...CITY_TELEPORT_LOCATIONS })) {
