@@ -12,6 +12,7 @@ import { ThirdPersonControllerManager } from './controllers.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
 import { HudNav } from './hud-nav.js';
+import { padFamily, padHints, applyPadLabels } from './input-hints.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
@@ -307,13 +308,20 @@ async function initApp() {
   // Top speeds in km/h set the full scale of the speed meter for each active vehicle.
   const topSpeedKmh = { person: 30, car: 130, cyclist: 25, cargobike: 25, drone: 75, bus: 70 };
 
+  // While a gamepad is connected the hints name its buttons instead of keys (js/input-hints.js): its family ('xbox' /
+  // 'playstation'), or null for the keyboard
+  let padHintFamily = null;
+  let hintMode = null;
   function renderControlHints(mode) {
+    hintMode = mode;
     if (!elControlsHint) return;
-    const items = (controlHints[mode] || []).map(([keys, action]) => {
+    const entries = padHintFamily ? padHints(mode, padHintFamily) : controlHints[mode] || [];
+    const items = entries.map(([keys, action]) => {
       const item = document.createElement('span');
       item.className = 'hint';
       for (const key of keys) {
         const kbd = document.createElement('kbd');
+        if (padHintFamily) kbd.className = 'pad-key';
         kbd.textContent = key;
         item.appendChild(kbd);
       }
@@ -1133,6 +1141,13 @@ async function initApp() {
     gamepadControls.tourMode = tour.guided;
     gamepadControls.update(dt);
     if (startScreen.isOpen) startEl.classList.toggle('has-pad', gamepadControls.connected);
+    // a pad connected or gone: the HUD's hints switch between its buttons and the keyboard
+    const family = gamepadControls.connected ? padFamily(gamepadControls.padId || '') : null;
+    if (family !== padHintFamily) {
+      padHintFamily = family;
+      applyPadLabels(document, family);
+      if (hintMode) renderControlHints(hintMode);
+    }
     hudNav.tick();
     if (race.blocking && Math.abs(controllerManager.getActiveEntity().speed || 0) > 0.5) tour.noteInput({ end: false }); // racing (even on a gamepad stick) is activity
     tour.update(rawDt); // wall time: the tour keeps its pace at low frame rates; it holds the player still on a guided tour

@@ -79,6 +79,7 @@
   <link rel="modulepreload" href="./js/cyclist-appearance.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
   <link rel="modulepreload" href="./js/hud-nav.js" />
+  <link rel="modulepreload" href="./js/input-hints.js" />
   <link rel="modulepreload" href="./js/tour.js" />
   <link rel="modulepreload" href="./js/tour-script.js" />
   <link rel="modulepreload" href="./js/race.js" />
@@ -216,7 +217,7 @@
   <div class="hud hud-top-right">
     <div id="hud-toolbar" class="panel toolbar">
       <button id="btn-open-map" class="tool-btn" type="button" title="Map of Aalborg [M]">
-        <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label">Map</span><kbd>M</kbd>
+        <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label">Map</span><kbd data-pad="MENU">M</kbd>
       </button>
       <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="btn-time" class="tool-btn" type="button" popovertarget="time-popover" title="Atmosphere &amp; time of day">
@@ -364,7 +365,7 @@
       <ul class="start-features">
         <li><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg><div><b>Kortdage race</b><span>AKKC to Jomfru Ane Gade, any route. Times are handicapped by vehicle, so walkers can beat the car.</span></div><kbd>R</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg><div><b>Guided tour</b><span>Sit back for 2 or 6 minutes past seven landmarks, or drive it with the GPS.</span></div></li>
-        <li><svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><div><b>Map &amp; teleport</b><span>Search a street, click to jump there, right-click to plan a GPS route.</span></div><kbd>M</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><div><b>Map &amp; teleport</b><span>Search a street, click to jump there, right-click to plan a GPS route.</span></div><kbd data-pad="MENU">M</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><div><b>Real buildings</b><span>Click any building for its data. Step from bare LoD2 shells to photo-textured hero buildings.</span></div><kbd>L</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><div><b>Cameras</b><span>Chase, action, first person and scenic views of the landmarks. Drag to orbit, scroll to zoom.</span></div><kbd>V</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><div><b>Day &amp; night</b><span>Golden hour, midday, blue hour or 23:00 with neon and music from the bars.</span></div></li>
@@ -391,7 +392,7 @@
     <aside id="minimap-card" class="panel radar" aria-label="Live street radar" title="Open the map of Aalborg [M]">
       <canvas id="minimap-canvas"></canvas>
       <span class="radar-north" aria-hidden="true">N</span>
-      <kbd class="radar-key">M</kbd>
+      <kbd class="radar-key" data-pad="MENU">M</kbd>
     </aside>
   </div>
 
@@ -512,7 +513,7 @@
         <input id="fullmap-search" class="fullmap-search" type="text" placeholder="Search streets &amp; places — Jomfru Ane Gade, Boulevarden, Utzon…" aria-label="Search street or place" autocomplete="off" spellcheck="false" />
       </label>
       <button id="close-fullmap-btn" class="panel tool-btn fullmap-close" type="button" title="Close map [M / Esc]">
-        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg><span class="tool-label">Close</span><kbd>Esc</kbd>
+        <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg><span class="tool-label">Close</span><kbd data-pad="B">Esc</kbd>
       </button>
     </div>
 

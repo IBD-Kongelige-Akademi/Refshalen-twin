@@ -1863,6 +1863,14 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
 .start-hint-pad { display: none !important; }
 .start-screen.has-pad .start-ctl[data-input='pad'] { display: flex !important; margin-top: 6px; }
 .start-screen.has-pad .start-hint-pad { display: inline !important; }
+/* with a gamepad connected its controls replace the keyboard's */
+.start-screen.has-pad .start-ctl[data-input='keys'],
+.start-screen.has-pad .start-hint-keys,
+body.pad-input .start-label-keys { display: none !important; }
+.start-screen.has-pad .start-ctl[data-input='pad'] { margin-top: 0; }
+
+/* Gamepad connected (js/input-hints.js): keys with a pad button show its name (data-pad), the rest have no pad equivalent */
+body.pad-input kbd:not([data-pad]):not(.pad-key) { display: none; }
 body.touch-enabled .start-ctl[data-input='keys'],
 body.touch-enabled .start-hint-keys { display: none; }
 body.touch-enabled .start-ctl[data-input='touch'] { display: flex !important; }

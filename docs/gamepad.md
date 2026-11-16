@@ -10,6 +10,10 @@ Cameras have no pad button: pick them from the HUD's camera switch with the D-pa
 
 The browser pane in the Claude desktop app does not see gamepads; play and test with a pad in Chrome or Edge.
 
+## Hints
+
+While a pad is connected, the HUD names its buttons instead of keyboard keys (`js/input-hints.js`): the hint row under the mode bar shows the pad's controls for the current mode, Map and the map's close button show Menu and B, and keys with no pad button (mode numbers, cameras, L, R) are hidden. The start screen shows only its Gamepad controls. PlayStation pads get their own names (✕ ○ □ △, L1 / R1, Options); every other pad gets Xbox names. Disconnecting the pad brings the keys back.
+
 ## The HUD with the D-pad
 
 The D-pad moves a yellow highlight between the HUD's buttons, by where they sit on screen (`js/hud-nav.js`). Every HUD control can be reached this way:
