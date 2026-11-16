@@ -35,6 +35,7 @@ python3 tools/hosting/serve_range.py --port 8010   # then open http://127.0.0.1:
 | `?date=2026-06-21`, `?time=12:00` | Scene date and solar clock time (Europe/Copenhagen, the Danish time zone; CET/CEST handled). |
 | `?sky=overcast`, `?wet=0.7` | Broken overcast clouds; ground wetness 0–1. |
 | `?tour=express`, `full`, `drive`, `loop` | Starts that tour at once (`loop`: the looping Express tour). |
+| `?intro=0` | No start screen (docs/start-screen.md); `?tour=` and `?race=1` skip it too. |
 | `?idle=<s>` | Seconds without input before the attract loop starts (default 60; `0` turns it off). |
 | `?ao=1` | Half-resolution GTAO (opt-in). |
 | `?data=<url>` | Reads the data from another base (packed or unpacked). |

@@ -10,6 +10,8 @@ const UP = 12, DOWN = 13, LEFT = 14, RIGHT = 15;
 // Buttons that keep working while the full map is open (everything else is suppressed there)
 const MAP_BUTTONS = new Set([A, B, X, MENU]);
 const DPAD = [[UP, 'up'], [DOWN, 'down'], [LEFT, 'left'], [RIGHT, 'right']];
+// The buttons the start screen answers to (js/start-screen.js handlePad)
+const START_BUTTONS = [[A, 'a'], [B, 'b'], [X, 'x'], [Y, 'y'], [LB, 'lb'], [RB, 'rb'], [MENU, 'menu']];
 const REPEAT_DELAY = 400, REPEAT_EVERY = 140; // ms: a held D-pad direction repeats after REPEAT_DELAY, every REPEAT_EVERY
 const R3_TAP = 350; // ms: the right stick pressed and let go within this, without zooming, recenters the camera
 
@@ -136,6 +138,7 @@ class GamepadControls {
     // cameras have no button: they are picked from the HUD's camera switch (the D-pad)
     const cycleSubtype = edge(Y), recenter = edge(R3), horn = edge(L3), inspect = closeMap;
     const interact = confirm && this.controller.getGoBoatInteraction?.();
+    const startPress = START_BUTTONS.find(([i]) => edge(i))?.[1] || null;
     this.previousButtons = pressed;
     const step = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
 
@@ -151,6 +154,15 @@ class GamepadControls {
     // Any fresh press or a stick off centre is activity (the tour's idle timer and attract loop, js/tour.js)
     const sticksMoved = stick(pad, 0).x || stick(pad, 0).y || stick(pad, 2).x || stick(pad, 2).y;
     if (sticksMoved || anyPress) this.callbacks.onActivity?.();
+    if (this.callbacks.startActive?.()) {
+      // The start screen (js/start-screen.js): the D-pad moves its highlight, the buttons pick; nothing drives the player
+      this.controller.clearGamepadInput();
+      this.viewDownAt = null;
+      const dir = this.dpadDirection(held);
+      if (dir) this.callbacks.onStartPad?.(dir);
+      else if (startPress) this.callbacks.onStartPad?.(startPress);
+      return;
+    }
     if (this.tourMode) {
       // A guided tour plays: A / D-pad right next, D-pad left back, B ends it; nothing drives the player
       this.controller.clearGamepadInput();

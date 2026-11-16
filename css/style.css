@@ -1754,3 +1754,159 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
   text-shadow: none;
 }
 #race-result:not(.is-done) .race-after { display: none; }
+
+/* ------------------------------------------------------------------------------------------------------------------
+   The start screen (js/start-screen.js, docs/start-screen.md): over the running city, under the loading screen
+   ------------------------------------------------------------------------------------------------------------------ */
+.start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: radial-gradient(ellipse at 50% 40%, rgba(5, 6, 8, 0.25), rgba(5, 6, 8, 0.7));
+  animation: start-in 0.5s var(--ease-out);
+}
+
+.start-screen[hidden] { display: none; }
+
+@keyframes start-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.start-card {
+  width: min(880px, 100%);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 24px 26px 18px;
+  background: var(--grain), var(--glass-strong);
+  color: var(--text);
+  user-select: none;
+}
+
+.start-head { display: flex; align-items: center; gap: 14px; }
+.start-head .brand-mark { width: 46px; height: 46px; font-size: 13px; }
+.start-kicker { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
+.start-title { margin-top: 2px; font: 700 30px / 1.1 var(--font-sign); }
+.start-pitch { margin-top: 10px; max-width: 64ch; font-size: 15px; line-height: 1.5; color: var(--text-2); }
+
+.start-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 8px;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.start-label-keys { display: inline-flex; align-items: center; gap: 3px; letter-spacing: 0; }
+
+.start-modes { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+
+.start-mode {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  gap: 3px;
+  padding: 12px 12px 11px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-ctl);
+  background: var(--hover);
+  text-align: left;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.start-mode:hover { background: rgba(255, 255, 255, 0.14); }
+.start-mode .icon { width: 24px; height: 24px; margin-bottom: 4px; }
+.start-mode kbd { position: absolute; top: 10px; right: 10px; }
+.start-mode-name { font: 700 15px var(--font-sign); }
+.start-mode-sub { font-size: 12px; line-height: 1.35; color: var(--text-2); }
+.start-mode.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.start-mode.active .start-mode-sub { color: rgba(23, 20, 10, 0.72); }
+.start-mode.active kbd { color: var(--accent-ink); background: rgba(0, 0, 0, 0.12); box-shadow: none; }
+
+.start-features {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 18px;
+  list-style: none;
+}
+
+.start-features li { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; }
+.start-features .icon { width: 20px; height: 20px; margin-top: 1px; color: var(--accent); }
+.start-features div { flex: 1; display: grid; gap: 2px; }
+.start-features b { font-size: 14px; font-weight: 650; }
+.start-features span { font-size: 12.5px; line-height: 1.4; color: var(--text-2); }
+
+.start-controls { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--divider); }
+
+.start-ctl {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+
+.start-ctl > span { display: inline-flex; align-items: center; gap: 3px; }
+.start-ctl-title { min-width: 74px; font-weight: 650; color: var(--text); }
+/* one row of controls: the keyboard, the gamepad once one is connected, touch on a touch screen */
+.start-ctl[data-input='pad'],
+.start-ctl[data-input='touch'],
+.start-hint-pad { display: none !important; }
+.start-screen.has-pad .start-ctl[data-input='pad'] { display: flex !important; margin-top: 6px; }
+.start-screen.has-pad .start-hint-pad { display: inline !important; }
+body.touch-enabled .start-ctl[data-input='keys'],
+body.touch-enabled .start-hint-keys { display: none; }
+body.touch-enabled .start-ctl[data-input='touch'] { display: flex !important; }
+
+.start-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+
+.start-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-ctl);
+  background: var(--hover);
+  font: 650 14px var(--font-sans);
+}
+
+.start-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.start-primary { flex: 1 1 220px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 16px; }
+.start-primary:hover { background: #ffd04d; }
+
+.start-hint { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 12px; color: var(--text-3); }
+.start-hint > span { display: inline-flex; align-items: center; gap: 4px; }
+.start-hint b { color: var(--text-2); }
+
+/* the HUD and touch controls step aside while the start screen is up */
+body.start-open .hud,
+body.start-open #touch-controls { opacity: 0; pointer-events: none; }
+body.start-open .hud > * { pointer-events: none; }
+
+@media (max-width: 720px) {
+  .start-card { padding: 18px 16px 14px; }
+  .start-title { font-size: 24px; }
+  .start-pitch { font-size: 14px; }
+  .start-modes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .start-mode-sub { display: none; }
+  .start-features { grid-template-columns: 1fr; }
+  .start-btn { flex: 1 1 100%; }
+}
+
+@media (max-height: 720px) and (min-width: 721px) {
+  .start-mode-sub { display: none; }
+  .start-features li { padding: 3px 0; }
+  .start-label { margin: 12px 0 6px; }
+}

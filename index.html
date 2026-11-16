@@ -140,13 +140,14 @@
   <link rel="modulepreload" href="./js/water.js" />
   <link rel="modulepreload" href="./js/world.js" />
   <link rel="modulepreload" href="./js/overview-map.js" />
+  <link rel="modulepreload" href="./js/start-screen.js" />
   <link rel="modulepreload" href="./js/main.js" />
   <script type="module" src="./js/main.js"></script>
   <!-- Inter (UI) & Overpass (street-name signs) -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..800&amp;family=Overpass:wght@600;700&amp;display=swap" />
-  <link rel="stylesheet" href="./css/style.css?v=20261103-map" />
+  <link rel="stylesheet" href="./css/style.css?v=20261116-start" />
 </head>
 <body>
   <!-- Icon sprite (24 × 24 stroke icons, drawn in currentColor) -->
@@ -335,6 +336,52 @@
       <button class="tour-btn tour-guided-only" data-tour-cmd="next" type="button" title="Next [→ / Space]" aria-label="Next"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></button>
       <button class="tour-btn tour-drive-only" data-tour-cmd="next" type="button" title="Teleport to the next stop">Skip leg</button>
       <button class="tour-btn" data-tour-cmd="end" type="button" title="End the tour [Esc]">End tour</button>
+    </div>
+  </section>
+
+  <!-- The start screen (js/start-screen.js, docs/start-screen.md): what the twin can do, a mode picker and three ways in -->
+  <section id="start-screen" class="start-screen" role="dialog" aria-modal="true" aria-labelledby="start-title" hidden>
+    <div class="start-card panel">
+      <header class="start-head">
+        <span class="brand-mark" aria-hidden="true">AAL</span>
+        <div>
+          <div class="start-kicker">Kortdage · Aalborg Kongres &amp; Kultur Center</div>
+          <h2 id="start-title" class="start-title">Aalborg Twin</h2>
+        </div>
+      </header>
+      <p class="start-pitch">Aalborg's centre rebuilt in 3D from open map data, aerial photos and building drawings. Walk, cycle, drive, fly or take the Plusbus through it.</p>
+
+      <div class="start-label">Choose how to get around <span class="start-label-keys"><kbd>1</kbd>–<kbd>5</kbd></span></div>
+      <div class="start-modes" role="group" aria-label="Choose a mode">
+        <button class="start-mode" data-start-mode="person" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-walk"/></svg><span class="start-mode-name">Walk</span><span class="start-mode-sub">On foot, skates or skateboard</span><kbd>1</kbd></button>
+        <button class="start-mode" data-start-mode="car" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-car"/></svg><span class="start-mode-name">Drive</span><span class="start-mode-sub">A car in live traffic</span><kbd>2</kbd></button>
+        <button class="start-mode" data-start-mode="cyclist" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bike"/></svg><span class="start-mode-name">Cycle</span><span class="start-mode-sub">City bike or cargo bike</span><kbd>3</kbd></button>
+        <button class="start-mode" data-start-mode="drone" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-drone"/></svg><span class="start-mode-name">Fly</span><span class="start-mode-sub">A drone over the rooftops</span><kbd>4</kbd></button>
+        <button class="start-mode" data-start-mode="bus" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg><span class="start-mode-name">Plusbus</span><span class="start-mode-sub">The articulated line 2 bus</span><kbd>5</kbd></button>
+      </div>
+
+      <div class="start-label">What you can do</div>
+      <ul class="start-features">
+        <li><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg><div><b>Kortdage race</b><span>AKKC to Jomfru Ane Gade, any route. Times are handicapped by vehicle, so walkers can beat the car.</span></div><kbd>R</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg><div><b>Guided tour</b><span>Sit back for 2 or 6 minutes past seven landmarks, or drive it with the GPS.</span></div></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><div><b>Map &amp; teleport</b><span>Search a street, click to jump there, right-click to plan a GPS route.</span></div><kbd>M</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><div><b>Real buildings</b><span>Click any building for its data. Step from bare LoD2 shells to photo-textured hero buildings.</span></div><kbd>L</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-camera"/></svg><div><b>Cameras</b><span>Chase, action, first person and scenic views of the landmarks. Drag to orbit, scroll to zoom.</span></div><kbd>V</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><div><b>Day &amp; night</b><span>Golden hour, midday, blue hour or 23:00 with neon and music from the bars.</span></div></li>
+      </ul>
+
+      <div class="start-controls" aria-label="Controls">
+        <div class="start-ctl" data-input="keys"><span class="start-ctl-title">Keyboard</span><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> move</span><span><kbd>Shift</kbd> boost</span><span><kbd>Space</kbd> jump / climb</span><span><kbd>H</kbd> hide HUD</span><span><kbd>N</kbd> sound</span></div>
+        <div class="start-ctl" data-input="pad"><span class="start-ctl-title">Gamepad</span><span>Left stick move</span><span>RT / LT drive</span><span>LB / RB mode</span><span>D-pad menus</span><span>Menu map</span></div>
+        <div class="start-ctl" data-input="touch"><span class="start-ctl-title">Touch</span><span>Joystick to move</span><span>Drag to look</span><span>Pinch to zoom</span></div>
+      </div>
+
+      <div class="start-actions">
+        <button class="start-btn start-primary" data-start-action="explore" type="button">Explore Aalborg</button>
+        <button class="start-btn" data-start-action="race" type="button"><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg>Race to Jomfru Ane Gade</button>
+        <button class="start-btn" data-start-action="tour" type="button"><svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg>Express tour · 2 min</button>
+      </div>
+      <div class="start-hint"><span class="start-hint-keys">Press <kbd>Enter</kbd> to start · <kbd>R</kbd> race · <kbd>T</kbd> tour</span><span class="start-hint-pad">Gamepad: <b>A</b> start · <b>Y</b> race · <b>X</b> tour</span></div>
     </div>
   </section>
 

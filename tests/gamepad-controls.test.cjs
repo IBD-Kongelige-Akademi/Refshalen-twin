@@ -225,3 +225,23 @@ test('Menu opens the map; the button that closed it does not inspect a building 
   h.frame();
   assert.deepEqual(h.events(), [['onToggleMap'], ['onCloseMap']]);
 });
+
+test('while the start screen is up every press goes to it and nothing drives the player', () => {
+  const h = harness();
+  let open = true;
+  h.controls.callbacks.startActive = () => open;
+  h.controls.callbacks.onStartPad = (button) => h.calls.push(['onStartPad', button]);
+  h.frame();
+  h.tap(RIGHT);
+  h.tap(A);
+  h.tap(Y);
+  h.tap(4); // LB
+  h.tap(MENU);
+  h.pad.axes[1] = -1;
+  h.frame();
+  assert.deepEqual(h.events(), [['onStartPad', 'right'], ['onStartPad', 'a'], ['onStartPad', 'y'], ['onStartPad', 'lb'], ['onStartPad', 'menu']]);
+  assert.equal(h.inputs.forward, undefined, 'the stick does not drive behind the screen');
+  open = false;
+  h.frame();
+  assert.ok(h.inputs.forward > 0, 'once it closes the stick drives again');
+});

@@ -23,6 +23,7 @@ import { OverviewMap } from './overview-map.js';
 import { createTour } from './tour.js';
 import { createRace, finishSegments } from './race.js';
 import { MODE_LABEL, MODE_ICON, formatTime, raceMode } from './race-scores.js';
+import { createStartScreen } from './start-screen.js';
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
@@ -285,9 +286,13 @@ async function initApp() {
     onInspect: () => world.buildings?.toggleInfoAt?.(0, 0),
     // the Kortdage tour (js/tour.js): any press counts as activity, A / B / D-pad step through a guided tour
     onActivity: () => tour?.noteInput(),
-    onTour: (cmd) => tour?.command(cmd)
+    onTour: (cmd) => tour?.command(cmd),
+    // the start screen (js/start-screen.js) takes every press while it is up
+    startActive: () => Boolean(startScreen?.isOpen),
+    onStartPad: (button) => startScreen?.handlePad(button)
   });
   let tour = null; // created once the map and the building levels exist (below)
+  let startScreen = null; // the start screen (js/start-screen.js), created after the race
   let race = null; // the Kortdage race (js/race.js), created after the tour
 
   // Keyboard guide for each mode: [keys, action]
@@ -671,7 +676,13 @@ async function initApp() {
       if (tourEls.bar) tourEls.bar.style.transform = `scaleX(${info.progress || 0})`;
     },
     hideCard: () => { if (tourCard) tourCard.hidden = true; },
-    setTouring: (on) => document.body.classList.toggle('touring', on),
+    setTouring: (on, state) => {
+      document.body.classList.toggle('touring', on);
+      // the attract loop takes over from the start screen, and hands back to it for the next visitor when input ends it
+      // (after stop() has restored the player at AKKC)
+      if (on) startScreen?.close();
+      else if (state?.loop) queueMicrotask(() => startScreen?.open());
+    },
     hideBuilding: () => { const panel = document.getElementById('building-info'); if (panel) panel.style.display = 'none'; },
     closePopovers
   };
@@ -845,6 +856,67 @@ async function initApp() {
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   });
+  // The start screen (js/start-screen.js, docs/start-screen.md): after every boot and every attract loop; `?intro=0` turns it off
+  const startEl = document.getElementById('start-screen');
+  const startModeButtons = startEl ? [...startEl.querySelectorAll('[data-start-mode]')] : [];
+  const startActionButtons = startEl ? [...startEl.querySelectorAll('[data-start-action]')] : [];
+  const startButtonFor = (item) => (item.kind === 'mode' ? startModeButtons : startActionButtons)
+    .find((btn) => (btn.dataset.startMode || btn.dataset.startAction) === item.id);
+  const startUi = {
+    show() {
+      if (!startEl) return;
+      closePopovers();
+      if (mapSystem.isFullMapOpen) mapSystem.toggleFullMap(false);
+      startEl.hidden = false;
+      document.body.classList.add('start-open');
+    },
+    hide() {
+      if (startEl) startEl.hidden = true;
+      document.body.classList.remove('start-open');
+      document.activeElement?.blur?.();
+    },
+    markMode(mode) {
+      startModeButtons.forEach((btn) => {
+        const selected = btn.dataset.startMode === mode;
+        btn.classList.toggle('active', selected);
+        btn.setAttribute('aria-pressed', String(selected));
+      });
+    },
+    focus(item) {
+      const target = startButtonFor(item);
+      // a highlight, not DOM focus: a Space keyup on a focused button would press it a second time
+      [...startModeButtons, ...startActionButtons].forEach((btn) => btn.classList.toggle('pad-focus', btn === target));
+      target?.scrollIntoView?.({ block: 'nearest' });
+    }
+  };
+  startScreen = createStartScreen({
+    ui: startUi,
+    enabled: Boolean(startEl) && query.get('intro') !== '0',
+    getMode: () => controllerManager.activeMode,
+    onSelectMode: (mode) => selectMode(mode),
+    onRace: startRace,
+    onTour: () => tour.start('express'),
+    onOpenChange: (open) => {
+      // like the full map: nothing drives the player behind the screen
+      controllerManager.resetInput();
+      touchControls.setEnabled(!open);
+      gamepadControls.reset();
+      if (open) hudNav.hide();
+    }
+  });
+  startModeButtons.forEach((btn) => btn.addEventListener('click', () => startScreen.click({ kind: 'mode', id: btn.dataset.startMode })));
+  startActionButtons.forEach((btn) => btn.addEventListener('click', () => startScreen.click({ kind: 'action', id: btn.dataset.startAction })));
+  // Keys go to the start screen before anything else (capture on window runs ahead of every other key listener):
+  // movement (js/controllers.js), the shortcuts below and the map's [M] never see them. Browser combos still work.
+  window.addEventListener('keydown', (e) => {
+    if (!startScreen.isOpen || e.ctrlKey || e.metaKey || e.altKey || /^F\d+$/.test(e.code)) return;
+    tour.noteInput({ end: false });
+    if (e.repeat && ['Enter', 'NumpadEnter', 'Space', 'KeyR', 'KeyT', 'Escape'].includes(e.code)) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+    startScreen.handleKey(e.code, { shift: e.shiftKey });
+    e.preventDefault();
+    e.stopImmediatePropagation();
+  }, { capture: true });
+
   if (query.get('raceReset') === '1' && race.scores.size && window.confirm(`Clear all ${race.scores.size} race highscores on this machine?`)) race.scores.clear();
 
   // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
@@ -1060,6 +1132,7 @@ async function initApp() {
     const T0 = frameProbe ? performance.now() : 0;
     gamepadControls.tourMode = tour.guided;
     gamepadControls.update(dt);
+    if (startScreen.isOpen) startEl.classList.toggle('has-pad', gamepadControls.connected);
     hudNav.tick();
     if (race.blocking && Math.abs(controllerManager.getActiveEntity().speed || 0) > 0.5) tour.noteInput({ end: false }); // racing (even on a gamepad stick) is activity
     tour.update(rawDt); // wall time: the tour keeps its pace at low frame rates; it holds the player still on a guided tour
@@ -1133,12 +1206,14 @@ async function initApp() {
         markInit('gpu');
         console.log(`[init] ${initTimings.join(', ')}`);
         initTimings = null;
+        const tourParam = query.get('tour');
+        // the start screen fades in under the loading screen, unless the URL starts a tour or the race
+        if (!tourParam && query.get('race') !== '1') startScreen.open();
         if (loadingOverlay) loadingOverlay.classList.add('hidden');
         audioSystem.ready = true;
         setLoadingProgress(1);
         // `?tour=express|full|drive|loop` starts a tour at once (loop: the express tour, looping, as after the idle time)
         tour.setReady();
-        const tourParam = query.get('tour');
         if (tourParam === 'loop') tour.start('express', { loop: true });
         else if (tourParam) tour.start(tourParam);
         else if (query.get('race') === '1') startRace();
