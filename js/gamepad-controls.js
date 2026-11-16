@@ -9,6 +9,9 @@ const A = 0, B = 1, X = 2, Y = 3, LB = 4, RB = 5, LT = 6, RT = 7, VIEW = 8, MENU
 const UP = 12, DOWN = 13, LEFT = 14, RIGHT = 15;
 // Buttons that keep working while the full map is open (everything else is suppressed there)
 const MAP_BUTTONS = new Set([A, B, X, MENU]);
+const DPAD = [[UP, 'up'], [DOWN, 'down'], [LEFT, 'left'], [RIGHT, 'right']];
+const REPEAT_DELAY = 400, REPEAT_EVERY = 140; // ms: a held D-pad direction repeats after REPEAT_DELAY, every REPEAT_EVERY
+const R3_TAP = 350; // ms: the right stick pressed and let go within this, without zooming, recenters the camera
 
 function axis(value) {
   return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
@@ -45,6 +48,9 @@ class GamepadControls {
     this.revision = 0;
     this.viewDownAt = null; // performance.now() when View went down; a release before LONG_PRESS is a tap
     this.viewFired = false;
+    this.dpad = null; // the held D-pad direction: { dir, next } (performance.now() of its next repeat)
+    this.r3DownAt = null; // performance.now() when the right stick went down
+    this.r3Zoomed = false; // the right stick zoomed during this press (so letting go does not recenter)
     this.focused = typeof document.hasFocus !== 'function' || document.hasFocus();
 
     window.addEventListener('blur', () => {
@@ -79,6 +85,8 @@ class GamepadControls {
   reset() {
     this.revision++;
     this.viewDownAt = null;
+    this.dpad = null;
+    this.r3DownAt = null;
     this.controller.clearGamepadInput();
     const pad = this.readPad();
     if (pad && pad.index === this.padIndex && pad.id === this.padId) {
@@ -123,9 +131,10 @@ class GamepadControls {
     // Capture edges before callbacks: changing mode or opening the map may synchronously call reset().
     const toggleMap = edge(MENU), closeMap = edge(B), confirm = edge(A), route = edge(X);
     const cycleMode = Number(Boolean(edge(RB))) - Number(Boolean(edge(LB)));
-    const cycleLevel = Number(Boolean(edge(RIGHT))) - Number(Boolean(edge(LEFT)));
+    const dpadX = Number(Boolean(edge(RIGHT))) - Number(Boolean(edge(LEFT)));
     const anyPress = pressed.some((_, i) => edge(i));
-    const cycleCamera = edge(Y), recenter = edge(R3), horn = edge(L3), inspect = closeMap;
+    // cameras have no button: they are picked from the HUD's camera switch (the D-pad)
+    const cycleSubtype = edge(Y), recenter = edge(R3), horn = edge(L3), inspect = closeMap;
     const interact = confirm && this.controller.getGoBoatInteraction?.();
     this.previousButtons = pressed;
     const step = Number.isFinite(dt) ? Math.max(0, Math.min(0.1, dt)) : 0;
@@ -147,8 +156,8 @@ class GamepadControls {
       this.controller.clearGamepadInput();
       this.viewDownAt = null;
       if (closeMap) this.callbacks.onTour?.('end');
-      else if (confirm || cycleLevel > 0) this.callbacks.onTour?.('next');
-      else if (cycleLevel < 0) this.callbacks.onTour?.('prev');
+      else if (confirm || dpadX > 0) this.callbacks.onTour?.('next');
+      else if (dpadX < 0) this.callbacks.onTour?.('prev');
       return;
     }
 
@@ -186,17 +195,39 @@ class GamepadControls {
     if (viewTap) this.callbacks.onToggleHud?.();
     if (viewLong) this.callbacks.onToggleSound?.();
     if (horn) this.callbacks.onHorn?.();
-    if (cycleLevel) this.callbacks.onCycleLevel?.(cycleLevel);
-    if (inspect) this.callbacks.onInspect?.();
+    if (revision !== this.revision) return;
+
+    // The D-pad moves the HUD highlight (js/hud-nav.js); while it shows, A presses the highlighted button and B backs out
+    const dir = this.dpadDirection(held);
+    if (dir) this.callbacks.onNav?.(dir);
+    if (revision !== this.revision) return;
+    if (confirm && this.callbacks.navActive?.()) {
+      this.suppressedButtons[A] = true; // no jump while this press is held
+      this.callbacks.onNavPress?.();
+      return;
+    }
+    if (inspect && this.callbacks.onNavBack?.()) this.suppressedButtons[B] = true;
+    else if (inspect) this.callbacks.onInspect?.();
     if (revision !== this.revision) return;
     if (interact) { this.callbacks.onInteract?.(); return; }
     if (cycleMode) this.callbacks.onCycleMode?.(cycleMode);
     if (revision !== this.revision) return;
-    if (cycleCamera) this.callbacks.onCycleCamera?.(1);
+    if (cycleSubtype) this.callbacks.onCycleSubtype?.();
     if (revision !== this.revision) return;
-    if (recenter) this.camera.resetOrbit();
 
     const movement = stick(pad, 0), look = stick(pad, 2);
+    // Right stick pressed in: up / down zoom (the camera keeps its pitch); a quick press without zooming recenters
+    let zoom = 0;
+    if (held(R3)) {
+      this.r3DownAt ??= performance.now();
+      if (recenter) this.r3Zoomed = false;
+      zoom = look.y;
+      if (zoom) this.r3Zoomed = true;
+    } else if (this.r3DownAt !== null) {
+      if (!this.r3Zoomed && performance.now() - this.r3DownAt <= R3_TAP) this.camera.resetOrbit();
+      this.r3DownAt = null;
+      this.r3Zoomed = false;
+    }
     const mode = this.controller.activeMode;
     let drive = -movement.y;
     let vertical = 0;
@@ -212,8 +243,22 @@ class GamepadControls {
     this.controller.setGamepadInput('up', mode === 'person' ? Number(Boolean(held(A))) : Math.max(0, vertical));
     this.controller.setGamepadInput('down', Math.max(0, -vertical));
     this.controller.setGamepadInput('boost', Number(Boolean(held(X))));
-    const zoom = Number(Boolean(held(DOWN))) - Number(Boolean(held(UP)));
-    this.camera.applyGamepadInput(look.x, look.y, zoom, step);
+    this.camera.applyGamepadInput(look.x, zoom ? 0 : look.y, zoom, step);
+  }
+
+  /** The D-pad direction to act on this frame: a fresh press, or a held one once it repeats (null otherwise). */
+  dpadDirection(held) {
+    const now = performance.now();
+    const down = DPAD.find(([i]) => held(i));
+    if (!down) { this.dpad = null; return null; }
+    const dir = down[1];
+    if (this.dpad?.dir !== dir) {
+      this.dpad = { dir, next: now + REPEAT_DELAY };
+      return dir;
+    }
+    if (now < this.dpad.next) return null;
+    this.dpad.next = now + REPEAT_EVERY;
+    return dir;
   }
 }
 

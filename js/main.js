@@ -11,6 +11,7 @@ import { rememberBuildingLevel } from './buildings-stream.js';
 import { ThirdPersonControllerManager } from './controllers.js';
 import { TouchControls } from './touch-controls.js';
 import { GamepadControls } from './gamepad-controls.js';
+import { HudNav } from './hud-nav.js';
 import { CameraSystem, CAMERA_PRESETS } from './cameras.js';
 import { LightingSystem } from './lighting.js';
 import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
@@ -251,6 +252,8 @@ async function initApp() {
   const elAltitude = document.getElementById('hud-altitude');
   const elLocation = document.getElementById('hud-location');
   const elControlsHint = document.getElementById('hud-controls-hint');
+  // The gamepad's D-pad walks the HUD's buttons (time of day and the other dropdowns, modes, walker / bike type, cameras)
+  const hudNav = new HudNav();
   const gamepadControls = new GamepadControls(controllerManager, cameraSystem, {
     onCycleMode: (step) => {
       const modes = ['person', 'car', 'cyclist', 'drone', 'bus'];
@@ -258,7 +261,14 @@ async function initApp() {
       const nextMode = modes[(modes.indexOf(activeMode) + step + modes.length) % modes.length];
       selectMode(nextMode === 'cyclist' ? lastBikeMode : nextMode);
     },
-    onCycleCamera: cycleCamera,
+    // Y: the next walker (Walk) or bike type (Cycle), as a click on the next button of the switch above the mode bar
+    onCycleSubtype: () => {
+      const mode = controllerManager.activeMode;
+      const list = mode === 'person' ? walkTypeButtons : mode === 'cyclist' || mode === 'cargobike' ? bikeTypeButtons : [];
+      if (!list.length) return;
+      const i = list.findIndex((btn) => btn.classList.contains('active'));
+      list[(i + 1) % list.length].click();
+    },
     onToggleMap: () => mapSystem.toggleFullMap(!mapSystem.isFullMapOpen),
     onCloseMap: () => mapSystem.toggleFullMap(false),
     onMapInput: (panX, panY, zoom, dt) => mapSystem.gamepadInput(panX, panY, zoom, dt),
@@ -267,7 +277,10 @@ async function initApp() {
     onHorn: () => audioSystem.honk(controllerManager.getActiveEntity()),
     onToggleHud: () => hudToggleBtn?.click(),
     onToggleSound: () => audioSystem.setEnabled(!audioSystem.enabled),
-    onCycleLevel: (step) => cycleBuildingLevel(step),
+    onNav: (dir) => hudNav.move(dir),
+    navActive: () => hudNav.active,
+    onNavPress: () => hudNav.press(),
+    onNavBack: () => hudNav.back(),
     // the building in the middle of the screen (the chase camera looks over the player at it)
     onInspect: () => world.buildings?.toggleInfoAt?.(0, 0),
     // the Kortdage tour (js/tour.js): any press counts as activity, A / B / D-pad step through a guided tour
@@ -383,11 +396,22 @@ async function initApp() {
     selectCamera(CAMERA_PRESETS[(idx + step + n) % n].id, true);
   }
 
+  // The toolbar's Time button shows the chosen preset's icon and name; its dropdown marks it
+  const timeIcon = document.getElementById('time-current-icon');
+  const timeLabel = document.getElementById('time-current-label');
+  const timeMenuBtn = document.getElementById('btn-time');
   function selectTime(timeId) {
     lightingSystem.applyPreset(timeId);
     colorGrade.applyPreset(lightingSystem.activePresetId);
     timeButtons.forEach((btn) => {
-      btn.classList.toggle('active', btn.getAttribute('data-time') === timeId);
+      const selected = btn.getAttribute('data-time') === timeId;
+      btn.classList.toggle('active', selected);
+      btn.setAttribute('aria-pressed', String(selected));
+      if (!selected) return;
+      const name = btn.querySelector('.pop-name')?.textContent || timeId;
+      if (timeIcon) timeIcon.setAttribute('href', `#${btn.dataset.icon}`);
+      if (timeLabel) timeLabel.textContent = name;
+      if (timeMenuBtn) timeMenuBtn.title = `Time of day: ${name}`;
     });
   }
 
@@ -464,6 +488,7 @@ async function initApp() {
   timeButtons.forEach((btn) => {
     btn.addEventListener('click', () => {
       selectTime(btn.getAttribute('data-time'));
+      closePopovers();
     });
   });
 
@@ -565,6 +590,7 @@ async function initApp() {
       controllerManager.resetInput();
       touchControls.setEnabled(!open);
       gamepadControls.setEnabled(!open);
+      if (open) hudNav.hide();
       const mapHint = document.getElementById('fullmap-hover-info');
       if (open && touchControls.available && mapHint) mapHint.textContent = 'Tap to teleport · Drag to pan · Use + / − to zoom';
     },
@@ -609,7 +635,7 @@ async function initApp() {
   const openMapBtn = document.getElementById('btn-open-map');
   if (openMapBtn) openMapBtn.addEventListener('click', () => mapSystem.toggleFullMap(true));
 
-  // The next (step 1) or previous (-1) building model level, wrapping around: [L] / [Shift+L] and the gamepad's D-pad
+  // The next (step 1) or previous (-1) building model level, wrapping around: [L] / [Shift+L]
   function cycleBuildingLevel(step) {
     if (!buildingLayer || !levelIds.length) return;
     const i = levelIds.indexOf(buildingLayer.level);
@@ -1034,6 +1060,7 @@ async function initApp() {
     const T0 = frameProbe ? performance.now() : 0;
     gamepadControls.tourMode = tour.guided;
     gamepadControls.update(dt);
+    hudNav.tick();
     if (race.blocking && Math.abs(controllerManager.getActiveEntity().speed || 0) > 0.5) tour.noteInput({ end: false }); // racing (even on a gamepad stick) is activity
     tour.update(rawDt); // wall time: the tour keeps its pace at low frame rates; it holds the player still on a guided tour
     // the attract loop started (60 s without input): it ends a race, or closes its result card

@@ -42,17 +42,23 @@ function harness({ mapping = 'standard', mode = 'person' } = {}) {
     clearGamepadInput: () => { for (const k of Object.keys(inputs)) delete inputs[k]; },
     getGoBoatInteraction: () => null
   };
-  const camera = { resetOrbit() {}, applyGamepadInput() {} };
   const calls = [];
+  const looks = [];
+  const camera = { resetOrbit: () => calls.push(['resetOrbit']), applyGamepadInput: (...args) => looks.push(args) };
   const record = (name) => (...args) => calls.push([name, ...args]);
   const callbacks = Object.fromEntries([
     'onCycleMode', 'onCycleCamera', 'onToggleMap', 'onCloseMap', 'onInteract', 'onMapInput', 'onMapTeleport', 'onMapWaypoint',
-    'onHorn', 'onToggleHud', 'onToggleSound', 'onCycleLevel', 'onInspect'
+    'onHorn', 'onToggleHud', 'onToggleSound', 'onInspect', 'onNav', 'onNavPress', 'onCycleSubtype'
   ].map((name) => [name, record(name)]));
+  // a stand-in for js/hud-nav.js: the D-pad shows the highlight, B hides it
+  const nav = { active: false };
+  callbacks.onNav = (dir) => { nav.active = true; calls.push(['onNav', dir]); };
+  callbacks.navActive = () => nav.active;
+  callbacks.onNavBack = () => { const was = nav.active; nav.active = false; if (was) calls.push(['onNavBack']); return was; };
   const controls = new GamepadControls(controller, camera, callbacks);
   const names = (list) => list.filter(([name]) => name !== 'onMapInput').map(([name, ...args]) => [name, ...args]);
   return {
-    pad, controls, calls, inputs,
+    pad, controls, calls, inputs, looks, nav,
     press(i, value = 1) { pad.buttons[i] = { pressed: value > 0.5, value }; },
     release(i) { pad.buttons[i] = { pressed: false, value: 0 }; },
     frame(dt = 1 / 60) { clock.t += dt * 1000; controls.update(dt); },
@@ -62,7 +68,7 @@ function harness({ mapping = 'standard', mode = 'person' } = {}) {
   };
 }
 
-const A = 0, B = 1, X = 2, LT = 6, RT = 7, VIEW = 8, MENU = 9, L3 = 10, LEFT = 14, RIGHT = 15;
+const A = 0, B = 1, X = 2, Y = 3, LT = 6, RT = 7, VIEW = 8, MENU = 9, L3 = 10, R3 = 11, UP = 12, DOWN = 13, LEFT = 14, RIGHT = 15;
 
 test('only pads with the standard mapping are read', () => {
   const h = harness({ mapping: '' });
@@ -72,14 +78,76 @@ test('only pads with the standard mapping are read', () => {
   assert.deepEqual(h.events(), []);
 });
 
-test('left stick click honks, the D-pad sides step the building level, B inspects the building ahead', () => {
+test('left stick click honks, B inspects the building ahead while no HUD highlight shows', () => {
   const h = harness();
   h.frame();
   h.tap(L3);
-  h.tap(RIGHT);
-  h.tap(LEFT);
   h.tap(B);
-  assert.deepEqual(h.events(), [['onHorn'], ['onCycleLevel', 1], ['onCycleLevel', -1], ['onInspect']]);
+  assert.deepEqual(h.events(), [['onHorn'], ['onInspect']]);
+});
+
+test('the D-pad moves the HUD highlight; while it shows A presses it (no jump) and B backs out instead of inspecting', () => {
+  const h = harness();
+  h.frame();
+  h.tap(DOWN);
+  h.tap(RIGHT);
+  h.tap(UP);
+  h.tap(LEFT);
+  assert.deepEqual(h.events(), [['onNav', 'down'], ['onNav', 'right'], ['onNav', 'up'], ['onNav', 'left']]);
+  h.calls.length = 0;
+  h.press(A);
+  h.frame();
+  assert.deepEqual(h.events(), [['onNavPress']]);
+  h.frame();
+  assert.equal(h.inputs.up, 0, 'the press that went to the HUD does not jump while held');
+  h.release(A);
+  h.frame();
+  h.tap(B);
+  h.tap(B);
+  assert.deepEqual(h.events(), [['onNavPress'], ['onNavBack'], ['onInspect']]);
+  h.calls.length = 0;
+  h.press(A);
+  h.frame();
+  assert.equal(h.inputs.up, 1, 'with no highlight A jumps again');
+  assert.deepEqual(h.events(), []);
+});
+
+test('Y switches the walker or bike type', () => {
+  const h = harness();
+  h.frame();
+  h.tap(Y);
+  assert.deepEqual(h.events(), [['onCycleSubtype']]);
+});
+
+test('a held D-pad direction repeats after a pause', () => {
+  const h = harness();
+  h.frame();
+  h.press(DOWN);
+  for (let i = 0; i < 60; i++) h.frame(0.01); // 0.6 s held: the press, then repeats from 0.4 s every 0.14 s
+  h.release(DOWN);
+  h.frame();
+  assert.equal(h.events().filter(([name]) => name === 'onNav').length, 3);
+});
+
+test('right stick pressed in: up / down zooms without pitching; a quick press recenters, a zooming one does not', () => {
+  const h = harness();
+  h.frame();
+  h.tap(R3);
+  assert.deepEqual(h.events(), [['resetOrbit']]);
+  h.calls.length = 0;
+  h.press(R3);
+  h.pad.axes = [0, 0, 0.5, 1];
+  h.frame();
+  const [lookX, lookY, zoom] = h.looks.at(-1);
+  assert.ok(lookX > 0 && lookY === 0 && zoom > 0.8, `zoom ${zoom}, pitch ${lookY}`);
+  h.pad.axes = [0, 0, 0, 0];
+  h.release(R3);
+  h.frame();
+  assert.deepEqual(h.events(), [], 'no recenter after zooming');
+  h.pad.axes = [0, 0, 0, 1];
+  h.frame();
+  assert.equal(h.looks.at(-1)[2], 0, 'the D-pad and the stick alone do not zoom');
+  assert.ok(h.looks.at(-1)[1] > 0, 'the stick alone pitches');
 });
 
 test('a button held when the pad connects does not fire until released and pressed again', () => {

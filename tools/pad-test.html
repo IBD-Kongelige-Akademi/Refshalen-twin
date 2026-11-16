@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gamepad test</title>
+<style>
+  :root { color-scheme: dark; --bg: #121314; --panel: #1d1f21; --text: #e8e6e1; --dim: #8b8f94; --on: #ffc21a; --ink: #17140a; }
+  body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--text); font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  p { color: var(--dim); margin: 0 0 16px; }
+  #pad { padding: 12px 14px; border-radius: 10px; background: var(--panel); margin-bottom: 16px; }
+  #pad b { color: var(--text); }
+  #last { font-size: 28px; font-weight: 700; margin: 0 0 16px; min-height: 42px; }
+  #grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .btn { padding: 10px 8px; border-radius: 9px; background: var(--panel); text-align: center; }
+  .btn .n { font-size: 22px; font-weight: 700; }
+  .btn .name { font-size: 12px; color: var(--dim); }
+  .btn.on { background: var(--on); color: var(--ink); }
+  .btn.on .name { color: var(--ink); }
+  .btn.extra { outline: 1px dashed var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Gamepad test</h1>
+  <p>Press any button on the pad. Each button lights up with the number the browser gives it. Click this page first, and use Chrome or Edge (the Claude app's browser pane does not see gamepads).</p>
+  <div id="pad">No pad yet: press a button on it with this page in front.</div>
+  <div id="last"></div>
+  <div id="grid"></div>
+</main>
+<script>
+  // Standard-mapping names (Xbox names; 8BitDo: View = −, Menu = +)
+  const NAMES = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'View (−)', 'Menu (+)', 'Left stick', 'Right stick',
+    'D-pad up', 'D-pad down', 'D-pad left', 'D-pad right', 'Home'];
+  const padEl = document.getElementById('pad'), lastEl = document.getElementById('last'), grid = document.getElementById('grid');
+  let shownCount = -1, was = [];
+  function frame() {
+    const pad = [...(navigator.getGamepads?.() || [])].find(Boolean);
+    if (pad) {
+      if (pad.buttons.length !== shownCount) {
+        shownCount = pad.buttons.length;
+        grid.replaceChildren(...pad.buttons.map((_, i) => {
+          const el = document.createElement('div');
+          el.className = 'btn' + (i >= NAMES.length ? ' extra' : '');
+          const n = document.createElement('div'); n.className = 'n'; n.textContent = i;
+          const name = document.createElement('div'); name.className = 'name';
+          name.textContent = pad.mapping === 'standard' ? (NAMES[i] || 'extra') : '';
+          el.append(n, name);
+          return el;
+        }));
+      }
+      padEl.innerHTML = '';
+      const parts = [['Pad', pad.id], ['Mapping', pad.mapping || 'none (the game ignores this pad)'], ['Buttons', pad.buttons.length]];
+      for (const [k, v] of parts) {
+        const line = document.createElement('div');
+        const b = document.createElement('b'); b.textContent = `${k}: `;
+        line.append(b, String(v));
+        padEl.appendChild(line);
+      }
+      pad.buttons.forEach((b, i) => {
+        const on = b.pressed || b.value > 0.5;
+        grid.children[i]?.classList.toggle('on', on);
+        if (on && !was[i]) lastEl.textContent = `Last pressed: ${i}${pad.mapping === 'standard' && NAMES[i] ? ` (${NAMES[i]})` : ''}`;
+        was[i] = on;
+      });
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+</script>
+</body>
+</html>

@@ -78,6 +78,7 @@
   <link rel="modulepreload" href="./js/skate-props.js" />
   <link rel="modulepreload" href="./js/cyclist-appearance.js" />
   <link rel="modulepreload" href="./js/gamepad-controls.js" />
+  <link rel="modulepreload" href="./js/hud-nav.js" />
   <link rel="modulepreload" href="./js/tour.js" />
   <link rel="modulepreload" href="./js/tour-script.js" />
   <link rel="modulepreload" href="./js/race.js" />
@@ -210,26 +211,15 @@
     </div>
   </header>
 
-  <!-- Top-Right Toolbar: Time of Day, Teleport & Clean View -->
+  <!-- Top-Right Toolbar: Map, Time of Day, Teleport & Clean View -->
   <div class="hud hud-top-right">
     <div id="hud-toolbar" class="panel toolbar">
-      <div class="time-switch" role="group" aria-label="Atmosphere &amp; time of day">
-        <button id="time-golden" class="time-btn active" data-time="golden" type="button" title="Golden Hour">
-          <svg class="icon" aria-hidden="true"><use href="#i-golden"/></svg><span class="seg-label">Golden Hour</span>
-        </button>
-        <button id="time-midday" class="time-btn" data-time="midday" type="button" title="Sunny Midday">
-          <svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span class="seg-label">Midday</span>
-        </button>
-        <button id="time-twilight" class="time-btn" data-time="twilight" type="button" title="Blue Hour">
-          <svg class="icon" aria-hidden="true"><use href="#i-twilight"/></svg><span class="seg-label">Blue Hour</span>
-        </button>
-        <button id="time-midnight" class="time-btn" data-time="midnight" type="button" title="Night 23:00">
-          <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span class="seg-label">Night</span>
-        </button>
-      </div>
-      <span class="toolbar-divider" aria-hidden="true"></span>
       <button id="btn-open-map" class="tool-btn" type="button" title="Map of Aalborg [M]">
         <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label">Map</span><kbd>M</kbd>
+      </button>
+      <span class="toolbar-divider" aria-hidden="true"></span>
+      <button id="btn-time" class="tool-btn" type="button" popovertarget="time-popover" title="Atmosphere &amp; time of day">
+        <svg class="icon" aria-hidden="true"><use id="time-current-icon" href="#i-golden"/></svg><span id="time-current-label" class="tool-label">Golden Hour</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
       <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
         <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Teleport</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
@@ -251,6 +241,15 @@
         <svg class="icon icon-hide" aria-hidden="true"><use href="#i-eye"/></svg><svg class="icon icon-show" aria-hidden="true"><use href="#i-eye-off"/></svg>
       </button>
     </div>
+  </div>
+
+  <!-- Atmosphere & time of day (js/lighting.js presets) -->
+  <div id="time-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-time" aria-label="Atmosphere &amp; time of day">
+    <div class="pop-title">Time of day</div>
+    <button id="time-golden" class="pop-item time-item active" data-time="golden" data-icon="i-golden" type="button" aria-pressed="true"><svg class="icon" aria-hidden="true"><use href="#i-golden"/></svg><span class="pop-name">Golden Hour</span></button>
+    <button id="time-midday" class="pop-item time-item" data-time="midday" data-icon="i-sun" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-sun"/></svg><span class="pop-name">Sunny Midday</span></button>
+    <button id="time-twilight" class="pop-item time-item" data-time="twilight" data-icon="i-twilight" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-twilight"/></svg><span class="pop-name">Blue Hour</span></button>
+    <button id="time-midnight" class="pop-item time-item" data-time="midnight" data-icon="i-moon" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg><span class="pop-name">Night 23:00</span></button>
   </div>
 
   <!-- Teleport Destinations (native popover: light-dismiss & Esc) -->

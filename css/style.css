@@ -424,49 +424,17 @@ body.hud-minimized .toolbar > :not(#btn-toggle-hud) {
   background: var(--divider);
 }
 
-.time-switch {
-  display: flex;
-  gap: 2px;
+/* The gamepad's D-pad highlight (js/hud-nav.js): a ring that reads on light and dark buttons */
+.pad-focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.35);
 }
 
-.time-btn {
-  height: 36px;
-  padding: 0 9px;
-  border-radius: var(--r-ctl);
-  display: inline-flex;
-  align-items: center;
-  gap: 0;
-  color: var(--text-2);
-  transition: background-color 0.2s ease, color 0.2s ease, gap 0.35s var(--ease-out), padding 0.35s var(--ease-out);
-}
-
-.time-btn:hover {
-  color: var(--text);
-  background: var(--hover);
-}
-
-/* The active time of day spells out its name */
-.time-btn .seg-label {
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  font-size: 13px;
-  font-weight: 600;
-  transition: max-width 0.4s var(--ease-out), opacity 0.25s ease;
-}
-
-.time-btn.active,
-.time-btn.active:hover {
-  gap: 7px;
-  padding: 0 12px 0 10px;
-  background: var(--text);
-  color: #121314;
-}
-
-.time-btn.active .seg-label {
-  max-width: 120px;
-  opacity: 1;
+/* The time-of-day dropdown: icon first, the name after it */
+.pop-item.time-item {
+  justify-content: flex-start;
+  gap: 10px;
 }
 
 .tool-btn {
@@ -517,7 +485,6 @@ body.hud-minimized .icon-show {
 }
 
 .tool-btn:active,
-.time-btn:active,
 .icon-btn:active,
 .mode-btn:active,
 .camera-current:active,
@@ -1017,8 +984,6 @@ body.is-boosting #hud-speed-meter {
 }
 
 @media (max-width: 620px) {
-  .time-btn.active .seg-label { display: none; }
-  .time-btn.active { padding: 0 9px; gap: 0; }
   .hud-bottom-right { bottom: calc(var(--edge) + 64px); }
   .gauge { display: none; }
   .camera-switch { border-top: 0; }
@@ -1126,13 +1091,10 @@ body.is-boosting #hud-speed-meter {
 body.touch-enabled .controls-hint,
 body.touch-enabled .gauge,
 body.touch-enabled kbd,
-body.touch-enabled .toolbar-divider,
-body.touch-enabled .seg-label { display: none; }
+body.touch-enabled .toolbar-divider { display: none; }
 
 body.touch-enabled .hud-top-right { top: max(var(--edge), env(safe-area-inset-top)); right: max(var(--edge), env(safe-area-inset-right)); }
 body.touch-enabled .toolbar { gap: 2px; padding: 4px; }
-body.touch-enabled .time-btn,
-body.touch-enabled .time-btn.active { height: 44px; min-width: 44px; padding: 0 8px; gap: 0; }
 body.touch-enabled .tool-btn { min-width: 44px; min-height: 44px; }
 body.touch-enabled .tool-label { display: none; }
 body.touch-enabled .hud-bottom-center { bottom: max(var(--edge), env(safe-area-inset-bottom)); }
