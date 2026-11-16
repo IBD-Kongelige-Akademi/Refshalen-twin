@@ -292,6 +292,14 @@ async function initApp() {
     startActive: () => Boolean(startScreen?.isOpen),
     onStartPad: (button) => startScreen?.handlePad(button)
   });
+  // Collisions rumble the gamepad when the player's own vehicle is hit (the sound system hears every collision first)
+  for (const system of [controllerManager, trafficSystem]) {
+    system.setCollisionListener?.((impact) => {
+      audioSystem.onCollision?.(impact);
+      const player = controllerManager.getActiveEntity();
+      if (impact.a === player || impact.b === player) gamepadControls.rumbleImpact(impact.speed, impact.kind);
+    });
+  }
   let tour = null; // created once the map and the building levels exist (below)
   let startScreen = null; // the start screen (js/start-screen.js), created after the race
   let race = null; // the Kortdage race (js/race.js), created after the tour

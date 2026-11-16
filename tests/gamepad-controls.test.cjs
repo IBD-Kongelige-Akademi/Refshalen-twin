@@ -245,3 +245,35 @@ test('while the start screen is up every press goes to it and nothing drives the
   h.frame();
   assert.ok(h.inputs.forward > 0, 'once it closes the stick drives again');
 });
+
+test('impactRumble: nothing for a nudge, harder and longer with speed, softer for a drone landing', () => {
+  const { impactRumble } = loadModule(source, {
+    globals: { window: eventTarget(), document: { ...eventTarget(), hasFocus: () => true }, navigator: {} },
+    imports: { './city-config.js': { isTypingInField: () => false } }
+  });
+  assert.equal(impactRumble(1.5, 'building'), null);
+  const soft = impactRumble(3, 'building'), hard = impactRumble(20, 'vehicle');
+  assert.ok(soft.strong > 0 && soft.strong < 0.3 && soft.duration < 150, JSON.stringify(soft));
+  assert.deepEqual([hard.strong, hard.weak, hard.duration], [1, 1, 300]);
+  assert.ok(impactRumble(20, 'ground').strong < 0.7);
+});
+
+test('a collision rumbles the pad; a second hit right after only when clearly harder; pads without vibration stay still', () => {
+  const h = harness();
+  const effects = [];
+  h.pad.vibrationActuator = { playEffect: (type, params) => { effects.push([type, params.strongMagnitude]); return Promise.resolve('complete'); } };
+  h.frame();
+  assert.equal(h.controls.rumbleImpact(10, 'building'), true);
+  assert.equal(effects[0][0], 'dual-rumble');
+  h.clock.t += 100;
+  assert.equal(h.controls.rumbleImpact(10, 'building'), false, 'scraping on: too soon');
+  assert.equal(h.controls.rumbleImpact(14, 'vehicle'), false, 'not clearly harder');
+  h.clock.t += 50;
+  assert.equal(h.controls.rumbleImpact(30, 'vehicle'), false, 'already near full strength');
+  h.clock.t += 300;
+  assert.equal(h.controls.rumbleImpact(5, 'building'), true, 'after the gap');
+  assert.equal(effects.length, 2);
+  delete h.pad.vibrationActuator;
+  h.clock.t += 300;
+  assert.equal(h.controls.rumbleImpact(10, 'building'), false);
+});

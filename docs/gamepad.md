@@ -63,6 +63,10 @@ While the map is open, the pad drives the map. A crosshair marks the centre of t
 
 Searching the map still needs a keyboard.
 
+## Vibration
+
+The pad rumbles when the player's vehicle hits something: a building or other solid, another vehicle, or the ground when the drone lands hard (`impactRumble` and `rumbleImpact` in `js/gamepad-controls.js`, fed from the same collision events as the crash sounds). Hits under 2 m/s are ignored; above that the rumble grows with the speed to a full 0.3 s jolt at about 50 km/h. Scraping along a wall gives at most one rumble every 0.25 s. Walking into walls does not rumble. It needs a pad with a vibration actuator in Chrome or Edge (Xbox and XInput pads, which includes the 8BitDo in XInput mode); other pads stay still.
+
 ## Behaviour
 
 - Buttons held while the pad connects, while the map opens or closes, while a mode changes, or after a teleport do not fire again until they are released.

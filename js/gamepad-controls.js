@@ -15,6 +15,19 @@ const START_BUTTONS = [[A, 'a'], [B, 'b'], [X, 'x'], [Y, 'y'], [LB, 'lb'], [RB, 
 const REPEAT_DELAY = 400, REPEAT_EVERY = 140; // ms: a held D-pad direction repeats after REPEAT_DELAY, every REPEAT_EVERY
 const R3_TAP = 350; // ms: the right stick pressed and let go within this, without zooming, recenters the camera
 
+const RUMBLE_GAP = 250; // ms between two rumbles, unless the second hit is clearly harder (scraping along a wall stays a soft buzz)
+
+/**
+ * The rumble for an impact at `speed` m/s (the closing speed js/controllers.js and js/traffic.js report): null below
+ * 2 m/s, else { duration ms, strong, weak } growing with the speed up to a full 0.3 s jolt at 14 m/s (50 km/h). A drone
+ * touching down ('ground') rumbles at 60 %.
+ */
+function impactRumble(speed, kind = '') {
+  if (!(speed >= 2)) return null;
+  const s = Math.min(1, (speed - 1) / 13) * (kind === 'ground' ? 0.6 : 1);
+  return { duration: Math.round(90 + 210 * s), strong: s, weak: Math.min(1, 0.25 + 0.75 * s) };
+}
+
 function axis(value) {
   return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
 }
@@ -53,6 +66,8 @@ class GamepadControls {
     this.dpad = null; // the held D-pad direction: { dir, next } (performance.now() of its next repeat)
     this.r3DownAt = null; // performance.now() when the right stick went down
     this.r3Zoomed = false; // the right stick zoomed during this press (so letting go does not recenter)
+    this.lastRumbleAt = -Infinity;
+    this.lastRumbleStrength = 0;
     this.focused = typeof document.hasFocus !== 'function' || document.hasFocus();
 
     window.addEventListener('blur', () => {
@@ -258,6 +273,28 @@ class GamepadControls {
     this.camera.applyGamepadInput(look.x, zoom ? 0 : look.y, zoom, step);
   }
 
+  /**
+   * Shakes the pad for a collision of the player at `speed` m/s (see impactRumble) through its vibration actuator
+   * (Chrome / Edge: Xbox and XInput pads, DualShock 4). Returns whether a rumble started; pads without one stay still.
+   */
+  rumbleImpact(speed, kind) {
+    const effect = impactRumble(speed, kind);
+    if (!effect || !this.connected || !this.focused || document.hidden) return false;
+    const now = performance.now();
+    if (now - this.lastRumbleAt < RUMBLE_GAP && effect.strong <= this.lastRumbleStrength * 1.5) return false;
+    const actuator = this.readPad()?.vibrationActuator;
+    if (typeof actuator?.playEffect !== 'function') return false;
+    this.lastRumbleAt = now;
+    this.lastRumbleStrength = effect.strong;
+    try {
+      actuator.playEffect('dual-rumble', { startDelay: 0, duration: effect.duration, strongMagnitude: effect.strong, weakMagnitude: effect.weak })
+        ?.catch?.(() => {});
+    } catch {
+      return false;
+    }
+    return true;
+  }
+
   /** The D-pad direction to act on this frame: a fresh press, or a held one once it repeats (null otherwise). */
   dpadDirection(held) {
     const now = performance.now();
@@ -274,4 +311,4 @@ class GamepadControls {
   }
 }
 
-export { GamepadControls };
+export { GamepadControls, impactRumble };
