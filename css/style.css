@@ -1,11 +1,11 @@
 /* css/style.css */
-/* Copenhagen Twin HUD: quiet graphite glass in the corners of the screen, accent yellow for whatever is active,
-   blue-and-white street-name plates, so that the city itself stays the star */
+/* Aalborg Twin HUD, in the sponsor Ramboll's colours: deep blue glass in the corners of the screen, Ramboll signature
+   blue for whatever is active, white type, blue-and-white street-name plates, so that the city itself stays the star */
 
 :root {
   /* Surfaces */
-  --glass: rgba(18, 19, 22, 0.62);
-  --glass-strong: rgba(16, 17, 20, 0.88);
+  --glass: rgba(6, 24, 46, 0.62);
+  --glass-strong: rgba(5, 21, 41, 0.9);
   --glass-border: rgba(255, 255, 255, 0.09);
   --glass-highlight: rgba(255, 255, 255, 0.08);
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -13,13 +13,15 @@
   --divider: rgba(255, 255, 255, 0.1);
 
   /* Text */
-  --text: #f6f5f2;
-  --text-2: rgba(246, 245, 242, 0.68);
-  --text-3: rgba(246, 245, 242, 0.44);
+  --text: #ffffff;
+  --text-2: rgba(255, 255, 255, 0.72);
+  --text-3: rgba(255, 255, 255, 0.48);
 
   /* Accents */
-  --accent: #ffc21a;
-  --accent-ink: #17140a;
+  --accent: #009df0; /* Ramboll signature blue */
+  --accent-hover: #33b4f5;
+  --accent-ink: #ffffff;
+  --navy-ink: #06182e; /* dark text on white */
   --sign-blue: #1b4f9c;
   --highway: #c08a3e;
   --ok: #5ee08f;
@@ -48,7 +50,7 @@ html, body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background-color: #0a0b0d;
+  background-color: #051529;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -173,7 +175,7 @@ body::after {
   z-index: 100;
   display: grid;
   place-items: center;
-  background: radial-gradient(120% 90% at 50% 38%, #1b1e24 0%, #0c0d10 55%, #060607 100%);
+  background: radial-gradient(120% 90% at 50% 38%, #0d2f55 0%, #071c36 55%, #03101f 100%);
   transition: opacity 0.6s ease, visibility 0.6s ease;
 }
 
@@ -346,11 +348,7 @@ body.hud-minimized .toolbar > :not(#btn-toggle-hud) {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-weight: 800;
-  font-size: 12.5px;
-  letter-spacing: -0.02em;
+  background: #ffffff url('ramboll-logo.png') center / 78% no-repeat;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -426,7 +424,7 @@ body.hud-minimized .toolbar > :not(#btn-toggle-hud) {
 
 /* The gamepad's D-pad highlight (js/hud-nav.js): a ring that reads on light and dark buttons */
 .pad-focus {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #ffffff; /* white: the selected buttons are accent blue */
   outline-offset: 2px;
   box-shadow: 0 0 0 5px rgba(0, 0, 0, 0.35);
 }
@@ -577,7 +575,7 @@ body.hud-minimized .icon-show {
 .pop-item.active,
 .pop-item.active:hover {
   background: var(--text);
-  color: #121314;
+  color: var(--navy-ink);
 }
 
 .pop-item.active kbd {
@@ -704,7 +702,7 @@ body.hud-minimized .icon-show {
 
 .hint kbd {
   color: #ffffff;
-  background: rgba(12, 13, 15, 0.55);
+  background: rgba(5, 21, 41, 0.55);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
   text-shadow: none;
 }
@@ -733,7 +731,7 @@ body.hud-minimized .icon-show {
 }
 
 .bike-type-btn:hover { background: var(--hover); color: var(--text); }
-.bike-type-btn.active { color: var(--accent); background: rgba(255, 194, 26, 0.12); }
+.bike-type-btn.active { color: var(--accent); background: rgba(0, 157, 240, 0.12); }
 
 .mode-switch {
   position: relative;
@@ -742,7 +740,7 @@ body.hud-minimized .icon-show {
   padding: 5px;
 }
 
-/* The accent-yellow pill glides to the selected mode (positioned by main.js) */
+/* The accent-blue pill glides to the selected mode (positioned by main.js) */
 .mode-indicator {
   position: absolute;
   z-index: 0;
@@ -800,8 +798,8 @@ body.hud-minimized .icon-show {
 }
 
 .mode-btn.active kbd {
-  color: rgba(23, 20, 10, 0.62);
-  background: rgba(23, 20, 10, 0.1);
+  color: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.18);
   box-shadow: none;
 }
 
@@ -1038,7 +1036,7 @@ body.is-boosting #hud-speed-meter {
   height: 48px;
   border-radius: 50%;
   border: 1px solid rgba(255, 255, 255, 0.45);
-  background: rgba(246, 245, 242, 0.8);
+  background: rgba(255, 255, 255, 0.8);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   transform: translate(calc(-50% + var(--stick-x, 0px)), calc(-50% + var(--stick-y, 0px)));
   pointer-events: none;
@@ -1085,7 +1083,7 @@ body.is-boosting #hud-speed-meter {
   touch-action: none;
 }
 .touch-action > [aria-hidden] { font-size: 23px; line-height: 1; }
-.touch-boost { grid-column: 2; border-color: rgba(255, 194, 26, 0.65); color: var(--accent); }
+.touch-boost { grid-column: 2; border-color: rgba(0, 157, 240, 0.65); color: var(--accent); }
 .touch-action.is-pressed { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 
 body.touch-enabled .controls-hint,
@@ -1141,7 +1139,7 @@ body.touch-enabled .pop-item { min-height: 44px; }
   height: 184px;
   overflow: hidden;
   border-radius: 18px;
-  background: #0a1118;
+  background: #061a30;
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
   cursor: pointer;
@@ -1182,7 +1180,7 @@ body.touch-enabled .pop-item { min-height: 44px; }
   font-weight: 800;
   line-height: 1;
   color: #ffffff;
-  background: rgba(10, 12, 15, 0.72);
+  background: rgba(5, 21, 41, 0.72);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
   pointer-events: none;
 }
@@ -1193,7 +1191,7 @@ body.touch-enabled .pop-item { min-height: 44px; }
   right: 9px;
   z-index: 1;
   color: rgba(255, 255, 255, 0.85);
-  background: rgba(10, 12, 15, 0.6);
+  background: rgba(5, 21, 41, 0.6);
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
@@ -1210,7 +1208,7 @@ body.touch-enabled .pop-item { min-height: 44px; }
   position: fixed;
   inset: 0;
   z-index: 90;
-  background: #0a1118;
+  background: #061a30;
   transition: opacity 0.25s ease, visibility 0.25s ease;
 }
 
@@ -1653,7 +1651,7 @@ body.touring .hud > * { pointer-events: none; }
 }
 
 .race-board li.is-new { background: var(--accent); color: var(--accent-ink); }
-.race-board li.is-new::before, .race-board li.is-new .race-who small { color: rgba(0, 0, 0, 0.6); }
+.race-board li.is-new::before, .race-board li.is-new .race-who small { color: rgba(255, 255, 255, 0.78); }
 .race-board .icon { width: 16px; height: 16px; }
 .race-who { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .race-who small { margin-left: 5px; font-weight: 500; color: var(--text-3); }
@@ -1733,7 +1731,7 @@ body.touring .hud > * { pointer-events: none; }
 }
 #race-form input:focus { outline: 2px solid var(--accent); outline-offset: 0; }
 .race-save { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
-.race-save:hover { background: #ffd04d; }
+.race-save:hover { background: var(--accent-hover); }
 #race-result .race-board { margin-top: 12px; padding: 0; }
 #race-result .race-board:empty { display: none; }
 
@@ -1766,7 +1764,7 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
   align-items: center;
   justify-content: center;
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  background: radial-gradient(ellipse at 50% 40%, rgba(5, 6, 8, 0.25), rgba(5, 6, 8, 0.7));
+  background: radial-gradient(ellipse at 50% 40%, rgba(3, 16, 31, 0.25), rgba(3, 16, 31, 0.7));
   animation: start-in 0.5s var(--ease-out);
 }
 
@@ -1828,8 +1826,8 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
 .start-mode-name { font: 700 15px var(--font-sign); }
 .start-mode-sub { font-size: 12px; line-height: 1.35; color: var(--text-2); }
 .start-mode.active { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.start-mode.active .start-mode-sub { color: rgba(23, 20, 10, 0.72); }
-.start-mode.active kbd { color: var(--accent-ink); background: rgba(0, 0, 0, 0.12); box-shadow: none; }
+.start-mode.active .start-mode-sub { color: rgba(255, 255, 255, 0.82); }
+.start-mode.active kbd { color: var(--accent-ink); background: rgba(255, 255, 255, 0.2); box-shadow: none; }
 
 .start-features {
   display: grid;
@@ -1892,7 +1890,7 @@ body.touch-enabled .start-ctl[data-input='touch'] { display: flex !important; }
 
 .start-btn:hover { background: rgba(255, 255, 255, 0.16); }
 .start-primary { flex: 1 1 220px; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-size: 16px; }
-.start-primary:hover { background: #ffd04d; }
+.start-primary:hover { background: var(--accent-hover); }
 
 .start-hint { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 10px; font-size: 12px; color: var(--text-3); }
 .start-hint > span { display: inline-flex; align-items: center; gap: 4px; }

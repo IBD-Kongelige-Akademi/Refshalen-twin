@@ -20,7 +20,7 @@ const ROUTE_EVERY_MS = 400; // the GPS route is recomputed at most this often, a
 const RADAR_EVERY_MS = 66; // the radar's moving parts are redrawn ~15 times a second; its ground layers come from a cache
 
 // Map palette, shared by the radar & the full map (in step with css/style.css): graphite ground with the streets lighter than the
-// blocks between them, muted parks & water; a yellow GPS route (the HUD accent), white places & player, cyan search hits
+// blocks between them, muted parks & water; a blue GPS route (the HUD accent), white places & player, cyan search hits
 const MAP = {
   void: '#0c0f13', // beyond the data
   land: '#171c22',
@@ -39,7 +39,7 @@ const MAP = {
     cycleway: '#2f4a3c',
     footway: '#2b323b'
   },
-  route: '#ffc21a',
+  route: '#009df0', // Ramboll signature blue, the HUD accent
   search: '#5fd0ff',
   halo: 'rgba(8, 11, 15, 0.9)'
 };

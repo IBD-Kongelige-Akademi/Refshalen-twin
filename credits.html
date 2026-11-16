@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aalborg Twin – Credits</title>
   <style>
-    :root { --bg: #f6f5f1; --ink: #1d1c19; --muted: #5d5a52; --line: #dedad0; --accent: #ffc21a; --accent-ink: #17140a; --link: #1d4fa3; }
-    @media (prefers-color-scheme: dark) { :root { --bg: #121315; --ink: #ecebe6; --muted: #a3a097; --line: #2c2d31; --link: #8fb4ff; } }
+    :root { --bg: #ffffff; --ink: #06182e; --muted: #4f5d6e; --line: #d8e2ec; --accent: #009df0; --link: #0077c0; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #051529; --ink: #ffffff; --muted: #9db0c6; --line: #16314f; --link: #5cc4ff; } }
     * { box-sizing: border-box; }
     body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
     main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
     header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-    .mark { background: var(--accent); color: var(--accent-ink); font-weight: 800; font-size: 13px; border-radius: 50%; width: 40px; height: 40px; display: grid; place-items: center; flex: none; }
+    .mark { background: #ffffff url("./css/ramboll-logo.png") center / 78% no-repeat; border-radius: 50%; width: 40px; height: 40px; flex: none; box-shadow: 0 0 0 1px var(--line); }
     h1 { font-size: 26px; margin: 0; }
     h2 { font-size: 17px; margin: 32px 0 8px; padding-top: 16px; border-top: 1px solid var(--line); }
     h3 { font-size: 15px; margin: 18px 0 4px; }
@@ -25,8 +25,8 @@
 </head>
 <body>
 <main>
-  <header><span class="mark" aria-hidden="true">AAL</span><h1>Aalborg Twin – credits</h1></header>
-  <p class="muted">A playable model of central Aalborg built from open Danish geodata. <a class="back" href="./">← Back to the city</a></p>
+  <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – credits</h1></header>
+  <p class="muted">A playable model of central Aalborg built from open Danish geodata, sponsored by Ramboll. <a class="back" href="./">← Back to the city</a></p>
 
   <h2>Software</h2>
   <ul>
