@@ -1,5 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { texture, uv, positionWorld, float, vec3, floor, fract, sin, dot, smoothstep, step, mix } from 'three/tsl';
+import { cityUniforms, apartmentOccupancy, apartmentLight } from './tsl-materials.js';
 import { getAtlasSource } from './data-packs.js';
 import { dataUrl } from './data-config.js';
 import { detailGeometry } from './detail-overrides.js';
@@ -22,6 +24,37 @@ export async function fetchOverrideBytes(path, { signal = null, fetchImpl = glob
   const r = await fetchImpl(dataUrl(path), signal ? { signal } : {});
   if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status} ${path}`), { status: r.status });
   return new Uint8Array(await r.arrayBuffer());
+}
+
+// Night light behind an override's glass. A converter names its glazing materials (tools/overrides: glass, glassd, glassb, glassw, skyglass, tri, and
+// Hotel Hvide Hus's rooms and lift); their textures draw dark panes in lighter frames, so the pane is found in the texture itself and no new texture
+// is needed. Rooms of about 4 m by 3.2 m in world space are lit or dark together, as many as the generated facades light (apartmentOccupancy), in
+// their lamp colours, and follow the same uInteriorGlow from dusk to night.
+const GLAZING = /^(glass\w*|skyglass|tri|rooms|lift)$/;
+const BLUE_PANES = /^(glassd|rooms|lift)$/; // their frames or panels are dark too: only the bluish pane is glass
+
+/** A node material in the place of a glazing material of a loaded override, with the night light; other materials come back as they are. */
+export function litGlazing(m) {
+  if (!m?.map || !GLAZING.test(m.name || '')) return m;
+  const mat = new THREE.MeshStandardNodeMaterial();
+  mat.name = m.name;
+  mat.map = m.map;
+  mat.color.copy(m.color);
+  mat.roughness = m.roughness;
+  mat.metalness = m.metalness;
+  mat.side = m.side;
+  mat.vertexColors = m.vertexColors;
+  mat.userData = m.userData;
+  const tex = texture(m.map, uv()).rgb;
+  const dark = float(1).sub(smoothstep(0.16, 0.26, dot(tex, vec3(0.3, 0.5, 0.2))));
+  const pane = BLUE_PANES.test(m.name) ? dark.mul(step(tex.r.mul(1.45), tex.b)) : dark;
+  const room = floor(positionWorld.mul(vec3(1 / 4.2, 1 / 3.2, 1 / 4.2)));
+  const pick = fract(sin(dot(room, vec3(12.9898, 78.233, 37.719))).mul(43758.5453));
+  const lit = step(float(1).sub(apartmentOccupancy()), pick);
+  const shade = fract(pick.mul(7.31));
+  mat.emissiveNode = apartmentLight(shade).mul(mix(float(0.55), float(1), shade)).mul(lit).mul(pane).mul(cityUniforms.uInteriorGlow).mul(0.45);
+  m.dispose();
+  return mat;
 }
 
 const abortError = () => (typeof DOMException === 'function' ? new DOMException('aborted', 'AbortError') : Object.assign(new Error('aborted'), { name: 'AbortError' }));
@@ -67,6 +100,7 @@ export async function loadOverrideMesh(entry, { signal = null, fetchImpl = globa
     o.receiveShadow = true;
     const m = o.material;
     if (m?.map) { m.map.anisotropy = 8; m.map.needsUpdate = true; }
+    o.material = litGlazing(m);
   });
   group.updateMatrixWorld(true);
   if (signal?.aborted) { disposeOverride(group); throw abortError(); }
