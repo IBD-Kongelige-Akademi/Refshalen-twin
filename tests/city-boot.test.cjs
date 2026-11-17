@@ -52,7 +52,7 @@ test('there is no ?city switch and no NYC strings in the shipped sources', () =>
   const files = ['index.html', 'css/style.css', ...readdirSync(join(root, 'js')).map((f) => `js/${f}`)];
   for (const file of files) {
     const source = read(file);
-    assert.ok(!/\?city=|IS_NYC|resolveCity|NYC_LANDMARKS|Slop New York|\bmph\b|NYC Yellow Taxi|NYPD|MTA\b/.test(source.replace(/Based on Slop New York by mrdoob \(MIT\)/g, '')), `${file} has New York leftovers`);
+    assert.ok(!/\?city=|IS_NYC|resolveCity|NYC_LANDMARKS|Slop New York|\bmph\b|NYC Yellow Taxi|NYPD|MTA\b/.test(source.replace(/(Based on|Baseret på) Slop New York (by|af) mrdoob \(MIT\)/g, '')), `${file} has New York leftovers`);
   }
 });
 

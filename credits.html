@@ -21,10 +21,15 @@
     .muted { color: var(--muted); font-size: 13px; }
     a { color: var(--link); overflow-wrap: anywhere; }
     .back { display: inline-block; margin-top: 4px; }
+    .lang-bar { display: flex; justify-content: flex-end; }
+    #lang-toggle { min-height: 32px; padding: 0 12px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--ink); font: 600 13px/1 system-ui, -apple-system, "Segoe UI", sans-serif; cursor: pointer; }
+    #lang-toggle:hover { border-color: var(--accent); }
   </style>
 </head>
 <body>
 <main>
+<div class="lang-bar"><button id="lang-toggle" type="button" lang="da">Dansk</button></div>
+<div data-lang="en">
   <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – credits</h1></header>
   <p class="muted">A playable model of central Aalborg built from open Danish geodata, sponsored by Ramboll. <a class="back" href="./">← Back to the city</a></p>
 
@@ -89,6 +94,95 @@
 
   <h2>Licence</h2>
   <p>The code is available under the MIT License. Data derived from OpenStreetMap stays under the ODbL, and the rest of the data keeps the licence of its source.</p>
+</div>
+
+<div data-lang="da" lang="da" hidden>
+  <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – kreditering</h1></header>
+  <p class="muted">En spilbar model af det centrale Aalborg bygget af åbne danske geodata, sponsoreret af Ramboll. <a class="back" href="./">← Tilbage til byen</a></p>
+
+  <h2>Software</h2>
+  <ul>
+    <li><a href="https://github.com/mrdoob/slop-newyork/">Slop New York</a> af mrdoob (MIT): renderer, efterbehandling, styring, kameraer, lyd, trafik og fodgængere.</li>
+    <li><a href="https://github.com/martincollignon/copenhagen-twin">copenhagen-twin</a> af Martin Collignon (MIT): geodata-pipelinen og den streamende bymotor, som projektet er forgrenet fra.</li>
+    <li><a href="https://threejs.org/">three.js</a> (MIT): WebGPU-renderer og TSL-shadere.</li>
+  </ul>
+
+  <h2>Kort- og bygningsdata</h2>
+  <p><strong>Indeholder data fra Klimadatastyrelsen / Styrelsen for Dataforsyning og Infrastruktur</strong>, under
+    <a href="https://dataforsyningen.dk/asset/PDF/rettigheder_vilkaar/Vilk%C3%A5r%20for%20frie%20geografiske%20data%20og%20CC%20BY%204_0%20licens.pdf">vilkår for frie geografiske data (CC BY 4.0)</a>:</p>
+  <ul>
+    <li>GeoDanmark: bygninger, veje, søer, kyst, havn, træer, master, parkering, skove og parker.</li>
+    <li>DAR (adresser), BBR (Bygnings- og Boligregistret) og DAGI (administrative inddelinger).</li>
+    <li>DHM, Danmarks Højdemodel: terræn, bygningshøjder og vegetationshøjder.</li>
+    <li>Skråfoto 2021 (skrå luftfotos): facadeteksturer og tagfarver.</li>
+  </ul>
+  <p class="muted">Vektordata hentet via <a href="https://datagrundlag.dk/om/">datagrundlag.dk</a> (MapCentias spejling af de offentlige data).</p>
+  <ul>
+    <li>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-bidragydere</a>, Open Database License (ODbL): veje, lyssignaler, lygter, vand, parker, broer, jernbaner, nattelivssteder og buslinjer.</li>
+    <li>LoD2-tagformer: CityJSON-bygningsmodel fra Ramboll, lavet med <a href="https://github.com/geoflow3d/geoflow-bundle">Geoflow</a> (MIT).</li>
+  </ul>
+
+  <h2>Vartegn</h2>
+  <p>Seks bygninger er modelleret i hånden. Placering og omrids kommer fra GeoDanmark Bygning, og farver og mål fra Skråfoto 2021 (begge ovenfor).
+    Tegningerne nævnt nedenfor er fra Aalborg Kommunes byggesagsarkiv på <a href="https://weblager.dk">weblager.dk</a>; kun mål taget fra dem indgår i modellerne.</p>
+
+  <h3>Aalborg Kongres &amp; Kultur Center</h3>
+  <ul>
+    <li>Tagniveauer, tagfødder og kip fra DHM-punktskyen.</li>
+    <li>Referencefotos (ikke brugt som teksturer): Leonhard Lenz, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres-_og_Kulturcenter_2022-08-16_01.jpg">CC0</a>; Drlady, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center_01.jpg">CC BY-SA 4.0</a>; Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center,_seen_from_Prinsensgade,_Photo_1,Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Musikkens Hus</h3>
+  <ul>
+    <li>Tagniveauer fra DHM-punktskyen og overflademodellen.</li>
+    <li>Referencefoto (ikke brugt som tekstur): Marc Søgaard, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Musikkens_Hus_-_front.JPG">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Utzon Center</h3>
+  <ul>
+    <li>Tagniveauer fra Skråfotos overflademodel.</li>
+    <li>Referencefotos af murstensudfyldningen og lanternerne (ikke brugt som teksturer): Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Utzon_Center,_Eastern_side,_Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+  </ul>
+
+  <h3>Budolfi Domkirke</h3>
+  <ul>
+    <li>Tegninger fra byggesagsarkivet: <em>Sankt Budolfi – Aalborg Domkirke, hovedrenovering 1. afsnit</em>, Arkitekter Dall &amp; Lindhardtsen A/S, 2000 (efter opmålingen fra 1986, Brøgger arkitektfirma), og <em>Budolfi Kirke: opmaaling af spiret</em>, 1934.</li>
+  </ul>
+
+  <h3>Ansgars Kirke</h3>
+  <ul>
+    <li>Tegninger fra byggesagsarkivet: <em>Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg</em>, facadetegninger, 1925.</li>
+  </ul>
+
+  <h3>Hotel Det Hvide Hus</h3>
+  <ul>
+    <li>Tegninger fra byggesagsarkivet: <em>Hotel ved Kilden, Aalborg</em>, K. Friis og E. Moltke Nielsen, arkitekter, 1967; <em>Hotel Hvide Hus: udskiftning af facadepartier</em>, Jørgen Braad A/S, 2005; <em>opholdsterrasse mod Kildeparken</em>, Peter Sørensen, landskabsarkitekt, 2002.</li>
+  </ul>
+
+  <h2>Licens</h2>
+  <p>Koden er tilgængelig under MIT-licensen. Data afledt af OpenStreetMap forbliver under ODbL, og resten af dataene beholder licensen fra deres kilde.</p>
+</div>
 </main>
+<script>
+  // English or Danish, as chosen in the twin (js/i18n.js keeps it under the same key) or with ?lang=da|en
+  (function () {
+    var KEY = 'aalborg-lang';
+    var lang = 'en';
+    try { lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem(KEY) || 'en'; } catch (e) {}
+    function apply(next) {
+      lang = next === 'da' ? 'da' : 'en';
+      document.documentElement.lang = lang;
+      document.querySelectorAll('[data-lang]').forEach(function (el) { el.hidden = el.getAttribute('data-lang') !== lang; });
+      document.title = lang === 'da' ? 'Aalborg Twin – Kreditering' : 'Aalborg Twin – Credits';
+      var btn = document.getElementById('lang-toggle');
+      btn.textContent = lang === 'da' ? 'English' : 'Dansk';
+      btn.lang = lang === 'da' ? 'en' : 'da';
+      btn.setAttribute('aria-label', lang === 'da' ? 'Switch to English' : 'Skift til dansk');
+      try { localStorage.setItem(KEY, lang); } catch (e) {}
+    }
+    document.getElementById('lang-toggle').addEventListener('click', function () { apply(lang === 'da' ? 'en' : 'da'); });
+    apply(lang);
+  })();
+</script>
 </body>
 </html>

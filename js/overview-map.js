@@ -451,8 +451,10 @@ class OverviewMap {
    * @param roadGraph  the citywide road graph ({ nodes, links, names, classes }) or null
    * @param places     { key: { name, sub, x, z, pin? } } (the teleports): white pins at `pin` (the building's centre) or else x, z, searchable
    * @param locate     (x, z) -> 'Aalborg · <street>' (world.locationLabel)
+   * @param translate  English UI text -> the current language (js/i18n.js t)
    */
-  constructor({ controllerManager, cameraSystem, trafficSystem = null, roadGraph = null, places = {}, locate = () => '', onTeleport, onToggle }) {
+  constructor({ controllerManager, cameraSystem, trafficSystem = null, roadGraph = null, places = {}, locate = () => '', translate = (text) => text, onTeleport, onToggle }) {
+    this.t = translate;
     this.controllerManager = controllerManager;
     this.cameraSystem = cameraSystem;
     this.trafficSystem = trafficSystem;
@@ -548,10 +550,17 @@ class OverviewMap {
 
   updateCounts() {
     if (!this.elCounts) return;
-    const parts = [`${this.roadLabels.length} streets`];
-    if (this.buildingCount) parts.push(`${this.buildingCount.toLocaleString('en-US')} buildings`);
+    const parts = [`${this.roadLabels.length} ${this.t('streets')}`];
+    if (this.buildingCount) parts.push(`${this.buildingCount.toLocaleString('en-US')} ${this.t('buildings')}`);
     this.elCounts.textContent = parts.join(' · ');
-    if (this.elSearchInput) this.elSearchInput.placeholder = `Search ${this.roadLabels.length} streets & places…`;
+    if (this.elSearchInput) this.elSearchInput.placeholder = `${this.t('Search')} ${this.roadLabels.length} ${this.t('streets & places…')}`;
+  }
+
+  /** The language changed (js/main.js): the counts and search hint now, the "You are at" line on the next draw */
+  refreshLanguage() {
+    this.updateCounts();
+    this.playerInfoText = '';
+    if (this.isFullMapOpen) this.renderFullMap();
   }
 
   streetLayers() {
@@ -643,7 +652,7 @@ class OverviewMap {
       if (mx >= 0 && mx <= rect.width && my >= 0 && my <= rect.height) {
         const wPos = this.screenToWorld(mx, my, rect.width, rect.height);
         this.hoverWorld = wPos;
-        if (this.elHoverInfo) this.elHoverInfo.textContent = `${this.placeName(wPos.x, wPos.z)} · Click to teleport · Shift-click to route`;
+        if (this.elHoverInfo) this.elHoverInfo.textContent = `${this.placeName(wPos.x, wPos.z)} · ${this.t('Click to teleport · Shift-click to route')}`;
       }
     });
 
@@ -734,7 +743,7 @@ class OverviewMap {
       this.viewCenterZ = Math.max(b.minZ, Math.min(b.maxZ, this.viewCenterZ));
     }
     const p = this.centerWorld();
-    if (this.elHoverInfo) this.elHoverInfo.textContent = `${this.placeName(p.x, p.z)} · A to teleport · X to route`;
+    if (this.elHoverInfo) this.elHoverInfo.textContent = `${this.placeName(p.x, p.z)} · ${this.t('A to teleport · X to route')}`;
     this.renderFullMap();
   }
 
@@ -1184,7 +1193,7 @@ class OverviewMap {
 
     const ent = this.controllerManager.getActiveEntity();
     if (this.elPlayerInfo) {
-      const text = `You are at ${this.placeName(ent.position.x, ent.position.z)}`;
+      const text = `${this.t('You are at')} ${this.placeName(ent.position.x, ent.position.z)}`;
       if (text !== this.playerInfoText) {
         this.playerInfoText = text;
         this.elPlayerInfo.textContent = text;

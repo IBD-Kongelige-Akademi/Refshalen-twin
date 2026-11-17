@@ -1785,8 +1785,29 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
   user-select: none;
 }
 
-.start-head { display: flex; align-items: center; gap: 14px; }
+.start-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.start-sponsor {
+  margin-left: auto;
+  padding: 6px 12px;
+  border: 1px solid rgba(0, 157, 240, 0.45);
+  border-radius: 999px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.start-sponsor b { color: var(--accent); font-weight: 700; }
 .start-head .brand-mark { width: 46px; height: 46px; font-size: 13px; }
+/* the language toggle (js/i18n.js): it names the language it switches to */
+.start-lang {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--hover);
+  color: var(--text);
+  font: 650 12.5px var(--font-sans);
+}
+.start-lang:hover { background: rgba(255, 255, 255, 0.16); }
+.tool-btn.lang-btn { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; }
 .start-kicker { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); }
 .start-title { margin-top: 2px; font: 700 30px / 1.1 var(--font-sign); }
 .start-pitch { margin-top: 10px; max-width: 64ch; font-size: 15px; line-height: 1.5; color: var(--text-2); }

@@ -13,6 +13,7 @@ import { createEntranceIndex, createDoorAccumulator, addDoors } from './entrance
 import { CPH_FRAME } from './city-config.js';
 import { disposeTree } from './dispose-tree.js';
 import { nextFrame } from './yield-frame.js';
+import { t, translatePhrases } from './i18n.js';
 import { dataUrl } from './data-config.js';
 import { getAtlasSource } from './data-packs.js';
 import { batchBuildingCells, batchBuildingCellsAsync, updateBuildingCellVisibility } from './building-batches.js';
@@ -112,7 +113,7 @@ function describeBuilding(b, lod2Info = null) {
     confFields: conf,
     src: b.src,
     roofSource: lod2Info?.conf === 'measured' ? `LoD2.2 ${lod2Info.scan_date ? `from the ${lod2Info.scan_date} point cloud` : 'model'}${lod2Info.roof_type ? ` (${lod2Info.roof_type})` : ''}${lod2Info.rmse != null ? `, fit ${lod2Info.rmse.toFixed(2)} m` : ''}` : (lod2Info?.reason ? `flat extrusion (${lod2Info.reason})` : null),
-    heightText: Number.isFinite(b.eave) ? `${metres(b.eave - b.ground)} to eave${b.ridge > b.eave + 0.3 ? `, ${metres(b.ridge - b.ground)} to ridge` : ''}` : 'unknown'
+    heightText: Number.isFinite(b.eave) ? `${metres(b.eave - b.ground)} ${t('to eave')}${b.ridge > b.eave + 0.3 ? `, ${metres(b.ridge - b.ground)} ${t('to ridge')}` : ''}` : t('unknown')
   };
 }
 
@@ -158,7 +159,7 @@ function titleFor(info, book = addressBook) {
   const bbr = info.bbr ? book.byBbr?.[String(info.bbr).toLowerCase()] : null;
   if (bbr) return bbr;
   if (info.doors?.address) return info.doors.address;
-  return book.loaded ? 'Building without an address' : undefined;
+  return book.loaded ? t('Building without an address') : undefined;
 }
 
 /**
@@ -171,7 +172,7 @@ function createInfoPanel() {
   const el = document.createElement('aside');
   el.id = 'building-info';
   el.setAttribute('aria-live', 'polite');
-  el.setAttribute('aria-label', 'Building');
+  el.setAttribute('aria-label', t('Building'));
   el.style.cssText = [
     'position:fixed', 'left:16px', 'top:96px', 'bottom:16px', 'z-index:20', 'width:320px', 'max-width:calc(100vw - 32px)',
     'box-sizing:border-box', 'overflow:auto', 'overscroll-behavior:contain', 'padding:0 14px 12px', 'border-radius:10px',
@@ -185,8 +186,8 @@ function createInfoPanel() {
   title.style.cssText = 'flex:1;min-width:0;font-weight:600;font-size:14px;line-height:1.3;overflow-wrap:anywhere';
   const close = document.createElement('button');
   close.type = 'button';
-  close.setAttribute('aria-label', 'Close building info');
-  close.title = 'Close';
+  close.setAttribute('aria-label', t('Close building info'));
+  close.title = t('Close');
   close.textContent = '×';
   close.style.cssText = 'flex:none;width:26px;height:26px;margin:-4px -2px 0 0;border:0;border-radius:6px;background:rgba(255,255,255,0.08);color:#e8e6e1;font:18px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer';
   head.append(title, close);
@@ -199,17 +200,17 @@ function createInfoPanel() {
     el.style.display = 'none';
     panel.onClose?.();
   });
-  const tag = (text, kind) => `<span style="padding:0 5px;border-radius:4px;margin-left:6px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;background:${kind === 'measured' ? '#2f6f4f' : kind === 'inferred' ? '#7a5a1c' : '#3b4a66'};color:#fff">${text}</span>`;
-  const row = (label, value, conf) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-top:1px solid rgba(255,255,255,0.07)"><span style="opacity:.65">${label}</span><span style="text-align:right">${value}${conf ? tag(conf, conf) : ''}</span></div>`;
+  const tag = (text, kind) => `<span style="padding:0 5px;border-radius:4px;margin-left:6px;font-size:10px;letter-spacing:.04em;text-transform:uppercase;background:${kind === 'measured' ? '#2f6f4f' : kind === 'inferred' ? '#7a5a1c' : '#3b4a66'};color:#fff">${t(text)}</span>`;
+  const row = (label, value, conf) => `<div style="display:flex;justify-content:space-between;gap:10px;padding:2px 0;border-top:1px solid rgba(255,255,255,0.07)"><span style="opacity:.65">${t(label)}</span><span style="text-align:right">${value}${conf ? tag(conf, conf) : ''}</span></div>`;
   const swatch = (rgb) => (Array.isArray(rgb) ? `<span style="display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;border:1px solid rgba(255,255,255,.35);background:rgb(${rgb.map((c) => Math.round(c * 255)).join(',')})"></span>` : '');
-  const e = (v) => (v === null || v === undefined || v === '' ? '<span style="opacity:.5">unknown</span>' : String(v).replace(/[<>&]/g, ''));
+  const e = (v) => (v === null || v === undefined || v === '' ? `<span style="opacity:.5">${t('unknown')}</span>` : translatePhrases(String(v)).replace(/[<>&]/g, ''));
   return Object.assign(panel, {
     element: el,
     show(info) {
       const c = info.confFields;
       const f = info.facade;
       shown = info;
-      title.textContent = titleFor(info) ?? 'Finding the address…';
+      title.textContent = titleFor(info) ?? t('Finding the address…');
       if (!addressBook.loaded) loadAddressBook().then(() => { if (shown === info) title.textContent = titleFor(info); });
       // start under the title card (the HUD's top-left corner moves with the window size)
       const card = typeof document !== 'undefined' ? document.querySelector('.hud-top-left') : null;
@@ -224,16 +225,16 @@ function createInfoPanel() {
         row('Storeys', e(info.storeys), c.storeys),
         row('Height', e(info.heightText), c.eave),
         row('Roof', `${e(info.roof)} / ${e(info.roofMaterial)}`, c.roof),
-        info.appearance?.wall ? row('Wall colour', `${swatch(info.appearance.wall.tone)}${e(info.appearance.wall.text)}${info.appearance.wall.photo ? ' + photo' : ''}`, info.appearance.wall.kind === 'observed' ? 'measured' : info.appearance.wall.kind === 'prior' ? 'scaled' : 'inferred') : '',
+        info.appearance?.wall ? row('Wall colour', `${swatch(info.appearance.wall.tone)}${e(info.appearance.wall.text)}${info.appearance.wall.photo ? ` ${t('+ photo')}` : ''}`, info.appearance.wall.kind === 'observed' ? 'measured' : info.appearance.wall.kind === 'prior' ? 'scaled' : 'inferred') : '',
         ...(info.appearance?.wall?.flags || []).map((t) => `<div style="padding:1px 0;color:#e7c27a;font-size:11px">${e(t)}</div>`),
         info.appearance?.roof ? row('Roof colour', `${swatch(info.appearance.roof.tone)}${e(info.appearance.roof.text)}`, info.appearance.roof.kind === 'observed' ? 'measured' : 'inferred') : '',
         info.appearance?.detail ? row('Detail', e(info.appearance.detail.text), 'inferred') : '',
         info.roofSource ? row('Roof geometry', e(info.roofSource), info.roofSource.startsWith('LoD2') ? 'measured' : 'inferred') : '',
-        info.override ? row('Detail model', e(`${info.override.set || 'override'}${info.override.details ? ' + traced details' : ''} (IoU ${info.override.iou ?? '?'})`), info.override.confidence === 'observed' ? 'measured' : 'inferred') : '',
+        info.override ? row('Detail model', e(`${info.override.set || 'override'}${info.override.details ? ` + ${t('traced details')}` : ''} (IoU ${info.override.iou ?? '?'})`), info.override.confidence === 'observed' ? 'measured' : 'inferred') : '',
         info.override?.attribution?.length ? `<div style="padding:1px 0;opacity:.6;font-size:10px">${e(info.override.attribution.join(' · '))}</div>` : '',
         row('Wall', e(info.wallMaterial), c.wall_material),
-        row('Facade', `floor ${e(f.floor_h)} m, bay ${e(f.bay_w)} m, ${e(f.ground_type)}`, c.facade ?? 'inferred'),
-        info.doors ? row('Entrances', info.doors.source === 'dar' ? `${info.doors.count} from DAR adgangspunkt` : info.doors.source === 'heuristic' ? `${info.doors.count} street door${info.doors.count === 1 ? '' : 's'}, placed by heuristic` : 'none', info.doors.conf) : '',
+        row('Facade', `${t('floor')} ${e(f.floor_h)} m, ${t('bay')} ${e(f.bay_w)} m, ${e(f.ground_type)}`, c.facade ?? 'inferred'),
+        info.doors ? row('Entrances', info.doors.source === 'dar' ? `${info.doors.count} ${t('from DAR adgangspunkt')}` : info.doors.source === 'heuristic' ? `${info.doors.count} ${t(info.doors.count === 1 ? 'street door' : 'street doors')}, ${t('placed by heuristic')}` : t('none'), info.doors.conf) : '',
         row('Record', e(info.conf)),
         `<div style="margin-top:6px;opacity:.55;font-size:10px;word-break:break-all">${e((info.src || []).join(', '))}</div>`
       ].join('');

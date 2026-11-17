@@ -15,6 +15,7 @@ class TouchControls {
     this.available = false;
     this.touchSeen = false;
     this.onAvailabilityChange = null;
+    this.translate = (text) => text; // js/main.js sets js/i18n.js t() for the button labels
     this.media = window.matchMedia('(any-pointer: coarse)');
 
     if (!this.root || !this.stick || !this.knob) return;
@@ -105,9 +106,9 @@ class TouchControls {
       button.hidden = (action === 'up' && mode !== 'person' && mode !== 'drone')
         || (action === 'down' && mode !== 'drone')
         || (action === 'boost' && mode === 'bus'); // the bus has no boost
-      button.setAttribute('aria-label', labels[action]);
+      button.setAttribute('aria-label', this.translate(labels[action]));
       const label = this.root.querySelector(`[data-touch-label="${action}"]`);
-      if (label) label.textContent = labels[action];
+      if (label) label.textContent = this.translate(labels[action]);
     }
   }
 

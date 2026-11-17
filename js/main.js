@@ -25,6 +25,7 @@ import { createTour } from './tour.js';
 import { createRace, finishSegments } from './race.js';
 import { MODE_LABEL, MODE_ICON, formatTime, raceMode } from './race-scores.js';
 import { createStartScreen } from './start-screen.js';
+import { t, getLang, setLang, onLangChange, translateDocument } from './i18n.js';
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
@@ -45,8 +46,10 @@ async function initApp() {
     loadingFill.style.transform = `scaleX(${Math.min(1, Math.max(0, p))})`;
   };
 
+  // English or Danish (js/i18n.js): the page's static text first, so the loading screen is in the chosen language too
+  translateDocument(document);
   if (loadingStatus) {
-    loadingStatus.textContent = `Initializing Three.js r${THREE.REVISION} WebGPURenderer & TSL Shaders...`;
+    loadingStatus.textContent = t('Initializing Three.js r{rev} WebGPURenderer & TSL Shaders...', { rev: THREE.REVISION });
   }
 
   // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer
@@ -79,7 +82,7 @@ async function initApp() {
   markInit('lighting');
 
   if (loadingStatus) {
-    loadingStatus.textContent = 'Constructing Aalborg...';
+    loadingStatus.textContent = t('Constructing Aalborg...');
   }
 
   // 3. Build the city from the Copenhagen geodata
@@ -135,6 +138,7 @@ async function initApp() {
   const cameraSystem = new CameraSystem(renderer.domElement, controllerManager);
   world.attach?.({ camera: cameraSystem.camera, domElement: renderer.domElement, controllerManager });
   const touchControls = new TouchControls(controllerManager);
+  touchControls.translate = t;
   const soundButton = document.getElementById('btn-sound');
   const audioSystem = new CityAudioSystem({ controllerManager, trafficSystem, audioSignals: world.audioSignals }, {
     onStateChange: updateSoundButton
@@ -143,8 +147,8 @@ async function initApp() {
     if (!soundButton) return;
     soundButton.disabled = !audioSystem.supported;
     soundButton.setAttribute('aria-pressed', String(audioSystem.enabled));
-    soundButton.setAttribute('aria-label', audioSystem.enabled ? 'Mute sound' : 'Enable sound');
-    soundButton.title = audioSystem.supported ? `${audioSystem.enabled ? 'Mute' : 'Enable'} sound [N]` : 'Web Audio is unavailable';
+    soundButton.setAttribute('aria-label', t(audioSystem.enabled ? 'Mute sound' : 'Enable sound'));
+    soundButton.title = t(audioSystem.supported ? (audioSystem.enabled ? 'Mute sound [N]' : 'Enable sound [N]') : 'Web Audio is unavailable');
     soundButton.querySelector('use').setAttribute('href', audioSystem.enabled ? '#i-sound' : '#i-sound-off');
   }
   soundButton?.addEventListener('click', () => audioSystem.setEnabled(!audioSystem.enabled));
@@ -330,12 +334,12 @@ async function initApp() {
       for (const key of keys) {
         const kbd = document.createElement('kbd');
         if (padHintFamily) kbd.className = 'pad-key';
-        kbd.textContent = key;
+        kbd.textContent = padHintFamily ? key : t(key);
         item.appendChild(kbd);
       }
       const label = document.createElement('span');
       label.className = 'hint-label';
-      label.textContent = action;
+      label.textContent = t(action);
       item.appendChild(label);
       return item;
     });
@@ -390,7 +394,7 @@ async function initApp() {
     document.body.dataset.mode = primaryMode;
     placeModeIndicator();
     const ent = controllerManager.getActiveEntity();
-    if (elMode) elMode.textContent = ent.label;
+    if (elMode) elMode.textContent = t(ent.label);
     const skating = activeMode === 'person' && (walker === 'skater' || walker === 'skateboarder');
     renderControlHints(skating ? 'skate' : primaryMode);
 
@@ -407,7 +411,7 @@ async function initApp() {
       btn.classList.toggle('active', btn.getAttribute('data-camera') === camId);
     });
     const preset = cameraSystem.getActivePreset();
-    if (elCamera) elCamera.textContent = preset.name;
+    if (elCamera) elCamera.textContent = t(preset.name);
   }
 
   // Steps through CAMERA_PRESETS (V / Shift+V, and the arrows either side of the camera name)
@@ -424,6 +428,9 @@ async function initApp() {
   function selectTime(timeId) {
     lightingSystem.applyPreset(timeId);
     colorGrade.applyPreset(lightingSystem.activePresetId);
+    markTime(timeId);
+  }
+  function markTime(timeId) {
     timeButtons.forEach((btn) => {
       const selected = btn.getAttribute('data-time') === timeId;
       btn.classList.toggle('active', selected);
@@ -432,7 +439,7 @@ async function initApp() {
       const name = btn.querySelector('.pop-name')?.textContent || timeId;
       if (timeIcon) timeIcon.setAttribute('href', `#${btn.dataset.icon}`);
       if (timeLabel) timeLabel.textContent = name;
-      if (timeMenuBtn) timeMenuBtn.title = `Time of day: ${name}`;
+      if (timeMenuBtn) timeMenuBtn.title = `${t('Time of day')}: ${name}`;
     });
   }
 
@@ -548,7 +555,7 @@ async function initApp() {
         streets = streets.slice(5);
         const near = document.createElement('span');
         near.className = 'location-near';
-        near.textContent = 'near';
+        near.textContent = t('near');
         row.appendChild(near);
       }
       for (const name of streets.split(' & ')) {
@@ -588,14 +595,18 @@ async function initApp() {
   const cityTitle = document.getElementById('tp-city-title');
   if (cityTitle) cityTitle.hidden = !Object.keys(CITY_TELEPORT_LOCATIONS).some((k) => presetFor(k));
 
+  function updateHudToggle() {
+    if (!hudToggleBtn) return;
+    const isMin = document.body.classList.contains('hud-minimized');
+    hudToggleBtn.setAttribute('aria-pressed', String(isMin));
+    hudToggleBtn.setAttribute('aria-label', t(isMin ? 'Show HUD' : 'Hide HUD'));
+    hudToggleBtn.title = t(isMin ? 'Show the HUD [H]' : 'Clean view: hide the HUD [H]');
+  }
   if (hudToggleBtn) {
     hudToggleBtn.addEventListener('click', () => {
       document.body.classList.toggle('hud-minimized');
-      const isMin = document.body.classList.contains('hud-minimized');
-      hudToggleBtn.setAttribute('aria-pressed', String(isMin));
-      hudToggleBtn.setAttribute('aria-label', isMin ? 'Show HUD' : 'Hide HUD');
-      hudToggleBtn.title = isMin ? 'Show the HUD [H]' : 'Clean view: hide the HUD [H]';
-      if (isMin) closePopovers();
+      updateHudToggle();
+      if (document.body.classList.contains('hud-minimized')) closePopovers();
     });
   }
 
@@ -607,13 +618,14 @@ async function initApp() {
     roadGraph: world.geo?.roadGraph || null,
     places: TELEPORT_LOCATIONS,
     locate: world.locationLabel,
+    translate: t,
     onToggle: (open) => {
       controllerManager.resetInput();
       touchControls.setEnabled(!open);
       gamepadControls.setEnabled(!open);
       if (open) hudNav.hide();
       const mapHint = document.getElementById('fullmap-hover-info');
-      if (open && touchControls.available && mapHint) mapHint.textContent = 'Tap to teleport · Drag to pan · Use + / − to zoom';
+      if (open && touchControls.available && mapHint) mapHint.textContent = t('Tap to teleport · Drag to pan · Use + / − to zoom');
     },
     onTeleport: (x, z) => { if (!race?.blocking) teleportTo(x, z); }
   });
@@ -641,7 +653,7 @@ async function initApp() {
     showBuildingLevel(level);
     rememberBuildingLevel(level);
     const run = ++levelRun;
-    if (levelStatus) levelStatus.textContent = 'Rebuilding the buildings…';
+    if (levelStatus) levelStatus.textContent = t('Rebuilding the buildings…');
     buildingLayer.setLevel(level).finally(() => {
       if (run === levelRun && levelStatus) levelStatus.textContent = '';
     });
@@ -688,7 +700,7 @@ async function initApp() {
       setText(tourEls.title, info.title);
       setText(tourEls.sub, info.sub || '');
       setText(tourEls.caption, info.caption);
-      setText(tourEls.hint, info.loop ? 'Press any key or tap to explore Aalborg yourself' : '');
+      setText(tourEls.hint, info.loop ? t('Press any key or tap to explore Aalborg yourself') : '');
       if (tourEls.bar) tourEls.bar.style.transform = `scaleX(${info.progress || 0})`;
     },
     hideCard: () => { if (tourCard) tourCard.hidden = true; },
@@ -742,12 +754,13 @@ async function initApp() {
     startMode: document.getElementById('race-start-mode')
   };
   const metres = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m / 10) * 10} m`);
+  const modeLabel = (mode) => t(MODE_LABEL[mode] || mode);
   function renderRaceBoard(list, entries, highlight = null) {
     if (!list) return;
     if (!entries.length) {
       const empty = document.createElement('li');
       empty.className = 'race-board-empty';
-      empty.textContent = 'No times yet. Be the first!';
+      empty.textContent = t('No times yet. Be the first!');
       empty.style.display = 'block';
       list.replaceChildren(empty);
       return;
@@ -755,7 +768,7 @@ async function initApp() {
     list.replaceChildren(...entries.map((e) => {
       const li = document.createElement('li');
       if (e === highlight) li.className = 'is-new';
-      li.title = `${MODE_LABEL[e.mode] || e.mode}: ${formatTime(e.time)} (handicapped ${formatTime(e.adjusted)})`;
+      li.title = `${modeLabel(e.mode)}: ${formatTime(e.time)} (${t('handicapped')} ${formatTime(e.adjusted)})`;
       const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       icon.setAttribute('class', 'icon');
       const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
@@ -773,7 +786,7 @@ async function initApp() {
       score.className = 'race-score';
       score.textContent = formatTime(e.adjusted);
       const raw = document.createElement('small');
-      raw.textContent = `${MODE_LABEL[e.mode] || e.mode} ${formatTime(e.time)}`;
+      raw.textContent = `${modeLabel(e.mode)} ${formatTime(e.time)}`;
       score.appendChild(raw);
       li.append(icon, who, score);
       return li;
@@ -786,9 +799,9 @@ async function initApp() {
     showHud(info) {
       if (raceEls.hud) raceEls.hud.hidden = false;
       setText(raceEls.time, formatTime(info.time));
-      setText(raceEls.dist, info.phase === 'running' ? `${metres(info.distance)} to go` : 'Get ready');
+      setText(raceEls.dist, info.phase === 'running' ? `${metres(info.distance)} ${t('to go')}` : t('Get ready'));
       if (!raceEls.count) return;
-      const text = info.phase === 'countdown' ? String(Math.max(1, info.count)) : info.go ? 'GO!' : '';
+      const text = info.phase === 'countdown' ? String(Math.max(1, info.count)) : info.go ? t('GO!') : '';
       raceEls.count.classList.remove('is-msg');
       raceEls.count.hidden = !text;
       setText(raceEls.count, text);
@@ -800,7 +813,7 @@ async function initApp() {
     aborted(reason) {
       if (!raceEls.count) return;
       const why = { mode: 'You changed vehicle', teleport: 'You teleported', idle: 'No input for a while' }[reason];
-      raceEls.count.textContent = why ? `Race cancelled · ${why}` : 'Race cancelled';
+      raceEls.count.textContent = why ? `${t('Race cancelled')} · ${t(why)}` : t('Race cancelled');
       raceEls.count.classList.add('is-msg');
       raceEls.count.hidden = false;
       clearTimeout(raceMsgTimer);
@@ -810,13 +823,13 @@ async function initApp() {
       if (!raceEls.result) return;
       raceEls.result.hidden = false;
       raceEls.result.classList.toggle('is-done', result.rejected); // Race again / Close once there is nothing to save
-      setText(raceEls.mode, `${MODE_LABEL[result.mode] || result.mode} · ${metres(result.length)} route`);
+      setText(raceEls.mode, `${modeLabel(result.mode)} · ${metres(result.length)} ${t('route')}`);
       setText(raceEls.title, formatTime(result.time));
       if (result.rejected) {
-        setText(raceEls.sub, 'That was faster than this vehicle can go: no score this time. Did something glitch?');
+        setText(raceEls.sub, t('That was faster than this vehicle can go: no score this time. Did something glitch?'));
       } else {
-        const pace = result.mode === 'car' ? '' : ` Handicapped to car time: ${formatTime(result.adjusted)}.`;
-        setText(raceEls.sub, `You reached Jomfru Ane Gade!${pace} That puts you #${result.rank} on the list.`);
+        const pace = result.mode === 'car' ? '' : ` ${t('Handicapped to car time: {time}.', { time: formatTime(result.adjusted) })}`;
+        setText(raceEls.sub, `${t('You reached Jomfru Ane Gade!')}${pace} ${t('That puts you #{rank} on the list.', { rank: result.rank })}`);
       }
       raceEls.form.hidden = result.rejected;
       setText(raceEls.msg, '');
@@ -830,7 +843,7 @@ async function initApp() {
     showBoard(top, entry, rank) {
       raceEls.form.hidden = true;
       raceEls.result.classList.add('is-done');
-      setText(raceEls.sub, rank <= top.length ? `Saved: you are #${rank}!` : `Saved: you are #${rank}. Top ${top.length}:`);
+      setText(raceEls.sub, rank <= top.length ? t('Saved: you are #{rank}!', { rank }) : t('Saved: you are #{rank}. Top {n}:', { rank, n: top.length }));
       renderRaceBoard(raceEls.board, top, entry);
     },
     hideResult() {
@@ -855,7 +868,7 @@ async function initApp() {
   document.getElementById('race-skip')?.addEventListener('click', () => { race.dismiss(); raceUi.hideResult(); });
   raceEls.form?.addEventListener('submit', (e) => {
     e.preventDefault();
-    if (!race.submit(raceEls.name.value, raceEls.company.value)) setText(raceEls.msg, 'Please enter a (polite) name');
+    if (!race.submit(raceEls.name.value, raceEls.company.value)) setText(raceEls.msg, t('Please enter a (polite) name'));
     else document.activeElement?.blur?.();
   });
   // typing a name is activity too (the global key handler skips text fields)
@@ -863,7 +876,7 @@ async function initApp() {
   document.getElementById('race-popover')?.addEventListener('beforetoggle', (e) => {
     if (e.newState !== 'open') return;
     const mode = raceMode(controllerManager.activeMode, controllerManager.entities.person.avatar);
-    setText(raceEls.startMode, `Racing as: ${MODE_LABEL[mode]} · switch vehicle first to race another way`);
+    setText(raceEls.startMode, `${t('Racing as')}: ${modeLabel(mode)} · ${t('switch vehicle first to race another way')}`);
     renderRaceBoard(raceEls.boardPop, race.scores.top(10));
   });
   document.getElementById('race-export')?.addEventListener('click', () => {
@@ -933,7 +946,7 @@ async function initApp() {
     e.stopImmediatePropagation();
   }, { capture: true });
 
-  if (query.get('raceReset') === '1' && race.scores.size && window.confirm(`Clear all ${race.scores.size} race highscores on this machine?`)) race.scores.clear();
+  if (query.get('raceReset') === '1' && race.scores.size && window.confirm(t('Clear all {n} race highscores on this machine?', { n: race.scores.size }))) race.scores.clear();
 
   // Global keyboard shortcuts for modes (1-5), cameras (V / 6-0), building level (L) and HUD (H)
   window.addEventListener('keydown', (e) => {
@@ -1019,6 +1032,25 @@ async function initApp() {
   selectMode(controllerManager.activeMode);
   selectCamera('chase', true);
   selectTime('golden');
+
+  // The language toggles (js/i18n.js): DA / EN in the toolbar, Dansk / English on the start screen. The static text is swapped
+  // in place; the text the code wrote is written again
+  document.querySelectorAll('[data-lang-toggle]').forEach((btn) => {
+    btn.addEventListener('click', () => setLang(getLang() === 'da' ? 'en' : 'da'));
+  });
+  onLangChange(() => {
+    translateDocument(document);
+    updateSoundButton();
+    updateHudToggle();
+    if (hintMode) renderControlHints(hintMode);
+    if (elMode) elMode.textContent = t(controllerManager.getActiveEntity().label);
+    if (elCamera) elCamera.textContent = t(cameraSystem.getActivePreset().name);
+    markTime(lightingSystem.activePresetId);
+    if (touchControls.mode) touchControls.setMode(touchControls.mode);
+    locationText = '';
+    mapSystem.refreshLanguage();
+    placeModeIndicator();
+  });
   // the web fonts change the buttons' widths once they arrive
   if (document.fonts) document.fonts.ready.then(placeModeIndicator);
   markInit('ui');
@@ -1026,7 +1058,7 @@ async function initApp() {
   // The loading screen stays up while the shaders compile (precompileShaders() & the warm-up frame, see the loop) and
   // until the first frame is on screen
   if (loadingStatus) {
-    loadingStatus.textContent = 'Compiling Shaders & Render Pipelines...';
+    loadingStatus.textContent = t('Compiling Shaders & Render Pipelines...');
   }
 
   // 6b. compileAsync() uses shared renderer/shader-builder state. Keep calls sequential;
@@ -1087,7 +1119,7 @@ async function initApp() {
       for (const object of job) await compile(object);
       done++;
       if (loadingStatus) {
-        loadingStatus.textContent = `Compiling Shaders & Render Pipelines... ${Math.round((done / jobs.length) * 100)}%`;
+        loadingStatus.textContent = `${t('Compiling Shaders & Render Pipelines...')} ${Math.round((done / jobs.length) * 100)}%`;
       }
       setLoadingProgress(done / jobs.length);
     }

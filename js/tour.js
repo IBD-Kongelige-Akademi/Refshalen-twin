@@ -1,5 +1,6 @@
 import { TELEPORT_LOCATIONS } from './city-config.js';
 import { TOUR_STOPS } from './tour-script.js';
+import { t } from './i18n.js';
 
 // js/tour.js
 // The Kortdage tour (docs/tour.md): from AKKC round the teleport stops and back, one feature of the twin per stop.
@@ -302,19 +303,20 @@ function createTour(deps) {
 
   function card() {
     const stop = stopAt(state.stopIndex);
-    const counter = state.stopIndex === 0 ? 'Start' : state.stopIndex === lastStop ? 'Finish' : `${state.stopIndex} / ${lastStop - 1}`;
-    const info = { kind: state.kind, loop: state.loop, counter, title: stop.title, sub: stop.sub, caption: '', progress: 0, phase: state.phase };
+    const counter = state.stopIndex === 0 ? t('Start') : state.stopIndex === lastStop ? t('Finish') : `${state.stopIndex} / ${lastStop - 1}`;
+    // the script is English; the card shows it in the chosen language (js/i18n.js)
+    const info = { kind: state.kind, loop: state.loop, counter, title: t(stop.title), sub: t(stop.sub), caption: '', progress: 0, phase: state.phase };
     if (state.phase === 'leg') {
       const { direct, route } = legDistance();
       const metres = Math.round(route ? Math.max(route.length, direct * 0.5) : direct);
-      info.title = `Next: ${stop.title}`;
-      info.caption = `Follow the GPS line on the minimap · ${metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${metres} m`}`;
+      info.title = `${t('Next')}: ${t(stop.title)}`;
+      info.caption = `${t('Follow the GPS line on the minimap')} · ${metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${metres} m`}`;
       info.distance = metres;
       return info;
     }
     const beats = beatsOf(stop);
     const beat = beats[state.beatIndex] || beats[0];
-    info.caption = beat?.caption || '';
+    info.caption = t(beat?.caption || '');
     if (state.phase === 'beat' || state.phase === 'arrive') info.progress = Math.min(1, state.t / (beat?.hold || 1));
     else if (state.phase === 'load' || state.phase === 'fadeOut') info.progress = 0;
     return info;
