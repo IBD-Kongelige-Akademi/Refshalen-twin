@@ -6,6 +6,8 @@
 
 const STORAGE_KEY = 'aalborg-lang';
 const LANGS = ['en', 'da'];
+// Danish unless the visitor picked English (or ?lang=en); the source strings stay English
+const DEFAULT_LANG = 'da';
 
 // English -> Danish. Keys are the exact English text (trimmed), as written in index.html (entities decoded) or in the code.
 const DA = {
@@ -456,7 +458,7 @@ function initialLang() {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
     if (LANGS.includes(saved)) return saved;
   } catch { /* storage blocked */ }
-  return 'en';
+  return DEFAULT_LANG;
 }
 
 let lang = initialLang();

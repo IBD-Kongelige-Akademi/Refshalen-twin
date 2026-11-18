@@ -10,7 +10,9 @@ import { TELEPORT_LOCATIONS } from '../js/city-config.js';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const decode = (s) => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
 const places = new Set(Object.values(TELEPORT_LOCATIONS).flatMap((p) => [p.name]));
-const covered = (s) => Object.hasOwn(DA, s) || KEEP.has(s) || places.has(s);
+// the loading screen is written in Danish (it shows before js/i18n.js loads): a Danish text with an English key counts too
+const danish = new Set(Object.values(DA));
+const covered = (s) => Object.hasOwn(DA, s) || danish.has(s) || KEEP.has(s) || places.has(s);
 const missing = (list) => [...new Set(list)].filter((s) => !covered(s));
 
 test('every text and label in index.html has a Danish entry', () => {
@@ -50,9 +52,15 @@ test('the tour, cameras, modes, hints and vehicle labels have Danish entries', (
   }
 });
 
+test('Danish is the default language', () => {
+  assert.equal(getLang(), 'da');
+  assert.equal(t('Explore Aalborg'), 'Udforsk Aalborg');
+});
+
 test('t() switches with the language, fills placeholders and passes unknown text through', () => {
   const seen = [];
   const off = onLangChange((lang) => seen.push(lang));
+  setLang('en');
   assert.equal(getLang(), 'en');
   assert.equal(t('Explore Aalborg'), 'Explore Aalborg');
   assert.equal(t('Saved: you are #{rank}!', { rank: 3 }), 'Saved: you are #3!');
@@ -67,7 +75,7 @@ test('t() switches with the language, fills placeholders and passes unknown text
   assert.equal(translatePhrases('outfit'), 'outfit', 'whole words only');
   setLang('en');
   assert.equal(translatePhrases('observed 2025, sunlit'), 'observed 2025, sunlit');
-  assert.deepEqual(seen, ['da', 'en']);
+  assert.deepEqual(seen, ['en', 'da', 'en']);
   off();
 });
 

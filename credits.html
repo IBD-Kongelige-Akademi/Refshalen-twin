@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="da">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aalborg Twin – Credits</title>
+  <title>Aalborg Twin – Kreditering</title>
   <style>
     :root { --bg: #ffffff; --ink: #06182e; --muted: #4f5d6e; --line: #d8e2ec; --accent: #009df0; --link: #0077c0; }
     @media (prefers-color-scheme: dark) { :root { --bg: #051529; --ink: #ffffff; --muted: #9db0c6; --line: #16314f; --link: #5cc4ff; } }
@@ -28,8 +28,8 @@
 </head>
 <body>
 <main>
-<div class="lang-bar"><button id="lang-toggle" type="button" lang="da">Dansk</button></div>
-<div data-lang="en">
+<div class="lang-bar"><button id="lang-toggle" type="button" lang="en">English</button></div>
+<div data-lang="en" lang="en" hidden>
   <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – credits</h1></header>
   <p class="muted">A playable model of central Aalborg built from open Danish geodata, sponsored by Ramboll. <a class="back" href="./">← Back to the city</a></p>
 
@@ -96,7 +96,7 @@
   <p>The code is available under the MIT License. Data derived from OpenStreetMap stays under the ODbL, and the rest of the data keeps the licence of its source.</p>
 </div>
 
-<div data-lang="da" lang="da" hidden>
+<div data-lang="da" lang="da">
   <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – kreditering</h1></header>
   <p class="muted">En spilbar model af det centrale Aalborg bygget af åbne danske geodata, sponsoreret af Ramboll. <a class="back" href="./">← Tilbage til byen</a></p>
 
@@ -167,10 +167,10 @@
   // English or Danish, as chosen in the twin (js/i18n.js keeps it under the same key) or with ?lang=da|en
   (function () {
     var KEY = 'aalborg-lang';
-    var lang = 'en';
-    try { lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem(KEY) || 'en'; } catch (e) {}
+    var lang = 'da'; // Danish unless English was picked
+    try { lang = new URLSearchParams(location.search).get('lang') || localStorage.getItem(KEY) || 'da'; } catch (e) {}
     function apply(next) {
-      lang = next === 'da' ? 'da' : 'en';
+      lang = next === 'en' ? 'en' : 'da';
       document.documentElement.lang = lang;
       document.querySelectorAll('[data-lang]').forEach(function (el) { el.hidden = el.getAttribute('data-lang') !== lang; });
       document.title = lang === 'da' ? 'Aalborg Twin – Kreditering' : 'Aalborg Twin – Credits';

@@ -4,6 +4,9 @@ import test from 'node:test';
 import { TELEPORT_LOCATIONS } from '../js/city-config.js';
 import { TOUR_STOPS } from '../js/tour-script.js';
 import { createTour, tourDuration, beatsFor, shotPose, ARRIVE_RADIUS } from '../js/tour.js';
+import { setLang } from '../js/i18n.js';
+
+setLang('en'); // the card texts below are checked in English (the default is Danish, tests/i18n.test.mjs)
 
 const camerasSource = readFileSync(new URL('../js/cameras.js', import.meta.url), 'utf8');
 const cameraIds = new Set([...camerasSource.matchAll(/\{ id: '([\w-]+)'/g)].map((m) => m[1]));
