@@ -277,3 +277,25 @@ test('a collision rumbles the pad; a second hit right after only when clearly ha
   h.clock.t += 300;
   assert.equal(h.controls.rumbleImpact(10, 'building'), false);
 });
+
+test('driving, the left stick only steers (full range past the dead zone) and the triggers alone drive', () => {
+  for (const mode of ['car', 'bus', 'cyclist', 'cargobike']) {
+    const h = harness({ mode });
+    h.frame();
+    h.pad.axes[0] = -0.575; // halfway between the dead zone and full left
+    h.pad.axes[1] = -0.9; // pushed forward too, as a thumb does while steering
+    h.frame();
+    assert.ok(Math.abs(h.inputs.left - 0.5) < 1e-9, `${mode}: steers half left (${h.inputs.left})`);
+    assert.equal(h.inputs.forward, 0, `${mode}: the stick does not accelerate`);
+    h.press(RT, 0.6);
+    h.press(LT, 0.2);
+    h.frame();
+    assert.ok(Math.abs(h.inputs.forward - 0.4) < 1e-9, `${mode}: RT minus LT drives`);
+  }
+  // on foot the stick still walks
+  const walk = harness({ mode: 'person' });
+  walk.frame();
+  walk.pad.axes[1] = -0.9;
+  walk.frame();
+  assert.ok(walk.inputs.forward > 0.8);
+});

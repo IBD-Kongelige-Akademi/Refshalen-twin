@@ -105,7 +105,7 @@ class TouchControls {
       const action = button.getAttribute('data-touch-action');
       button.hidden = (action === 'up' && mode !== 'person' && mode !== 'drone')
         || (action === 'down' && mode !== 'drone')
-        || (action === 'boost' && mode === 'bus'); // the bus has no boost
+        || (action === 'boost' && (mode === 'bus' || mode === 'car')); // the bus and the car have no boost
       button.setAttribute('aria-label', this.translate(labels[action]));
       const label = this.root.querySelector(`[data-touch-label="${action}"]`);
       if (label) label.textContent = this.translate(labels[action]);

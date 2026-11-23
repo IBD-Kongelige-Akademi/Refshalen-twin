@@ -311,7 +311,7 @@ async function initApp() {
   // Keyboard guide for each mode: [keys, action]
   const controlHints = {
     person: [[['W', 'S'], 'Walk'], [['A', 'D'], 'Turn'], [['Shift'], 'Sprint'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
-    car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['Shift'], 'Boost'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
+    car: [[['W', 'S'], 'Drive / Reverse'], [['A', 'D'], 'Steer'], [['B'], 'Horn'], [['Drag'], 'Orbit']],
     skate: [[['W', 'S'], 'Push / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Push hard'], [['Space'], 'Jump'], [['Drag'], 'Orbit']],
     cyclist: [[['W', 'S'], 'Pedal / Brake'], [['A', 'D'], 'Lean & Turn'], [['Shift'], 'Sprint'], [['Drag'], 'Orbit']],
     drone: [[['W', 'S'], 'Fly'], [['A', 'D'], 'Yaw'], [['Space', 'E'], 'Climb / Take off'], [['Q', 'C'], 'Descend / Land'], [['Shift'], 'Sport']],
@@ -1300,7 +1300,7 @@ async function initApp() {
       const bikeBoosting = (mode === 'cyclist' || mode === 'cargobike') && controllerManager.keys.boost;
       const speedCap = bikeBoosting ? 30 : topSpeedKmh[mode] || 130;
       if (elSpeedMeter) elSpeedMeter.style.transform = `scaleX(${Math.min(1, kmh / speedCap)})`;
-      document.body.classList.toggle('is-boosting', controllerManager.keys.boost && kmh > 0);
+      document.body.classList.toggle('is-boosting', controllerManager.keys.boost && kmh > 0 && mode !== 'car' && mode !== 'bus');
       if (elAltitude) elAltitude.textContent = altM.toLocaleString('en-US');
       // The street corner of the player on the follow cameras, of the camera itself on the scenic ones
       const where = cameraSystem.getActivePreset().category === 'follow' ? activeEnt.position : cameraSystem.currentPos;

@@ -7,11 +7,12 @@ const SIGNAL_RANGE = 35;
 const unit = (value) => Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
 const seedAt = (index) => ((Math.imul(index + 1, 2654435761) >>> 0) / 4294967296);
 
-function driveLoad(keys, speed, cyclist) {
+function driveLoad(keys, speed, cyclist, car = false) {
   // Match the controller's forward priority, and distinguish propulsion from braking.
   const throttle = unit(+keys.forward) || -unit(+keys.backward) * (cyclist ? 0.6 : 1);
   if ((cyclist && throttle <= 0) || speed * throttle < 0) return 0;
-  return unit(Math.abs(throttle) * (cyclist || keys.boost ? 1 : 0.8));
+  // (the car has no boost: its full throttle is full load, slop-newyork 398f9c9)
+  return unit(Math.abs(throttle) * (cyclist || car || keys.boost ? 1 : 0.8));
 }
 
 // The drone's controller keeps its own motor load (0 standing, ~0.45 hovering, up to 1 climbing at full speed) and vertical speed
@@ -177,7 +178,7 @@ class CityAudioSources {
         const drone = kind === 'drone';
         const verticalSpeed = player && drone ? droneVerticalSpeed(entity) : 0;
         // a drone left hovering keeps buzzing; one standing is silent
-        const load = drone ? droneLoad(entity) : player ? driveLoad(keys, entity.speed, bicycle) : 0;
+        const load = drone ? droneLoad(entity) : player ? driveLoad(keys, entity.speed, bicycle, entity.type === 'car') : 0;
         const gain = player ? 1 : drone ? 0.5 : 0.5;
         const range = drone ? DRONE_RANGE : 160;
         this.motor(entity, kind, x, y + (drone ? 0.16 : 0.7), z, player ? entity.speed : 0, load, entity.heading,

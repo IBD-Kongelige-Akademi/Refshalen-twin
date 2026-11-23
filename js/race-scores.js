@@ -5,7 +5,7 @@
 // Pure: storage is injected, so tests/race-scores.test.mjs runs without a browser.
 
 // Reference speeds in m/s: about what a good run averages through the old town in each mode (top speeds in js/controllers.js:
-// car 23.5 / boost 36, bus 19.4, bikes 6.9 / 8.3, walk 4.4 / sprint 8.2, skates 7.8, board 8.6, drone 16.7 / sport 20.8).
+// car 36 (no boost), bus 19.4, bikes 6.9 / 8.3, walk 4.4 / sprint 8.2, skates 7.8, board 8.6, drone 16.7 / sport 20.8).
 // The one place to tune the fairness: raise a mode's speed if it wins too easily, lower it if it cannot compete.
 export const REF_SPEED = {
   car: 17,

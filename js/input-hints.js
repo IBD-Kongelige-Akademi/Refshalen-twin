@@ -28,7 +28,7 @@ function padLabel(family, key) {
 const PAD_HINTS = {
   person: [[['LS'], 'Walk & turn'], [['X'], 'Sprint'], [['A'], 'Jump'], [['Y'], 'Walker'], [['RS'], 'Look']],
   skate: [[['LS'], 'Push & lean'], [['X'], 'Push hard'], [['A'], 'Jump'], [['Y'], 'Walker'], [['RS'], 'Look']],
-  car: [[['RT', 'LT'], 'Drive / Reverse'], [['LS'], 'Steer'], [['X'], 'Boost'], [['L3'], 'Horn'], [['RS'], 'Look']],
+  car: [[['RT', 'LT'], 'Drive / Reverse'], [['LS'], 'Steer'], [['L3'], 'Horn'], [['RS'], 'Look']],
   cyclist: [[['RT', 'LT'], 'Pedal / Brake'], [['LS'], 'Lean & turn'], [['X'], 'Sprint'], [['Y'], 'Bike'], [['RS'], 'Look']],
   drone: [[['LS'], 'Fly & yaw'], [['RT', 'LT'], 'Climb / Descend'], [['X'], 'Sport'], [['RS'], 'Look']],
   bus: [[['RT', 'LT'], 'Drive / Brake'], [['LS'], 'Steer'], [['L3'], 'Horn'], [['RS'], 'Look']]

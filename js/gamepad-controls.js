@@ -32,6 +32,12 @@ function axis(value) {
   return Number.isFinite(value) ? Math.max(-1, Math.min(1, value)) : 0;
 }
 
+// One axis with the dead zone taken out, rescaled to the full range: steering (from slop-newyork 67ef6be)
+function steeringAxis(value) {
+  const v = axis(value);
+  return Math.sign(v) * Math.max(0, (Math.abs(v) - DEAD_ZONE) / (1 - DEAD_ZONE));
+}
+
 function stick(pad, offset) {
   const x = axis(pad.axes?.[offset]), y = axis(pad.axes?.[offset + 1]);
   const distance = Math.hypot(x, y);
@@ -242,7 +248,12 @@ class GamepadControls {
     if (cycleSubtype) this.callbacks.onCycleSubtype?.();
     if (revision !== this.revision) return;
 
-    const movement = stick(pad, 0), look = stick(pad, 2);
+    const mode = this.controller.activeMode;
+    // Driving, the left stick only steers and the triggers alone drive and brake, so a stick pushed off-centre while
+    // steering does not also accelerate (slop-newyork 67ef6be)
+    const driving = mode === 'car' || mode === 'bus' || mode === 'cyclist' || mode === 'cargobike';
+    const movement = driving ? { x: steeringAxis(pad.axes?.[0]), y: 0 } : stick(pad, 0);
+    const look = stick(pad, 2);
     // Right stick pressed in: up / down zoom (the camera keeps its pitch); a quick press without zooming recenters
     let zoom = 0;
     if (held(R3)) {
@@ -255,11 +266,10 @@ class GamepadControls {
       this.r3DownAt = null;
       this.r3Zoomed = false;
     }
-    const mode = this.controller.activeMode;
     let drive = -movement.y;
     let vertical = 0;
-    if (mode === 'car' || mode === 'bus' || mode === 'cyclist' || mode === 'cargobike') {
-      drive = Math.max(0, drive, buttonValue(pad, RT)) - Math.max(0, -drive, buttonValue(pad, LT));
+    if (driving) {
+      drive = buttonValue(pad, RT) - buttonValue(pad, LT);
     } else if (mode === 'drone') {
       vertical = buttonValue(pad, RT) - buttonValue(pad, LT);
     }

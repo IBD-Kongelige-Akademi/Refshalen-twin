@@ -1280,7 +1280,8 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
   col = mix(col, alloyCol, isAlloy);
   col = mix(col, tyreCol, isTyre);
   const sign = spec.taxiSign ? taxiSignLayout(spec) : null;
-  const signFace = isSign.mul(step(0.5, n.z)).mul(state.w);
+  const signOn = fixed ? float(0) : state.w; // (on the player's car the fourth component is its reverse lamps)
+  const signFace = isSign.mul(step(0.5, n.z)).mul(signOn);
   const signColor = sign ? texture(taxiSignTexture(), vec2(p.x.div(sign.width).add(0.5), p.y.sub(sign.y).div(sign.height).add(0.5))).rgb : color(0x161b19);
   col = mix(col, mix(color(0x161b19), signColor, signFace), isSign);
 
@@ -1298,7 +1299,7 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
   metal = mix(metal, float(0.08), plates);
   metal = mix(metal, float(0.04), matte);
 
-  // ---- Emissive: running lights, tail / brake lights & CHMSL, turn signals -----------------------------------
+  // ---- Emissive: running, brake, reverse & turn lights, CHMSL ------------------------------------------------
   const brake = state.x;
   const blink = max(state.y.mul(step(0.0, p.x)), state.z.mul(step(p.x, 0.0)));
   const nightHeadlamp = smoothstep(0.60, 1.15, cityUniforms.uInteriorGlow);
@@ -1317,7 +1318,9 @@ function createLoftedCarMaterial(spec, fixedColorHex = null) {
   mat.metalnessNode = metal;
   mat.emissiveNode = headlamps.add(tail).add(stop).add(turn).add(signColor.mul(signFace).mul(nightHeadlamp.mul(0.8).add(0.15)));
   // positionNode runs after instancing; mask unused signs without resetting the chassis to model space.
-  if (spec.taxiSign) mat.maskNode = isSign.mul(one.sub(state.w)).lessThan(0.5);
+  if (spec.taxiSign) mat.maskNode = isSign.mul(one.sub(signOn)).lessThan(0.5);
+  // the player's car: reverse lamps from its state's fourth component (slop-newyork 21f6dde)
+  if (fixed) mat.emissiveNode = mat.emissiveNode.add(color(0xf0f6ff).mul(tailLens).mul(reverseRearSection).mul(state.w).mul(1.8));
 
   _carMaterialCache.set(cacheKey, mat);
   return mat;
