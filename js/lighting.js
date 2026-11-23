@@ -16,7 +16,10 @@ import {
   max,
   exp,
   abs,
-  select
+  select,
+  inverseSqrt,
+  output,
+  renderGroup
 } from 'three/tsl';
 import { SkyMesh } from 'three/addons/objects/SkyMesh.js';
 import { SunLight } from 'three/addons/lights/SunLight.js';
@@ -194,6 +197,53 @@ function parseLightingQuery(search) {
   };
 }
 
+// SkyMesh's turbidity is deprecated (three.js r188) and stays at its default, 2: a preset's turbidity is folded into its
+// mieCoefficient instead, which keeps the haze it had (slop-newyork b0af388)
+const foldTurbidity = (mieCoefficient, turbidity) => mieCoefficient * turbidity / 2;
+// The forward peak of the haze's in-scattering (see createAerialFogNode)
+const HAZE_MIE_G = 0.7;
+
+// A lighting state that blends into another (see LightingSystem.presetState, transitionTo): its colours (linear), the sun's
+// direction and the amounts
+const COLOR_KEYS = ['sunLightColor', 'sunColor', 'hemiSky', 'hemiGround', 'skyTop', 'skyHorizon', 'fogColor'];
+const AMOUNT_KEYS = ['sunIntensity', 'hemiIntensity', 'fogDensity', 'cloudCoverage', 'cloudDensity', 'rayleigh', 'mieCoefficient',
+  'mieDirectionalG', 'skySaturation', 'nightFactor', 'interiorGlow', 'roadWetness', 'canyonBounce', 'envIntensity',
+  'fogMaxLuminance', 'fogSkyRoughness'];
+
+function lightingState() {
+  const st = { sun: null, sunDir: new THREE.Vector3(0, 1, 0), skyExposure: 1 };
+  for (const k of COLOR_KEYS) st[k] = new THREE.Color();
+  for (const k of AMOUNT_KEYS) st[k] = 0;
+  return st;
+}
+
+function copyState(a, out) {
+  out.sun = a.sun;
+  out.sunDir.copy(a.sunDir);
+  out.skyExposure = a.skyExposure;
+  for (const k of COLOR_KEYS) out[k].copy(a[k]);
+  for (const k of AMOUNT_KEYS) out[k] = a[k];
+  return out;
+}
+
+// From unit vector a towards b, along the sky
+function slerpDirection(a, b, t, out) {
+  const angle = Math.acos(Math.min(1, Math.max(-1, a.dot(b))));
+  const s = Math.sin(angle);
+  if (s < 1e-4) return out.copy(t < 0.5 ? a : b);
+  return out.copy(a).multiplyScalar(Math.sin((1 - t) * angle) / s).addScaledVector(b, Math.sin(t * angle) / s);
+}
+
+// t of the way from a to b: colours and amounts linearly, the sun along the sky, the sky's exposure on a log scale
+function blendStates(a, b, t, out) {
+  for (const k of COLOR_KEYS) out[k].copy(a[k]).lerp(b[k], t);
+  for (const k of AMOUNT_KEYS) out[k] = a[k] + (b[k] - a[k]) * t;
+  out.skyExposure = a.skyExposure * Math.pow(b.skyExposure / a.skyExposure, t);
+  slerpDirection(a.sunDir, b.sunDir, t, out.sunDir);
+  out.sun = b.sun; // (the clock and the sun's position report where it is going)
+  return out;
+}
+
 class LightingSystem {
   constructor(scene, renderer = null) {
     this.scene = scene;
@@ -227,9 +277,8 @@ class LightingSystem {
     // whatever its size)
     this.sky = new SkyMesh();
     this.sky.scale.setScalar(200000);
-    this.sky.turbidity.value = 8.0;
     this.sky.rayleigh.value = 2.8;
-    this.sky.mieCoefficient.value = 0.008;
+    this.sky.mieCoefficient.value = 0.008 * 8.0 / 2; // (turbidity 8 folded in, see foldTurbidity)
     this.sky.mieDirectionalG.value = 0.88;
     this.sky.cloudScale.value = 0.00018;
     this.sky.cloudSpeed.value = 0.000015;
@@ -242,8 +291,16 @@ class LightingSystem {
     this.uNightFactor = uniform(0.0);
     this.uNightSkyColor = uniform(new THREE.Color(0x0b1528));
     this.uSkySaturation = uniform(0.72);
-    this.uFogMaxLuminance = uniform(DEFAULT_FOG_MAX_LUMINANCE);
-    this.uFogSkyRoughness = uniform(DEFAULT_FOG_SKY_ROUGHNESS);
+    this.uFogMaxLuminance = uniform(DEFAULT_FOG_MAX_LUMINANCE).setGroup(renderGroup);
+    this.uFogSkyRoughness = uniform(DEFAULT_FOG_SKY_ROUGHNESS).setGroup(renderGroup);
+    // The direct light the aerial haze scatters toward the eye (see createAerialFogNode, slop-newyork e9a03bd)
+    this.uHazeSunDir = uniform(new THREE.Vector3(0, 1, 0)).setGroup(renderGroup);
+    this.uHazeSunColor = uniform(new THREE.Color(0x000000)).setGroup(renderGroup);
+    // What is shown, and a change of time of day under way (blending `from` into `to`, see transitionTo)
+    this.state = lightingState();
+    this.from = lightingState();
+    this.to = lightingState();
+    this.transition = null;
     const rawSkyNode = this.sky.material.colorNode;
     this.sky.material.colorNode = Fn(() => {
       const dayCol = rawSkyNode.rgb.mul(this.uSkyExposure);
@@ -253,16 +310,6 @@ class LightingSystem {
       const finalSky = mix(paleDayCol, this.uNightSkyColor, this.uNightFactor);
       return vec4(finalSky, float(1.0));
     })();
-
-    // In reversedDepthBuffer mode ([1..0]), camera.far is z = 0.0 (whereas SkyMesh defaults to z = w)
-    if (renderer && renderer.reversedDepthBuffer) {
-      const rawSkyVertexNode = this.sky.material.vertexNode;
-      this.sky.material.vertexNode = Fn(() => {
-        const pos = rawSkyVertexNode.toVar();
-        pos.z.assign(0.0);
-        return pos;
-      })();
-    }
 
     this.scene.add(this.sky);
 
@@ -299,8 +346,8 @@ class LightingSystem {
 
     // Sky-matched aerial perspective (replaces the flat FogExp2 colour): distant surfaces fade into a diffuse baked-sky
     // sample just above the horizon through an exponential haze layer, so elevated views stay clearer than the horizon.
-    this.uFogDensity = uniform(this.currentFogDensity || TIME_PRESETS.golden.fogDensity);
-    this.uFogHeight = uniform(900.0);
+    this.uFogDensity = uniform(this.currentFogDensity || TIME_PRESETS.golden.fogDensity).setGroup(renderGroup);
+    this.uFogHeight = uniform(900.0).setGroup(renderGroup);
     if (this.envRenderTarget) this.scene.fogNode = this.createAerialFogNode();
   }
 
@@ -336,7 +383,15 @@ class LightingSystem {
     const eb = exp(yb.div(H).negate());
     const meanDensity = select(abs(dy).greaterThan(1.0), ea.sub(eb).mul(H).div(dy), ea);
     const tau = this.uFogDensity.mul(dist).mul(meanDensity);
-    return fog(skyColor, fogAttenuation(tau));
+    const factor = fogAttenuation(tau);
+    // Sunlight the haze along the view ray scatters toward the eye, with a forward-peaked Mie phase (Henyey-Greenstein):
+    // the air glows down a street that faces a low sun, from a few hundred metres on; further out the sky-coloured fog,
+    // which carries the sun's glow already, takes over (slop-newyork e9a03bd / a79eadf)
+    const g = HAZE_MIE_G;
+    const k = float(1 + g * g).sub(dot(dir, this.uHazeSunDir).mul(2 * g));
+    const phase = inverseSqrt(k.mul(k).mul(k)).mul((1 - g * g) / (4 * Math.PI));
+    const inscatter = this.uHazeSunColor.mul(phase).mul(float(1.0).sub(exp(tau.negate()))).mul(float(1.0).sub(factor));
+    return Fn(() => vec4(mix(output.rgb, skyColor, factor).add(inscatter), output.a))();
   }
 
   bakeEnvironmentMap() {
@@ -353,77 +408,119 @@ class LightingSystem {
     this.scene.add(this.sky);
   }
 
-  applyPreset(presetId, force = false) {
-    const p = TIME_PRESETS[presetId] || TIME_PRESETS.golden;
-    if (!force && this.activePresetId === p.id && this.envRenderTarget !== null) {
-      return;
-    }
-    this.activePresetId = p.id;
-
+  // The lighting state of preset p: its mood, under the sun of the date and time shown, clear or overcast, at the wetness set
+  presetState(p, out = lightingState()) {
     const sun = this.getPresetSun(p);
     const overcast = this.skyMode === 'overcast';
     const overcastDaylight = overcast && sun.position.elevation > 0;
-    const sunVector = new THREE.Vector3(sun.direction.x, sun.direction.y, sun.direction.z);
     const sunFactor = sun.position.elevation > 0 ? (overcast ? 0.4 : 1) : 0;
-    const sunIntensity = p.sunIntensity * sunFactor;
-    const sunColor = new THREE.Color(p.sunColor).multiplyScalar(sunFactor);
-    const hemiSky = overcastDaylight ? 0xc4cdd4 : p.hemiSky;
-    const hemiGround = overcastDaylight ? 0x898b88 : p.hemiGround;
-    const hemiIntensity = overcastDaylight ? Math.max(1.9, p.hemiIntensity * 1.3) : p.hemiIntensity;
-    const skyTop = overcastDaylight ? 0xaab6bf : p.skyTop;
-    const skyHorizon = overcastDaylight ? 0xc9ced1 : p.skyHorizon;
-    const fogColor = overcastDaylight ? 0xc0c7ca : p.fogColor;
-    const fogDensity = overcast ? 0.0004 : p.fogDensity;
-    const cloudCoverage = overcast ? 0.78 : p.cloudCoverage;
-    const cloudDensity = overcast ? 0.6 : p.cloudDensity;
-    const turbidity = overcastDaylight ? Math.max(8, p.turbidity) : p.turbidity;
-    const rayleigh = overcastDaylight ? p.rayleigh * 0.75 : p.rayleigh;
     const clearMidday = p.id === 'midday' && !overcast;
-    const mieCoefficient = clearMidday ? 0.0035 : p.mieCoefficient;
-    const wetness = this.wetnessOverride ?? (overcast ? 0.35 : p.roadWetness);
-    this.currentSunPosition = sun.position;
-    this.currentSunDateTime = sun.instant;
-    this.currentFogDensity = fogDensity;
-    this.uFogMaxLuminance.value = clearMidday ? CLEAR_MIDDAY_FOG_MAX_LUMINANCE : DEFAULT_FOG_MAX_LUMINANCE;
-    this.uFogSkyRoughness.value = clearMidday ? CLEAR_MIDDAY_FOG_SKY_ROUGHNESS : DEFAULT_FOG_SKY_ROUGHNESS;
+    out.sun = sun;
+    out.sunDir.set(sun.direction.x, sun.direction.y, sun.direction.z);
+    out.sunLightColor.setHex(p.sunColor);
+    out.sunIntensity = p.sunIntensity * sunFactor;
+    out.sunColor.setHex(p.sunColor).multiplyScalar(sunFactor);
+    out.hemiSky.setHex(overcastDaylight ? 0xc4cdd4 : p.hemiSky);
+    out.hemiGround.setHex(overcastDaylight ? 0x898b88 : p.hemiGround);
+    out.hemiIntensity = overcastDaylight ? Math.max(1.9, p.hemiIntensity * 1.3) : p.hemiIntensity;
+    out.skyTop.setHex(overcastDaylight ? 0xaab6bf : p.skyTop);
+    out.skyHorizon.setHex(overcastDaylight ? 0xc9ced1 : p.skyHorizon);
+    out.fogColor.setHex(overcastDaylight ? 0xc0c7ca : p.fogColor);
+    out.fogDensity = overcast ? 0.0004 : p.fogDensity;
+    out.cloudCoverage = overcast ? 0.78 : p.cloudCoverage;
+    out.cloudDensity = overcast ? 0.6 : p.cloudDensity;
+    const turbidity = overcastDaylight ? Math.max(8, p.turbidity) : p.turbidity;
+    out.rayleigh = overcastDaylight ? p.rayleigh * 0.75 : p.rayleigh;
+    out.mieCoefficient = foldTurbidity(clearMidday ? 0.0035 : p.mieCoefficient, turbidity);
+    out.mieDirectionalG = p.mieDirectionalG;
+    out.skyExposure = p.skyExposure;
+    out.skySaturation = overcastDaylight ? 0.54 : (p.id === 'twilight' ? 0.58 : (p.nightFactor > 0 ? 0.82 : 0.72));
+    out.nightFactor = p.nightFactor;
+    out.interiorGlow = p.interiorGlow;
+    out.roadWetness = this.wetnessOverride ?? (overcast ? 0.35 : p.roadWetness);
+    out.canyonBounce = p.canyonBounce;
+    out.envIntensity = p.envIntensity * (overcastDaylight ? 1.12 : 1);
+    out.fogMaxLuminance = clearMidday ? CLEAR_MIDDAY_FOG_MAX_LUMINANCE : DEFAULT_FOG_MAX_LUMINANCE;
+    out.fogSkyRoughness = clearMidday ? CLEAR_MIDDAY_FOG_SKY_ROUGHNESS : DEFAULT_FOG_SKY_ROUGHNESS;
+    return out;
+  }
 
-    this.sunLight.color.setHex(p.sunColor);
-    this.sunLight.intensity = sunIntensity;
-    this.sunLight.position.copy(sunVector);
+  // Show a preset at once
+  applyPreset(presetId, force = false) {
+    const p = TIME_PRESETS[presetId] || TIME_PRESETS.golden;
+    if (!force && this.activePresetId === p.id && !this.transition && this.envRenderTarget !== null) {
+      return;
+    }
+    // (the sky mode or the wetness changed while a change to this preset is under way: it carries on, to the new state)
+    if (this.transition && this.activePresetId === p.id) {
+      this.presetState(p, this.to);
+      return;
+    }
+    this.activePresetId = p.id;
+    this.transition = null;
+    this.applyState(this.presetState(p, this.state));
+  }
+
+  // Change to a preset over `seconds`, from what is shown now: lights, sky, fog and the city's uniforms ease across
+  // (slop-newyork e4de807); the sun moves along the sky
+  transitionTo(presetId, seconds = 2) {
+    const p = TIME_PRESETS[presetId] || TIME_PRESETS.golden;
+    if (!(seconds > 0) || !this.state.sun) { // (nothing shown yet: there is nothing to blend from)
+      this.applyPreset(p.id, true);
+      return;
+    }
+    copyState(this.state, this.from);
+    this.presetState(p, this.to);
+    this.activePresetId = p.id;
+    this.transition = { start: performance.now(), seconds, baked: -Infinity };
+  }
+
+  applyState(st, bake = true) {
+    this.currentSunPosition = st.sun.position;
+    this.currentSunDateTime = st.sun.instant;
+    this.currentFogDensity = st.fogDensity;
+    this.uFogMaxLuminance.value = st.fogMaxLuminance;
+    this.uFogSkyRoughness.value = st.fogSkyRoughness;
+    // the haze scatters the direct sunlight (none once the sun has set)
+    this.uHazeSunDir.value.copy(st.sunDir);
+    this.uHazeSunColor.value.copy(st.sunLightColor).multiplyScalar(st.sunIntensity * 0.5);
+
+    this.sunLight.color.copy(st.sunLightColor);
+    this.sunLight.intensity = st.sunIntensity;
+    this.sunLight.position.copy(st.sunDir);
     this.sunLight.updateMatrixWorld();
 
-    this.hemiLight.color.setHex(hemiSky);
-    this.hemiLight.groundColor.setHex(hemiGround);
-    this.hemiLight.intensity = hemiIntensity;
+    this.hemiLight.color.copy(st.hemiSky);
+    this.hemiLight.groundColor.copy(st.hemiGround);
+    this.hemiLight.intensity = st.hemiIntensity;
 
-    this.scene.fog.color.setHex(fogColor);
-    this.scene.fog.density = fogDensity;
-    if (this.uFogDensity) this.uFogDensity.value = fogDensity;
+    this.scene.fog.color.copy(st.fogColor);
+    this.scene.fog.density = st.fogDensity;
+    if (this.uFogDensity) this.uFogDensity.value = st.fogDensity;
 
-    // Update physical Preetham SkyMesh uniforms
-    this.sky.turbidity.value = turbidity;
-    this.sky.rayleigh.value = rayleigh;
-    this.sky.mieCoefficient.value = mieCoefficient;
-    this.sky.mieDirectionalG.value = p.mieDirectionalG;
-    this.sky.cloudCoverage.value = cloudCoverage;
-    this.sky.cloudDensity.value = cloudDensity;
-    this.sky.sunPosition.value.copy(sunVector);
-    this.uSkyExposure.value = p.skyExposure;
-    this.uSkySaturation.value = overcastDaylight ? 0.54 : (p.id === 'twilight' ? 0.58 : (p.nightFactor > 0 ? 0.82 : 0.72));
-    this.uNightFactor.value = p.nightFactor;
+    // Update physical Preetham SkyMesh uniforms (its turbidity is folded into mieCoefficient, see foldTurbidity)
+    this.sky.rayleigh.value = st.rayleigh;
+    this.sky.mieCoefficient.value = st.mieCoefficient;
+    this.sky.mieDirectionalG.value = st.mieDirectionalG;
+    this.sky.cloudCoverage.value = st.cloudCoverage;
+    this.sky.cloudDensity.value = st.cloudDensity;
+    this.sky.sunPosition.value.copy(st.sunDir);
+    this.uSkyExposure.value = st.skyExposure;
+    this.uSkySaturation.value = st.skySaturation;
+    this.uNightFactor.value = st.nightFactor;
 
-    cityUniforms.uSunColor.value.copy(sunColor);
-    cityUniforms.uSkyTopColor.value.setHex(skyTop);
-    cityUniforms.uSkyHorizonColor.value.setHex(skyHorizon);
-    cityUniforms.uSkySunDir.value.copy(sunVector);
-    cityUniforms.uInteriorGlow.value = p.interiorGlow;
-    cityUniforms.uRoadWetness.value = wetness;
+    cityUniforms.uSunColor.value.copy(st.sunColor);
+    cityUniforms.uSkyTopColor.value.copy(st.skyTop);
+    cityUniforms.uSkyHorizonColor.value.copy(st.skyHorizon);
+    cityUniforms.uSkySunDir.value.copy(st.sunDir);
+    cityUniforms.uInteriorGlow.value = st.interiorGlow;
+    cityUniforms.uRoadWetness.value = st.roadWetness;
     if (cityUniforms.uCanyonBounce) {
-      cityUniforms.uCanyonBounce.value = p.canyonBounce;
+      cityUniforms.uCanyonBounce.value = st.canyonBounce;
     }
 
-    this.scene.environmentIntensity = p.envIntensity * (overcastDaylight ? 1.12 : 1);
-    this.bakeEnvironmentMap();
+    this.scene.environmentIntensity = st.envIntensity;
+    if (bake) this.bakeEnvironmentMap();
   }
 
   setSkyMode(mode) {
@@ -434,6 +531,16 @@ class LightingSystem {
   }
 
   update(focusPos) {
+    if (this.transition) {
+      // eased in and out. Baking the sky's environment map (the fog's colour too) takes a few ms of GPU time: during a change
+      // it is baked 15 times a second, and on arrival
+      const now = performance.now();
+      const t = Math.min(1, (now - this.transition.start) / (this.transition.seconds * 1000));
+      const bake = t >= 1 || now - this.transition.baked >= 1000 / 15;
+      this.applyState(blendStates(this.from, this.to, t * t * (3 - 2 * t), this.state), bake);
+      if (bake) this.transition.baked = now;
+      if (t >= 1) this.transition = null;
+    }
     // SunLightShadow fits and texel-snaps its 2 cascades to the view camera frustum.
     // A 400 m floor reaches long late-October shadows while keeping the near cascade close to its former span.
     const altitude = focusPos && Number.isFinite(focusPos.y) ? Math.max(0, focusPos.y) : 0;

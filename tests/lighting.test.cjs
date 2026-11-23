@@ -8,6 +8,9 @@ const root = join(__dirname, '..');
 const sunSource = readFileSync(join(root, 'js/sun-position.js'), 'utf8');
 const lightingSource = readFileSync(join(root, 'js/lighting.js'), 'utf8');
 
+// the clock the lighting's time-of-day blends run on (performance.now in the browser)
+const testClock = { t: 0, now() { return this.t; } };
+
 class Vector3 {
   constructor(x = 0, y = 0, z = 0) { this.set(x, y, z); }
   set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
@@ -16,6 +19,12 @@ class Vector3 {
     const length = Math.hypot(this.x, this.y, this.z) || 1;
     return this.set(this.x / length, this.y / length, this.z / length);
   }
+  clone() { return new Vector3(this.x, this.y, this.z); }
+  dot(v) { return this.x * v.x + this.y * v.y + this.z * v.z; }
+  length() { return Math.hypot(this.x, this.y, this.z); }
+  distanceTo(v) { return Math.hypot(this.x - v.x, this.y - v.y, this.z - v.z); }
+  multiplyScalar(k) { return this.set(this.x * k, this.y * k, this.z * k); }
+  addScaledVector(v, k) { return this.set(this.x + v.x * k, this.y + v.y * k, this.z + v.z * k); }
 }
 
 class Color {
@@ -28,6 +37,7 @@ class Color {
   }
   multiplyScalar(scalar) { this.r *= scalar; this.g *= scalar; this.b *= scalar; return this; }
   copy(color) { this.r = color.r; this.g = color.g; this.b = color.b; return this; }
+  lerp(c, t) { this.r += (c.r - this.r) * t; this.g += (c.g - this.g) * t; this.b += (c.b - this.b) * t; return this; }
 }
 
 function value(initial) { return { value: initial }; }
@@ -104,7 +114,10 @@ function createLighting(search = '') {
       float: (number) => new NumericNode(number),
       vec3: (...components) => components,
       vec4: () => ({}),
-      uniform: (initial) => value(initial),
+      uniform: (initial) => Object.assign(value(initial), { setGroup() { return this; } }),
+      renderGroup: {},
+      inverseSqrt: () => ({}),
+      output: {},
       mix: () => ({}),
       dot: (color, weights) => new NumericNode(
         color.r * weights[0] + color.g * weights[1] + color.b * weights[2]
@@ -130,7 +143,7 @@ function createLighting(search = '') {
   imports['./sun-position.js'] = sunPosition;
   const lightingApi = loadModule(lightingSource, {
     imports,
-    globals: { window: { location: { search } }, URLSearchParams },
+    globals: { window: { location: { search } }, URLSearchParams, performance: testClock },
     filename: 'lighting.js'
   });
   const scene = { add() {}, fog: null };
@@ -218,7 +231,7 @@ test('clear-midday aerial haze keeps moderate attenuation and caps in-scatter wi
   assert.ok(Math.abs(oneKilometreVeil - 0.1219) < 0.0001, `1 km veil was ${oneKilometreVeil}`);
   assert.equal(lighting.uFogMaxLuminance.value, 0.48);
   assert.equal(lighting.uFogSkyRoughness.value, 0.72);
-  assert.equal(lighting.sky.mieCoefficient.value, 0.0035);
+  assert.ok(Math.abs(lighting.sky.mieCoefficient.value - 0.0035 * 5.8 / 2) < 1e-12); // (turbidity 5.8 folded in)
 
   const source = {
     r: 4.0,
@@ -263,7 +276,7 @@ test('clear-midday haze adjustments leave overcast and other preset fog/sky valu
   assert.equal(overcast.currentFogDensity, 0.0004);
   assert.equal(overcast.uFogMaxLuminance.value, 100);
   assert.equal(overcast.uFogSkyRoughness.value, 0.3);
-  assert.equal(overcast.sky.mieCoefficient.value, 0.005);
+  assert.ok(Math.abs(overcast.sky.mieCoefficient.value - 0.005 * 8 / 2) < 1e-12); // (overcast turbidity 8 folded in)
   assert.equal(overcast.sky.cloudCoverage.value, 0.78);
 
   const clear = createLighting().lighting;
@@ -271,10 +284,40 @@ test('clear-midday haze adjustments leave overcast and other preset fog/sky valu
   assert.equal(clear.currentFogDensity, 0.00032);
   assert.equal(clear.uFogMaxLuminance.value, 100);
   assert.equal(clear.uFogSkyRoughness.value, 0.3);
-  assert.equal(clear.sky.mieCoefficient.value, 0.01);
+  assert.ok(Math.abs(clear.sky.mieCoefficient.value - 0.01 * 9.5 / 2) < 1e-12); // (turbidity 9.5 folded in)
   clear.applyPreset('midnight');
   assert.equal(clear.currentFogDensity, 0.00036);
   assert.equal(clear.uFogMaxLuminance.value, 100);
   assert.equal(clear.uFogSkyRoughness.value, 0.3);
-  assert.equal(clear.sky.mieCoefficient.value, 0.004);
+  assert.ok(Math.abs(clear.sky.mieCoefficient.value - 0.004 * 4 / 2) < 1e-12); // (turbidity 4 folded in)
+});
+
+// Changes of time of day blend (slop-newyork e4de807): what is shown eases to the new preset, the sun along the sky
+test('a change of time of day blends from what is shown to the new preset, and a sky change on the way retargets it', () => {
+  const { lighting } = createLighting();
+  lighting.applyPreset('midday');
+  const fromSun = lighting.sunLight.position.clone();
+  const fromHemi = lighting.hemiLight.intensity;
+  testClock.t = 1000;
+  {
+    lighting.transitionTo('golden', 2);
+    assert.equal(lighting.activePresetId, 'golden', 'the new preset is the active one at once');
+    lighting.update(null);
+    assert.ok(lighting.sunLight.position.distanceTo(fromSun) < 1e-9, 'nothing has moved yet');
+    testClock.t += 1000;
+    lighting.update(null);
+    const half = lighting.hemiLight.intensity;
+    const golden = createLighting().lighting;
+    golden.applyPreset('golden');
+    const target = golden.hemiLight.intensity;
+    assert.ok(Math.abs(half - (fromHemi + target) / 2) < 1e-9, `half way: ${half}`);
+    assert.ok(Math.abs(lighting.sunLight.position.length() - 1) < 1e-6, 'the sun stays on the sky');
+    // overcast arrives mid-way: the change carries on, to the overcast state
+    lighting.setSkyMode('overcast');
+    assert.ok(lighting.transition, 'still blending');
+    testClock.t += 1500;
+    lighting.update(null);
+    assert.equal(lighting.transition, null);
+    assert.equal(lighting.sky.cloudCoverage.value, 0.78);
+  }
 });

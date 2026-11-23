@@ -47,7 +47,7 @@ function createPostProcessing(renderer, sceneColor, reflections) {
   const bloomInput = vec4(exposed.mul(float(8.0).div(max(peak, 8.0))), 1.0);
   const bloomPass = bloom(bloomInput, 0.24, 0.40, 1.20);
   bloomPass.smoothWidth.value = 0.30;
-  bloomPass.setResolutionScale(0.5);
+  bloomPass.setResolutionScale(0.35); // (a soft glow needs no more, and costs less: slop-newyork c8a904d)
 
   const outputNode = Fn(() => {
     const color = exposed.add(bloomPass.rgb).toVar();
@@ -72,8 +72,11 @@ function createPostProcessing(renderer, sceneColor, reflections) {
     return vec4(color.mul(vignette), 1.0);
   })();
 
-  function applyPreset(id) {
-    const look = LOOKS[id] || LOOKS.golden;
+  // The look shown, and a change of look under way (from what was shown to `to`, eased in and out: slop-newyork e4de807)
+  const shown = { ...LOOKS.golden, balance: [...LOOKS.golden.balance] };
+  let from = null, to = null, start = 0, duration = 0;
+
+  function show(look) {
     exposure.value = look.exposure;
     contrast.value = look.contrast;
     saturation.value = look.saturation;
@@ -82,8 +85,34 @@ function createPostProcessing(renderer, sceneColor, reflections) {
     bloomPass.threshold.value = look.threshold;
   }
 
+  // Switch to a time of day's look at once
+  function applyPreset(id) {
+    Object.assign(shown, LOOKS[id] || LOOKS.golden);
+    shown.balance = [...shown.balance];
+    to = null;
+    show(shown);
+  }
+
+  // Change to it over `seconds`
+  function transitionTo(id, seconds = 2) {
+    from = { ...shown, balance: [...shown.balance] };
+    to = LOOKS[id] || LOOKS.golden;
+    start = performance.now();
+    duration = seconds * 1000;
+  }
+
+  function update() {
+    if (!to) return;
+    const t = Math.min(1, (performance.now() - start) / duration);
+    const e = t * t * (3 - 2 * t);
+    for (const key of ['exposure', 'contrast', 'saturation', 'bloom', 'threshold']) shown[key] = from[key] + (to[key] - from[key]) * e;
+    for (let i = 0; i < 3; i++) shown.balance[i] = from.balance[i] + (to.balance[i] - from.balance[i]) * e;
+    show(shown);
+    if (t >= 1) to = null;
+  }
+
   applyPreset('golden');
-  return { outputNode, applyPreset };
+  return { outputNode, applyPreset, transitionTo, update };
 }
 
 export { createPostProcessing };

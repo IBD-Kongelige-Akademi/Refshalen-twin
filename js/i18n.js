@@ -15,6 +15,8 @@ const DA = {
   'Initializing WebGPURenderer & TSL Shaders...': 'Starter WebGPURenderer og TSL-shadere...',
   'Initializing Three.js r{rev} WebGPURenderer & TSL Shaders...': 'Starter Three.js r{rev} WebGPURenderer og TSL-shadere...',
   'Constructing Aalborg...': 'Bygger Aalborg...',
+  'Aalborg Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.':
+    'Aalborg Twin kræver WebGPU, som denne browser ikke har. Prøv en nyere Chrome, Edge eller Safari.',
   'Compiling Shaders & Render Pipelines...': 'Kompilerer shadere og render-pipelines...',
   'Based on Slop New York by mrdoob (MIT), via copenhagen-twin by Martin Collignon (MIT) · Map data © OpenStreetMap contributors (ODbL), GeoDanmark, DAR, BBR, DAGI, DHM and Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0, via datagrundlag.dk) · LoD2 roofs: Ramboll, Geoflow (MIT)':
     'Baseret på Slop New York af mrdoob (MIT), via copenhagen-twin af Martin Collignon (MIT) · Kortdata © OpenStreetMap-bidragydere (ODbL), GeoDanmark, DAR, BBR, DAGI, DHM og Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0, via datagrundlag.dk) · LoD2-tage: Ramboll, Geoflow (MIT)',

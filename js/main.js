@@ -1,6 +1,7 @@
 import * as THREE from 'three/webgpu';
 import { pass, mrt, output, normalView, positionView, roughness, vec2, vec4, mix, smoothstep } from 'three/tsl';
 import { ssr } from 'three/addons/tsl/display/SSRNode.js';
+import { fsr1 } from 'three/addons/tsl/display/FSR1Node.js';
 import { ssrReflectionWeight } from './surface-materials.js';
 import { createPostProcessing } from './post-processing.js';
 import { ClusteredLighting } from 'three/addons/lighting/ClusteredLighting.js';
@@ -52,9 +53,11 @@ async function initApp() {
     loadingStatus.textContent = t('Initializing Three.js r{rev} WebGPURenderer & TSL Shaders...', { rev: THREE.REVISION });
   }
 
-  // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer
+  // 1. Initialize Three.js WebGPURenderer with 32-bit float reversedDepthBuffer. Firefox stalls on multisampled floating-point
+  // MRT render targets, so MSAA is off there (slop-newyork c8a904d)
+  const isFirefox = typeof navigator !== 'undefined' && /Firefox\//.test(navigator.userAgent);
   const renderer = new THREE.WebGPURenderer({
-    antialias: true,
+    antialias: !isFirefox, // (at the scene's 3/4 resolution, see RENDER_SCALE)
     powerPreference: 'high-performance',
     reversedDepthBuffer: true
   });
@@ -74,6 +77,15 @@ async function initApp() {
   };
 
   await renderer.init();
+  // WebGPU only: on the WebGL2 fallback the city runs at a fraction of the frame rate and its people, whose poses are read from
+  // a storage buffer, are not drawn (slop-newyork 7970ce9)
+  if (!renderer.backend.isWebGPUBackend) {
+    renderer.dispose();
+    renderer.domElement.remove();
+    if (loadingFill) loadingFill.parentElement.style.visibility = 'hidden';
+    if (loadingStatus) loadingStatus.textContent = t('Aalborg Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.');
+    return;
+  }
   markInit('renderer');
 
   // 2. Build Scene & Physical Atmospheric Sky / PMREM IBL / 4096x4096 Shadow Lighting
@@ -98,8 +110,6 @@ async function initApp() {
     markInit,
     debug: new URLSearchParams(location.search).get('debug') || '',
     water: new URLSearchParams(location.search).get('water') || '',
-    // meshes created after the boot get the same storage-buffer treatment as the boot-time sweep below
-    adoptMesh: (mesh) => { if (renderer.backend.isWebGPUBackend && mesh.isInstancedMesh) mesh.instanceMatrix = new THREE.StorageInstancedBufferAttribute(mesh.instanceMatrix.array, 16); },
     tilesUrl: query.get('tiles') || null, // ?tiles=<url of a tile index directory> (default ./data/tiles)
     stream: Number.isFinite(streamParam) && streamParam > 0 ? { near: streamParam, ...(streamMid > streamParam ? { mid: streamMid } : {}) } : null,
     start
@@ -169,18 +179,10 @@ async function initApp() {
   setupSceneCulling(scene, cullingRoots, lightingSystem.sunLight.shadow);
   markInit('culling');
 
-  // On WebGPU, small InstancedMeshes (<= 1000 instances) keep their matrices in uniform buffers that three.js
-  // re-uploads on every draw of every pass (~2.5 MB/frame with the shadow cascades, stalling the GPU queue).
-  // Storage attributes only upload when needed; WebGL2 needs ordinary instanced attributes for correct transforms.
-  if (renderer.backend.isWebGPUBackend) {
-    scene.traverse((object) => {
-      if (object.isInstancedMesh) {
-        object.instanceMatrix = new THREE.StorageInstancedBufferAttribute(object.instanceMatrix.array, 16);
-      }
-    });
-  }
+  // (three.js binds InstancedMesh matrices as instanced vertex attributes that upload only when flagged, so they are no longer
+  // swapped for storage buffers: slop-newyork 21f71bd)
 
-  // 5. TSL RenderPipeline with Half-Res Screen Space Reflections (SSRNode), Bloom & Filmic Toning
+  // 5. TSL RenderPipeline with FSR 1 upscaling, Half-Res Screen Space Reflections (SSRNode), Bloom & Filmic Toning
   //    Fade out distant and matte surfaces so SSR spends its rays on visible glossy reflections.
   const scenePass = pass(scene, cameraSystem.camera);
   // The multisampled colour attachments (output, normal, metalRough) only need resolving, never storing: discarding
@@ -197,6 +199,11 @@ async function initApp() {
   sceneMRT.setBlendMode('normal', new THREE.BlendMode(THREE.MaterialBlending));
   sceneMRT.setBlendMode('metalRough', new THREE.BlendMode(THREE.MaterialBlending));
   scenePass.setMRT(sceneMRT);
+  // The scene renders at 3/4 of the resolution (with MSAA) and FidelityFX Super Resolution 1 reconstructs the full
+  // resolution, which cuts the GPU frame time by about a third (slop-newyork ce6de00); `?scale=1` renders it in full
+  const scaleParam = Number(query.get('scale'));
+  const RENDER_SCALE = scaleParam >= 0.5 && scaleParam <= 1 ? scaleParam : 0.75;
+  scenePass.setResolutionScale(RENDER_SCALE);
 
   const scenePassColor = scenePass.getTextureNode('output');
   const scenePassDepth = scenePass.getTextureNode('depth');
@@ -210,7 +217,7 @@ async function initApp() {
     aoPass = ao(scenePassDepth, scenePassNormal, cameraSystem.camera);
     aoPass.radius.value = 0.25;
     aoPass.samples.value = 16;
-    aoPass.resolutionScale = 0.5;
+    aoPass.resolutionScale = 0.5 * RENDER_SCALE; // half of the scene's resolution: no sharper at more, and the cost doubles
     const aoOutput = aoPass.getTextureNode().r;
     postColor = vec4(scenePassColor.rgb.mul(mix(1, aoOutput, 0.6)), scenePassColor.a);
   }
@@ -233,7 +240,8 @@ async function initApp() {
   // Roughness mip blur must not spread reflections back onto matte or nonreflective surfaces.
   const reflectionMask = scenePassMetalRough.r.greaterThan(0).select(smoothstep(maxSSRRoughness, 0.55, scenePassMetalRough.g), 0);
   const reflections = ssrPass.mul(reflectionMask);
-  const colorGrade = createPostProcessing(renderer, postColor, reflections);
+  const upscaled = RENDER_SCALE < 1 ? fsr1(postColor).getTextureNode() : postColor;
+  const colorGrade = createPostProcessing(renderer, upscaled, reflections);
   const renderPipeline = new THREE.RenderPipeline(renderer, colorGrade.outputNode);
 
   // 6. Wire UI Controls (Strictly using safe DOM APIs: textContent, classList, addEventListener)
@@ -425,9 +433,16 @@ async function initApp() {
   const timeIcon = document.getElementById('time-current-icon');
   const timeLabel = document.getElementById('time-current-label');
   const timeMenuBtn = document.getElementById('btn-time');
-  function selectTime(timeId) {
-    lightingSystem.applyPreset(timeId);
-    colorGrade.applyPreset(lightingSystem.activePresetId);
+  // Changes of time of day blend over a couple of seconds (`instant` for the first one: slop-newyork e4de807)
+  const TIME_TRANSITION = 2;
+  function selectTime(timeId, instant = false) {
+    if (instant) {
+      lightingSystem.applyPreset(timeId);
+      colorGrade.applyPreset(lightingSystem.activePresetId);
+    } else if (timeId !== lightingSystem.activePresetId) {
+      lightingSystem.transitionTo(timeId, TIME_TRANSITION);
+      colorGrade.transitionTo(lightingSystem.activePresetId, TIME_TRANSITION);
+    }
     markTime(timeId);
   }
   function markTime(timeId) {
@@ -1031,7 +1046,7 @@ async function initApp() {
   // Initialize the UI and chase camera around the restored player, or the default car on a first visit.
   selectMode(controllerManager.activeMode);
   selectCamera('chase', true);
-  selectTime('golden');
+  selectTime('golden', true);
 
   // The language toggles (js/i18n.js): DA / EN in the toolbar, Dansk / English on the start screen. The static text is swapped
   // in place; the text the code wrote is written again
@@ -1214,6 +1229,7 @@ async function initApp() {
     world.update(cameraSystem.currentPos.x, cameraSystem.currentPos.z, lightingSystem.uNightFactor.value);
     const T2 = frameProbe ? performance.now() : 0;
     lightingSystem.update(cameraSystem.currentPos);
+    colorGrade.update();
     mapSystem.update(now);
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     nightlife.setLevel(nightlifeLevel(lightingSystem.activePresetId, lightingSystem.uNightFactor.value));
