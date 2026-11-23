@@ -162,6 +162,9 @@ function populationContext() {
   };
   context.nearView = trafficFunction('nearView', context);
   context.groundHeight = null; context.pedRoutes = context.pedRoutes || { pathsNear: () => [] };
+  // spawnPed's neighbours: the busyness-weighted sidewalk pick & spot, the crowd check and the neighbour grid
+  Object.assign(context, { spawnEdge: () => context.nearEdges[0], densityAccepts: () => true, crowdDensity: () => 1,
+    crowdAt: () => 0, gridAdd: () => {} });
   return context;
 }
 

@@ -23,10 +23,10 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   };
 
   function clear(a, b, block = null) {
-    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
+    const steps = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z));
     let x = a.x, z = a.z;
     for (let i = 0; i <= steps; i++) {
-      const nx = a.x + (b.x - a.x) * i / steps, nz = a.z + (b.z - a.z) * i / steps;
+      const nx = a.x + (b.x - a.x) * i / (steps || 1), nz = a.z + (b.z - a.z) * i / (steps || 1);
       if (!walkable(Math.min(x, nx) - 0.4, Math.max(x, nx) + 0.4, Math.min(z, nz) - 0.4, Math.max(z, nz) + 0.4)) return false;
       if (block && blockAt(nx, nz) !== block) return false;
       x = nx; z = nz;
@@ -89,10 +89,24 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   // metres of it the static colliders block) moves sideways to the clearest of these shifts, keeping LINE_SPACING to the other.
   const SHIFTS = [0, -0.5, 0.5, -1, 1];
   const LINE_SPACING = 0.9;
+  // A two-way road is a pair of directed edges along one centreline (one-way roads have a single edge): both share one
+  // set of sidewalks, laid out along the first of the pair asked for
+  const twins = new Map();
+  function twin(e) {
+    if (!twins.has(e)) twins.set(e, e.to?.out?.find((o) => o.to === e.from && o.dx * e.dx + o.dz * e.dz < -0.99) || null);
+    return twins.get(e);
+  }
+
   function along(e) {
     if (sidewalks.has(e)) return sidewalks.get(e);
+    const other = twin(e);
+    if (other && sidewalks.has(other)) {
+      sidewalks.set(e, sidewalks.get(other));
+      return sidewalks.get(e);
+    }
     const result = [];
     sidewalks.set(e, result);
+    if (other) sidewalks.set(other, result);
     // Two walking lines on each side leave room for people to pass or stop together.
     for (const sign of [-1, 1]) {
       const ends = (off) => {
@@ -170,9 +184,12 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     const result = [], seen = new Set();
     junctions.set(n, result);
     for (const e of [...n.in, ...n.out]) {
-      if (seen.has(e)) continue;
-      seen.add(e);
-      for (const track of along(e)) result.push({ track, end: e.from === n ? 0 : 1 });
+      for (const track of along(e)) {
+        if (seen.has(track)) continue;
+        seen.add(track);
+        const end = track.from === n ? 0 : 1; // (the track runs along whichever edge of a two-way pair laid it out)
+        if (!(end ? track.after : track.before)) result.push({ track, end });
+      }
     }
     for (const track of across(n)) result.push({ track, end: 0 }, { track, end: 1 });
     return result;
@@ -184,7 +201,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     if (!block.poly || !block.poly.length) return true; // Copenhagen: one block, bounded by the buildings clear() tests
     const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z)));
     for (let i = 0; i <= steps; i++) {
-      const x = a.x + (b.x - a.x) * i / steps, z = a.z + (b.z - a.z) * i / steps;
+      const x = a.x + (b.x - a.x) * i / (steps || 1), z = a.z + (b.z - a.z) * i / (steps || 1);
       let distance = Infinity;
       for (let j = 0, k = block.poly.length - 1; j < block.poly.length; k = j++) {
         const p = block.poly[j], q = block.poly[k], dx = q.x - p.x, dz = q.z - p.z;
@@ -266,6 +283,8 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     const end = dir > 0 ? 1 : 0;
     if (ends[end]) return ends[end];
     const result = ends[end] = [];
+    const continuation = end ? track.after : track.before;
+    if (continuation) { result.push([{ track: continuation, dir }]); return result; }
     const n = end ? track.to : track.from;
     if (!n) return result;
     if (track.path) {
@@ -304,7 +323,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
     return result;
   }
 
-  function next(track, dir, goalX, goalZ) {
+  function next(track, dir, goalX, goalZ, penalty = null) {
     let best = null, bestScore = -Infinity;
     const a = point(track, dir > 0 ? 1 : 0);
     const gx = goalX - a.x, gz = goalZ - a.z, distance = Math.hypot(gx, gz) || 1;
@@ -312,13 +331,26 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
       const last = path[path.length - 1], target = last.track;
       const ux = target.ux * last.dir, uz = target.uz * last.dir;
       const back = ux * track.ux * dir + uz * track.uz * dir < -0.8;
-      const score = (ux * gx + uz * gz) / distance + Math.random() * 0.7 - (back ? 2 : 0);
+      const score = (ux * gx + uz * gz) / distance + Math.random() * 0.7 - (back ? 2 : 0) - (penalty ? penalty(path) : 0);
       if (score > bestScore) { best = path; bestScore = score; }
     }
     return best;
   }
 
-  return { along, across, next, pathsNear, gatePassed };
+  // Could someone on a walking line step `offset` metres to its side (an escape dive, a dodge round someone)? Clear of walls
+  // and furniture, off the carriageway, the railway and the water (slop-newyork 8492b56 / e673049, on Aalborg's limits)
+  function canDodge(p, offset) {
+    const target = { x: p.ax + p.ux * p.t + p.uz * offset, z: p.az + p.uz * p.t - p.ux * offset };
+    if (roadAt && roadAt(target.x, target.z)) return false;
+    if (hazardAt && hazardAt(target.x, target.z)) return false;
+    return clear(p, target);
+  }
+
+  // How much of a road an edge stands for, to spread people by sidewalk length: half of a two-way road (its twin shares
+  // the walking lines)
+  const share = (e) => (twin(e) ? 0.5 : 1);
+
+  return { along, across, next, pathsNear, gatePassed, canDodge, share };
 }
 
 export { createPedestrianRoutes };

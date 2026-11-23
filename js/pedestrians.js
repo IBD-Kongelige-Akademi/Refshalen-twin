@@ -1,42 +1,45 @@
 import * as THREE from 'three/webgpu';
 import {
   Fn,
+  If,
   float,
   int,
   vec2,
   vec3,
+  vec4,
   color,
   attribute,
   instanceIndex,
   attributeArray,
   normalLocal,
   varying,
+  vertexStage,
   cross,
   normalize,
-  sin,
+  atan,
   abs,
+  sign,
+  dot,
+  length,
+  floor,
   fract,
+  fwidth,
   max,
   clamp,
   mix,
   step,
-  smoothstep
+  smoothstep,
+  select,
+  normalView,
+  positionViewDirection
 } from 'three/tsl';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-// js/pedestrians.js
-// Skinned, procedurally animated pedestrians: the sidewalk crowds (traffic.js), the player's pedestrian and the
-// cyclist's rider (controllers.js).
-// - One continuous lofted body (torso & neck, trouser legs, sleeves, hands, head, hair, shoes) skinned to a 15-bone
-//   skeleton, with bind-pose morphs for build (girth), female proportions and hair volume & length; a near and a far
-//   level of detail.
-// - A whole crowd is one instanced draw per level of detail: every person's bone transforms (quaternion, translation &
-//   scale) live in a storage buffer the vertex stage skins from, and a per-person seed dresses them (TSL material).
-// - PersonRig walks a body along whatever path its owner moves it on: footsteps are planted in the world (heel strike,
-//   foot flat, heel-off & toe-off rolling over a toe joint), so feet never slide; two-bone IK bends hips & knees to
-//   reach them, the pelvis rides as high as the planted legs allow (the inverted pendulum's bob), and the pelvis
-//   rotation & sway, the chest's counter-rotation and the arm swing all follow the feet. It turns on the spot, stops
-//   with its feet together, steps up & down curbs, runs, jumps, and rides a bicycle (feet on the pedals).
+// Skinned characters for pedestrian-system.js and the player controllers.
+// Each crowd level uses one instanced draw, with 15-bone poses in a storage buffer and seeded appearance.
+// PersonRig plants footsteps in world space and uses two-bone IK to place the legs; it also handles
+// turns, curb steps, running, jumping, evasive dives, cycling and weight shifts while standing; and (Copenhagen /
+// Aalborg) roller skates, a skateboard and the cargo bike's rider. Gait, jumps and dives from slop-newyork.
 
 // ============================================================================
 // 1. SKELETON
@@ -59,8 +62,10 @@ const BONE = {
   TOE_R: 14
 };
 const BONE_COUNT = 15;
-// vec4s per person in the pose buffer: (quaternion) and (translation, scale) per bone, then (seed, female, girth, hair)
-const STRIDE = BONE_COUNT * 2 + 1;
+// vec4s per person in the pose buffer: (quaternion) and (translation, scale) per bone, the appearance (3 vec4s, see
+// personAppearance), then (seed, female, girth, hair)
+const APPEARANCE = BONE_COUNT * 2;
+const STRIDE = APPEARANCE + 4;
 
 // Bind pose (metres, a 1.75 m person standing at the origin facing +Z, +X on their left): legs straight down, arms
 // hanging 8 degrees out from the body
@@ -437,33 +442,33 @@ function armSkin(d, k) {
   return [fa, fa, 0];
 }
 
-// [y, rx, rzFront, rzBack, centreZ, keepInFarLod]
+// [y, rx, rzFront, rzBack, centreZ, keepInFarLod]: a head ~15.5 cm across and ~19.5 cm deep
 const HEAD = {
   m: [
-    [1.752, 0.018, 0.018, 0.02, -0.012, 1],
-    [1.738, 0.056, 0.058, 0.064, -0.013, 0],
-    [1.712, 0.078, 0.082, 0.092, -0.013, 1],
-    [1.682, 0.087, 0.09, 0.102, -0.011, 0],
-    [1.652, 0.088, 0.093, 0.103, -0.009, 1],
-    [1.622, 0.084, 0.094, 0.098, -0.007, 0],
-    [1.592, 0.078, 0.095, 0.09, -0.005, 1],
-    [1.562, 0.071, 0.091, 0.078, -0.002, 0],
-    [1.537, 0.063, 0.085, 0.066, 0.002, 1],
-    [1.514, 0.052, 0.074, 0.054, 0.008, 0],
-    [1.497, 0.03, 0.048, 0.032, 0.016, 1]
+    [1.752, 0.0162, 0.018, 0.02, -0.012, 1],
+    [1.738, 0.0504, 0.058, 0.064, -0.013, 0],
+    [1.712, 0.0702, 0.082, 0.092, -0.013, 1],
+    [1.682, 0.0783, 0.09, 0.102, -0.011, 0],
+    [1.652, 0.0792, 0.093, 0.103, -0.009, 1],
+    [1.622, 0.0756, 0.094, 0.098, -0.007, 0],
+    [1.592, 0.0702, 0.095, 0.09, -0.005, 1],
+    [1.562, 0.0639, 0.091, 0.078, -0.002, 0],
+    [1.537, 0.0567, 0.085, 0.066, 0.002, 1],
+    [1.514, 0.0468, 0.074, 0.054, 0.008, 0],
+    [1.497, 0.027, 0.048, 0.032, 0.016, 1]
   ],
   f: [
-    [1.748, 0.017, 0.017, 0.019, -0.012],
-    [1.734, 0.053, 0.055, 0.061, -0.013],
-    [1.709, 0.074, 0.078, 0.088, -0.013],
-    [1.68, 0.083, 0.086, 0.097, -0.011],
-    [1.651, 0.083, 0.089, 0.098, -0.009],
-    [1.622, 0.079, 0.09, 0.093, -0.007],
-    [1.594, 0.073, 0.09, 0.085, -0.005],
-    [1.566, 0.066, 0.086, 0.073, -0.002],
-    [1.543, 0.058, 0.08, 0.061, 0.002],
-    [1.522, 0.046, 0.068, 0.049, 0.008],
-    [1.507, 0.026, 0.042, 0.028, 0.014]
+    [1.748, 0.0153, 0.017, 0.019, -0.012],
+    [1.734, 0.0477, 0.055, 0.061, -0.013],
+    [1.709, 0.0666, 0.078, 0.088, -0.013],
+    [1.68, 0.0747, 0.086, 0.097, -0.011],
+    [1.651, 0.0747, 0.089, 0.098, -0.009],
+    [1.622, 0.0711, 0.09, 0.093, -0.007],
+    [1.594, 0.0657, 0.09, 0.085, -0.005],
+    [1.566, 0.0594, 0.086, 0.073, -0.002],
+    [1.543, 0.0522, 0.08, 0.061, 0.002],
+    [1.522, 0.0414, 0.068, 0.049, 0.008],
+    [1.507, 0.0234, 0.042, 0.028, 0.014]
   ]
 };
 
@@ -472,8 +477,8 @@ function headBump(y) {
   const front = Math.PI / 2;
   return (a) => {
     let b = 0;
-    if (Math.abs(y - 1.592) < 0.02) b += 0.017 * lobe(a, front, 0.16); // nose tip
-    if (Math.abs(y - 1.622) < 0.02) b += 0.007 * lobe(a, front, 0.14); // bridge
+    if (Math.abs(y - 1.592) < 0.02) b += 0.017 * lobe(a, front, 0.16) + 0.004 * (lobe(a, front - 0.62, 0.25) + lobe(a, front + 0.62, 0.25)); // nose tip, cheekbones
+    if (Math.abs(y - 1.622) < 0.02) b += 0.007 * lobe(a, front, 0.14) - 0.005 * (lobe(a, front - 0.4, 0.22) + lobe(a, front + 0.4, 0.22)); // bridge, eye sockets
     if (Math.abs(y - 1.652) < 0.02) b += 0.004 * lobe(a, front, 0.6); // brow ridge
     if (Math.abs(y - 1.562) < 0.02) b += 0.004 * lobe(a, front, 0.2) + 0.004 * (lobe(a, front - 0.75, 0.3) + lobe(a, front + 0.75, 0.3));
     if (Math.abs(y - 1.514) < 0.012) b += 0.006 * lobe(a, front, 0.35); // chin
@@ -516,13 +521,13 @@ function hairShellRing(table, f, t, n) {
 
 // Long hair falling behind the shoulders: [y, rx, rzFront, rzBack, centreZ]
 const LONG_HAIR = [
-  [1.635, 0.094, 0.045, 0.108, -0.01],
-  [1.59, 0.098, 0.034, 0.107, -0.015],
-  [1.55, 0.097, 0.03, 0.101, -0.022],
-  [1.5, 0.093, 0.028, 0.09, -0.036],
-  [1.45, 0.096, 0.028, 0.08, -0.05],
-  [1.4, 0.091, 0.026, 0.07, -0.06],
-  [1.36, 0.066, 0.02, 0.052, -0.068]
+  [1.635, 0.0874, 0.045, 0.108, -0.01],
+  [1.59, 0.0911, 0.034, 0.107, -0.015],
+  [1.55, 0.0902, 0.03, 0.101, -0.022],
+  [1.5, 0.0865, 0.028, 0.09, -0.036],
+  [1.45, 0.0893, 0.028, 0.08, -0.05],
+  [1.4, 0.0846, 0.026, 0.07, -0.06],
+  [1.36, 0.0614, 0.02, 0.052, -0.068]
 ];
 
 // [z from the ankle, half width, top, sole, keepInFarLod] (relative to the ankle joint)
@@ -723,44 +728,160 @@ function buildPersonGeometry(detail = 1) {
 // ============================================================================
 const COAT_COLORS = [0x2b3a52, 0x33332f, 0x8a6a44, 0x5a2f2f, 0x4f5238, 0x6a6a66, 0x222024, 0x7d3f22];
 const COAT_COLORS_F = [0x7a2630, 0xb89a72, 0x2e3e5c, 0x1f1d22, 0xc9c1b2, 0x5b6b4a, 0x8c5a7a, 0x3c3c40];
+const TEE_COLORS = [0xe6e4de, 0x1d1d1f, 0x8b8e94, 0x2b3651, 0x5c6849, 0x9a3434, 0x9db4cf, 0xd3c3a2];
+const KNIT_COLORS = [0x5f666f, 0x252a3b, 0x6a2c33, 0xd3cbba, 0x31463a, 0x1e1e21, 0x8f7253, 0x4b5a77];
 const SHIRT_COLORS = [0xe8e6e0, 0xb8c4d8, 0xcfc8b8, 0x9aa7b8];
+const ACCENT_COLORS = [0xeae8e2, 0x1b1b1d, 0xb03a32, 0x2f4b7c, 0xd6b045, 0x6f8f5a];
+const TIE_COLORS = [0x1e2b4c, 0x6b1f2a, 0x2b2b30, 0x3f5c7d, 0x5a4a2a];
 const LEG_COLORS = [0x22242c, 0x35485b, 0x51473d, 0x7c7160, 0x252526];
 const LEG_COLORS_F = [0x1c1c22, 0x2f4a6e, 0x46413b, 0xcfc8bb, 0x5a2a2e];
-const SKIN_COLORS = [0xc68863, 0xa96f4c, 0x8a5535, 0x6b3d24, 0xd9a077];
+const DENIM_COLORS = [0x232b3b, 0x34435c, 0x5f7088, 0x28292c, 0x2b374d];
+const SHORTS_COLORS = [0xb3a282, 0x3d4b62, 0x2a2a2d, 0x6b7158, 0x8d8f93];
+const SKIN_COLORS = [0xe0b090, 0xc68863, 0xa96f4c, 0x8a5535, 0x6b3d24, 0xd9a077, 0x4c2c1c];
 const HAIR_COLORS = [0x1a1512, 0x3a2a1a, 0x584022, 0x6e6862, 0x2a2624, 0x8f6d43, 0x5e3020];
 
-// Branchless TSL palette selector from an array of hex colors and a [0..1) hash value
-function pickColorFromPalette(hexArray, tNode) {
-  const n = hexArray.length;
-  const scaled = tNode.mul(n);
-  let acc = color(hexArray[0]);
-  for (let i = 1; i < n; i++) {
-    acc = mix(acc, color(hexArray[i]), step(float(i), scaled));
-  }
-  return acc;
-}
+const LEATHER_COLORS = [0x201e1c, 0x2e231a, 0x3b2b1f, 0x4a3524];
+const SOCK_COLORS = [0xe4e2dc, 0x26262a]; // white, dark
+const EYE_COLORS = [0x2c1c12, 0x4a5e6c]; // brown, blue-grey
+
+const isPartF = (pId, id) => step(abs(pId.sub(id)), 0.25);
+// Triangle wave 0..1..0 with period 1 (a cheap stand-in for sin in fragment patterns)
+const wave = (x) => abs(fract(x).sub(0.5)).mul(2.0);
 
 // v rotated by unit quaternion q
 const qrot = (q, v) => v.add(cross(q.xyz, cross(q.xyz, v).add(v.mul(q.w))).mul(2.0));
 
+// Outfit codes, packed per person into one float (top + 4 bottom + 16 face + 96 detail + 384 female):
+//   top: 0 tailored jacket over a shirt, 1 casual zip jacket, 2 T-shirt (bare forearms), 3 sweater
+//   bottom: 0 trousers, 1 jeans, 2 shorts (bare calves & socks, only with a T-shirt)
+//   face: beard (0 none, 1 stubble, 2 full) + 3 for sunglasses
+//   detail: 0 none, 1 tie (tailored), 2 striped T-shirt, 3 chest print
+// and flags (sneakers 1, bald 2, blue eyes 4, dark socks 8)
+const TOP = { TAILORED: 0, ZIP: 1, TEE: 2, KNIT: 3 };
+const SLEEVE_END = { TEE: 0.33, LONG: 0.93 }; // u along the sleeve loft where the cuff (or the bare forearm) starts
+
+const srgbToLinear = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+// A colour in one float, exact in fp32: 8 bits per channel of the square root of its linear value (fine steps in the
+// darks), red lowest
+function packColor(hex) {
+  const ch = (shift) => Math.round(Math.sqrt(srgbToLinear(((hex >> shift) & 255) / 255)) * 255);
+  return ch(16) + ch(8) * 256 + ch(0) * 65536;
+}
+const unpackColor = (f) => {
+  const b = floor(f.div(65536.0));
+  const rg = f.sub(b.mul(65536.0));
+  const g = floor(rg.div(256.0));
+  const c = vec3(rg.sub(g.mul(256.0)), g, b).div(255.0);
+  return c.mul(c);
+};
+
+/**
+ * A person's look, worked out once from the seed (when the rig is made) and packed into the 3 appearance vec4s of the
+ * pose buffer, so the shaders only unpack the colours each body part needs:
+ *   0: skin, hair, top, shirt colours; 1: trousers, accent (tie, stripes or print), shoe upper, sole colours;
+ *   2: hem height, bare-leg height (-1: covered legs), outfit code, flags
+ */
+function personAppearance(seed, female) {
+  const lane = (salt) => hash01(seed + salt);
+  const pick = (palette, t) => palette[Math.min(palette.length - 1, Math.floor(t * palette.length))];
+  const f = female ? 1 : 0;
+  const topRoll = lane(89);
+  const top = topRoll < 0.24 ? TOP.TEE : topRoll < 0.46 ? TOP.KNIT : topRoll < 0.7 ? TOP.ZIP : TOP.TAILORED;
+  const tee = top === TOP.TEE;
+  const knit = top === TOP.KNIT;
+  const tailored = top === TOP.TAILORED;
+  const shorts = tee && lane(97) < 0.38;
+  const jeans = !shorts && lane(53) < (tailored ? 0.18 : 0.5);
+  const beard = f ? 0 : lane(13) < 0.15 ? 2 : lane(13) < 0.34 ? 1 : 0;
+  const glasses = lane(37) < 0.1 ? 1 : 0;
+  const detail = tailored ? (!f && lane(43) < 0.6 ? 1 : 0) : tee ? (lane(59) < 0.2 ? 2 : lane(59) < 0.42 ? 3 : 0) : 0;
+  const code = top + 4 * (jeans ? 1 : shorts ? 2 : 0) + 16 * (beard + 3 * glasses) + 96 * detail + 384 * f;
+  const sneaker = lane(5) >= 0.4;
+  const flags = (sneaker ? 1 : 0) + (!f && lane(41) < 0.08 ? 2 : 0) + (lane(19) >= 0.84 ? 4 : 0) + (lane(7) >= 0.62 ? 8 : 0);
+  const topHex = tee ? pick(TEE_COLORS, lane(29)) : knit ? pick(KNIT_COLORS, lane(29)) : pick(f ? COAT_COLORS_F : COAT_COLORS, lane(29));
+  const legsHex = shorts
+    ? pick(SHORTS_COLORS, lane(47))
+    : jeans ? pick(DENIM_COLORS, lane(47)) : pick(f ? LEG_COLORS_F : LEG_COLORS, lane(47));
+  const accentHex = tee ? pick(ACCENT_COLORS, lane(31)) : pick(TIE_COLORS, lane(43));
+  const upperHex = sneaker ? (lane(31) >= 0.55 ? 0xc8c3b8 : 0x252b32) : pick(LEATHER_COLORS, lane(23));
+  // Jackets end at the hips; T-shirts are tucked in (over a belt) or hang loose; sweaters end at the waistband
+  const hemY = tee ? (lane(61) >= 0.62 ? 0.99 : 0.905) : knit ? 0.9 + lane(61) * 0.03 : (f ? 0.88 : 0.955) + ((f ? 0.12 : 0.045) * lane(61));
+  // Shorts end a hand above the knee
+  const bareBelow = shorts ? 0.53 + lane(97) * 0.1 : -1;
+  return [
+    packColor(pick(SKIN_COLORS, lane(17))), packColor(pick(HAIR_COLORS, lane(3))), packColor(topHex), packColor(pick(SHIRT_COLORS, lane(71))),
+    packColor(legsHex), packColor(accentHex), packColor(upperHex), packColor(sneaker ? 0xd5d1c8 : 0x191816),
+    hemY, bareBelow, code, flags
+  ];
+}
+
+/**
+ * The appearance vec4s of the instance, read in the vertex stage: the packed colours (unpack them with unpackColor
+ * once picked per part) and the outfit values the bind-pose morphs & varyings need.
+ */
+function personLook(pose, base) {
+  const a0 = pose.element(base.add(APPEARANCE));
+  const a1 = pose.element(base.add(APPEARANCE + 1));
+  const a2 = pose.element(base.add(APPEARANCE + 2));
+  const code = a2.z;
+  const flags = a2.w;
+  const bit = (v, k) => fract(floor(v.div(k).add(0.01)).mul(0.5)).mul(2.0); // bit of an integer valued float
+  const top = code.sub(floor(code.div(4.0).add(0.01)).mul(4.0));
+  const isTee = step(abs(top.sub(TOP.TEE)), 0.25);
+  return {
+    skin: a0.x, hair: a0.y, top: a0.z, shirt: a0.w, legs: a1.x, accent: a1.y, upper: a1.z, sole: a1.w,
+    hemY: a2.x, bareBelow: a2.y, code,
+    isTee,
+    isTailored: step(top, 0.5),
+    isKnit: step(2.5, top),
+    shorts: bit(code, 8.0),
+    cuffStart: mix(float(SLEEVE_END.LONG), float(SLEEVE_END.TEE), isTee),
+    sneaker: bit(flags, 1.0),
+    bald: bit(flags, 2.0),
+    eyeCol: mix(color(EYE_COLORS[0]), color(EYE_COLORS[1]), bit(flags, 4.0)),
+    sockCol: mix(color(SOCK_COLORS[0]), color(SOCK_COLORS[1]), bit(flags, 8.0))
+  };
+}
+
 /**
  * Material for one crowd mesh. `pose` is its storage buffer (STRIDE vec4s per instance). The vertex stage morphs the
- * bind pose (girth, female, hair) and skins it with two bones; the fragment stage dresses the person from their seed:
- * skin tone, hair & hairline, eyes, brows & mouth, a tailored jacket (lapels, shirt V) or casual coat (zip, hem,
- * collar), cuffs, trousers, sneakers or leather shoes with soles & laces.
+ * bind pose (girth, female, hair, bare limbs), skins it with two bones and resolves per-instance palette colours &
+ * outfit codes; the near LOD (`detail = 1`) paints the clothes' cut, the face and soft contact shading per body part in
+ * the fragment stage, while the far LOD (`detail = 0`) shades its part colours directly in the vertex stage.
  */
-function createPersonMaterial(pose) {
+function createPersonMaterial(pose, detail = 1) {
   const mat = new THREE.MeshStandardNodeMaterial({ metalness: 0 });
   const base = int(instanceIndex).mul(STRIDE);
   const info = pose.element(base.add(STRIDE - 1)); // seed, female, girth, hair
+  const look = personLook(pose, base);
+  const female = info.y;
+
+  const skinAttr = attribute('skin', 'vec4');
+  const posAttr = attribute('position', 'vec3');
+  const extraAttr = attribute('extra', 'vec3');
+  const partId = skinAttr.w;
+  const isPart = (id) => step(abs(partId.sub(id)), 0.25);
+  const isTorso = isPart(PART.BODY);
+  const isLeg = isPart(PART.LEG);
+  const isShoe = isPart(PART.SHOE);
+  const isArm = isPart(PART.ARM);
+  const isHand = isPart(PART.HAND);
+  const isHead = isPart(PART.HEAD);
+  const isHairPart = step(PART.HAIR - 0.5, partId);
 
   mat.positionNode = Fn(() => {
-    const skin = attribute('skin', 'vec4');
-    const extra = attribute('extra', 'vec3');
+    const skin = skinAttr;
+    const extra = extraAttr;
     // hair volume on the shell (part 6), hair length on the long hair (part 7)
     const hairAmount = mix(clamp(info.w.mul(2.0), 0.0, 1.0), clamp(info.w.mul(2.0).sub(1.0), 0.0, 1.0), step(PART.LONG_HAIR - 0.5, skin.w));
-    const p = attribute('position', 'vec3')
-      .add(vec3(extra.x, 0.0, extra.y).mul(info.z.sub(1.0)))
+    // Bare forearms (T-shirts) & calves (shorts) are slimmer than the sleeves & trouser legs they replace: their rings
+    // shrink towards the limb's axis, the calves more towards the ankle
+    const bareArm = isArm.mul(look.isTee).mul(smoothstep(look.cuffStart, look.cuffStart.add(0.05), extra.z));
+    const bareLeg = isLeg.mul(look.shorts).mul(smoothstep(look.bareBelow.add(0.01), look.bareBelow.sub(0.03), posAttr.y));
+    const calf = mix(mix(0.36, 0.1, female), mix(0.1, 0.03, female), smoothstep(0.16, 0.34, posAttr.y));
+    const slim = bareArm.mul(0.15).add(bareLeg.mul(calf));
+    const p = posAttr
+      .add(vec3(extra.x, 0.0, extra.y).mul(info.z.sub(1.0).sub(slim)))
       .add(attribute('femaleDelta', 'vec3').mul(info.y))
       .add(attribute('hairDelta', 'vec3').mul(hairAmount));
     const n = attribute('normal', 'vec3');
@@ -775,118 +896,389 @@ function createPersonMaterial(pose) {
     return mix(qrot(qa, p).mul(ta.w).add(ta.xyz), qrot(qb, p).mul(tb.w).add(tb.xyz), w);
   })();
 
-  const vInfo = varying(info, 'vPersonInfo');
-  const isPart = (partId, id) => step(abs(partId.sub(id)), 0.25);
-  const lane = (salt) => fract(sin(vInfo.x.add(salt).mul(12.9898)).mul(43758.5453));
-  const partOf = () => attribute('skin', 'vec4').w;
+  const roughnessVal = mix(
+    mix(mix(float(0.86), float(0.55), max(isHand, isHead)), float(0.74), isHairPart),
+    float(0.38),
+    isShoe.mul(float(1.0).sub(look.sneaker))
+  );
+
+  if (!detail) {
+    const vFarSurface = varying(
+      vertexStage(
+        Fn(() => {
+          const q = posAttr;
+          const skinCol = unpackColor(look.skin);
+          const hairCol = unpackColor(look.hair);
+          const topCol = unpackColor(look.top);
+          const shirtCol = unpackColor(look.shirt);
+          const legsCol = unpackColor(look.legs);
+          const cuffCol = mix(mix(topCol.mul(0.8), shirtCol, look.isTailored), skinCol, look.isTee);
+          const hd = normalize(vec2(q.x, q.z.add(0.01)));
+          const hairline = hd.y.mul(0.055).add(1.62).sub(hd.x.mul(hd.x).sub(hd.y.mul(hd.y)).mul(0.005)).add(look.bald.mul(0.3));
+          const headCol = mix(skinCol, hairCol, smoothstep(hairline.sub(0.015), hairline.add(0.015), q.y));
+          const hairPartCol = mix(hairCol.mul(0.97), skinCol, look.bald.mul(step(q.y, 1.755)));
+          const opening = q.y.sub(1.33).mul(0.42);
+          const shirtV = smoothstep(1.33, 1.36, q.y)
+            .mul(step(abs(q.x), opening.add(0.01)))
+            .mul(smoothstep(0.035, 0.075, q.z))
+            .mul(look.isTailored);
+          const neckLine = mix(1.5, 1.49, max(look.isTailored, max(look.isTee, look.isKnit)));
+          const torsoCol = mix(mix(legsCol, mix(topCol, shirtCol, shirtV), step(look.hemY, q.y)), skinCol, step(neckLine, q.y));
+          const sleeveCol = mix(topCol, cuffCol, smoothstep(look.cuffStart, look.cuffStart.add(0.03), extraAttr.z));
+          const legCol = mix(legsCol, mix(skinCol, look.sockCol, step(q.y, 0.15)), step(q.y, look.bareBelow));
+          const shoeCol = mix(unpackColor(look.upper), unpackColor(look.sole), step(q.y, 0.022));
+          const farCol = mix(
+            mix(
+              mix(mix(mix(mix(torsoCol, legCol, isLeg), shoeCol, isShoe), sleeveCol, isArm), skinCol, isHand),
+              headCol,
+              isHead
+            ),
+            hairPartCol,
+            isHairPart
+          );
+          // Contact shading at a glance: under the arms, between the legs, under the chin
+          const shade = float(1.0)
+            .sub(isTorso.mul(smoothstep(0.12, 0.165, abs(q.x)).mul(smoothstep(1.42, 1.32, q.y)).mul(smoothstep(1.12, 1.26, q.y)).mul(0.3)))
+            .sub(isTorso.mul(smoothstep(1.565, 1.52, q.y).mul(step(1.49, q.y)).mul(0.25)))
+            .sub(isLeg.mul(smoothstep(0.66, 0.9, q.y)).mul(smoothstep(0.01, -0.03, extraAttr.x.mul(sign(q.x)))).mul(0.3));
+          return vec4(farCol.mul(shade), roughnessVal);
+        })()
+      ),
+      'vPersonFarSurface'
+    );
+    mat.colorNode = vFarSurface.xyz;
+    mat.roughnessNode = vFarSurface.w;
+    return mat;
+  }
+
+  // Varyings are what a crowd of skinned characters pays for most (every vertex writes them, every fragment reads
+  // them), so the near LOD passes only the bind-pose position (+ contact shading), the girth direction, u along the
+  // loft & part id, and the instance (flat): the fragment stage reads the person's packed appearance itself.
+  const vInstance = varying(instanceIndex, 'vPersonInstance');
+
+  // Soft contact shading where the body closes in on itself (armpits, inner arms & thighs, under the chin & the hem,
+  // eye sockets, behind the ears): low-frequency, so it is worked out per vertex (branch-free, from the bind pose) and
+  // occludes the sky & bounce light, and a little of the sun
+  const contactShade = (() => {
+    const q = posAttr;
+    const side = sign(q.x);
+    const gx = extraAttr.x.mul(side);
+    const torso = float(1.0)
+      .sub(smoothstep(0.115, 0.165, abs(q.x)).mul(smoothstep(1.43, 1.33, q.y)).mul(smoothstep(1.1, 1.26, q.y)).mul(0.5))
+      .sub(smoothstep(1.565, 1.515, q.y).mul(step(1.49, q.y)).mul(smoothstep(-0.01, 0.03, q.z)).mul(0.45))
+      .sub(smoothstep(0.93, 0.85, q.y).mul(0.3))
+      .sub(smoothstep(look.hemY.sub(0.045), look.hemY, q.y).mul(step(q.y, look.hemY)).mul(0.3));
+    const leg = float(1.0)
+      .sub(smoothstep(0.01, -0.035, gx).mul(smoothstep(0.62, 0.9, q.y)).mul(0.5))
+      .sub(smoothstep(0.0, -0.035, extraAttr.y).mul(smoothstep(0.06, 0.0, abs(q.y.sub(0.5)))).mul(0.25))
+      .sub(smoothstep(0.17, 0.11, q.y).mul(0.25));
+    const shoe = smoothstep(0.0, 0.03, q.y).mul(0.4).add(0.6);
+    const arm = float(1.0).sub(smoothstep(0.012, -0.03, gx).mul(smoothstep(0.6, 0.05, extraAttr.z)).mul(0.5));
+    const front = smoothstep(0.05, 0.075, q.z);
+    const head = float(1.0)
+      .sub(smoothstep(1.0, 0.35, length(vec2(abs(q.x).sub(0.031).div(0.02), q.y.sub(1.629).div(0.013)))).mul(front).mul(0.4))
+      .sub(smoothstep(0.012, 0.0, length(vec2(q.x.mul(0.6), q.y.sub(1.585)))).mul(front).mul(0.3))
+      .sub(smoothstep(1.53, 1.5, q.y).mul(0.45))
+      .sub(smoothstep(0.072, 0.085, abs(q.x)).mul(smoothstep(0.0, -0.03, q.z)).mul(smoothstep(0.035, 0.0, abs(q.y.sub(1.607)))).mul(0.35));
+    return isTorso.mul(torso).add(isLeg.mul(leg)).add(isShoe.mul(shoe)).add(isArm.mul(arm)).add(isHand).add(isHead.mul(head)).add(isHairPart.mul(0.82));
+  })();
+  const vLocal = varying(vertexStage(vec4(posAttr, contactShade)), 'vPersonLocal');
+  const vExtra = varying(vertexStage(vec4(extraAttr, partId)), 'vPersonExtra');
+  const fLook = personLook(pose, int(vInstance).mul(STRIDE));
+
+  // Outfit codes back from the packed float
+  const outfit = () => {
+    const code = floor(fLook.code.add(0.5));
+    const fem = floor(code.div(384.0).add(0.001));
+    const c1 = code.sub(fem.mul(384.0));
+    const detailCode = floor(c1.div(96.0).add(0.001));
+    const c2 = c1.sub(detailCode.mul(96.0));
+    const face = floor(c2.div(16.0).add(0.001));
+    const glasses = step(2.5, face);
+    const low = c2.sub(face.mul(16.0));
+    const bottom = floor(low.div(4.0).add(0.001));
+    const top = low.sub(bottom.mul(4.0));
+    const is = (v, k) => step(abs(v.sub(k)), 0.25);
+    return {
+      top,
+      female: fem,
+      isTailored: is(top, TOP.TAILORED),
+      isZip: is(top, TOP.ZIP),
+      isTee: is(top, TOP.TEE),
+      isKnit: is(top, TOP.KNIT),
+      isJeans: is(bottom, 1),
+      isShorts: is(bottom, 2),
+      beard: face.sub(glasses.mul(3.0)),
+      glasses,
+      hasTie: is(detailCode, 1),
+      hasStripes: is(detailCode, 2),
+      hasPrint: is(detailCode, 3)
+    };
+  };
+
+  const q = vLocal.xyz;
+  const occlusion = vLocal.w;
+  const pId = vExtra.w;
+  const along = vExtra.z;
+  // Girth direction (from the limb's or torso's axis): which way a point faces in the bind pose
+  const gx = vExtra.x;
+  const gz = vExtra.y;
+  const limbSide = sign(q.x);
+  const hemY = fLook.hemY;
+  const ndv = clamp(dot(normalView, positionViewDirection), 0.0, 1.0);
 
   mat.colorNode = Fn(() => {
-    const partId = partOf();
-    const female = vInfo.y;
-    const q = attribute('position', 'vec3').toVar();
-    const along = attribute('extra', 'vec3').z;
+    const o = outfit();
+    // This part's colours (A: top, trousers, shoe upper, skin or hair; B: shirt, skin, sole, cuff or hair), picked
+    // packed and unpacked once each. The details below branch on the person's outfit, the same for every fragment of
+    // a character, so a branch not taken costs next to nothing.
+    const fSkin = max(isPartF(pId, PART.HAND), isPartF(pId, PART.HEAD));
+    const fHair = step(PART.HAIR - 0.5, pId);
+    const fShoe = isPartF(pId, PART.SHOE);
+    const fLeg = isPartF(pId, PART.LEG);
+    const fArm = isPartF(pId, PART.ARM);
+    const fHead = isPartF(pId, PART.HEAD);
+    const colA = unpackColor(select(fHair.greaterThan(0.5), fLook.hair, select(fSkin.greaterThan(0.5), fLook.skin,
+      select(fShoe.greaterThan(0.5), fLook.upper, select(fLeg.greaterThan(0.5), fLook.legs, fLook.top))))).toVar();
+    const cuffPacked = select(o.isTee.greaterThan(0.5), fLook.skin, select(o.isTailored.greaterThan(0.5), fLook.shirt, fLook.top));
+    const plainCuff = fArm.mul(float(1.0).sub(max(o.isTee, o.isTailored)));
+    const colB = unpackColor(select(fHair.greaterThan(0.5), fLook.skin, select(fHead.greaterThan(0.5), fLook.hair,
+      select(fArm.greaterThan(0.5), cuffPacked, select(fShoe.greaterThan(0.5), fLook.sole,
+        select(fLeg.greaterThan(0.5), fLook.skin, fLook.shirt)))))).mul(mix(1.0, 0.8, plainCuff)).toVar();
+    const param0 = mix(fLook.sneaker, fLook.bald, max(fHead, fHair));
+    const fwY = max(fwidth(q.y), 0.0004).toVar();
+    // Fine stitching & weave fade out once they are smaller than a pixel
+    const fine = smoothstep(0.004, 0.0015, fwY).toVar();
+    const outCol = vec3(colA).toVar();
 
-    const skinCol = pickColorFromPalette(SKIN_COLORS, lane(17.0)).toVar();
-    const hairCol = pickColorFromPalette(HAIR_COLORS, lane(3.0)).toVar();
-    const coatCol = mix(pickColorFromPalette(COAT_COLORS, lane(29.0)), pickColorFromPalette(COAT_COLORS_F, lane(29.0)), female).toVar();
-    const shirtCol = pickColorFromPalette(SHIRT_COLORS, lane(71.0)).toVar();
-    const legsCol = mix(pickColorFromPalette(LEG_COLORS, lane(47.0)), pickColorFromPalette(LEG_COLORS_F, lane(47.0)), female);
+    If(pId.lessThan(0.5), () => {
+      // Torso: the top's cut (lapels & shirt with a tie, zip & collar band, crew necks & ribbed hems, stripes or a
+      // print), the neck above it and the trousers below the hem (belt when tucked in, back pockets on jeans)
+      const chestFront = smoothstep(0.035, 0.075, q.z);
+      const topCol = colA.mul(float(1.0).sub(smoothstep(hemY.add(0.035), hemY, q.y).mul(0.12))).toVar();
+      const neckLine = float(1.5).toVar();
+      const collarTop = float(1.5).toVar();
+      const shirtCollar = float(0.0).toVar();
+      If(o.isTailored.greaterThan(0.5), () => {
+        const opening = q.y.sub(1.33).mul(0.42);
+        const vEdge = abs(q.x).sub(opening);
+        const shirtV = smoothstep(1.33, 1.35, q.y).mul(smoothstep(0.004, 0.0, vEdge)).mul(chestFront);
+        const lapel = smoothstep(0.024, 0.009, abs(vEdge)).mul(smoothstep(1.32, 1.37, q.y)).mul(chestFront).mul(float(1.0).sub(shirtV));
+        const collarEdge = smoothstep(0.003, 0.0008, abs(vEdge.add(0.013))).mul(step(1.43, q.y));
+        const tieHalf = mix(0.0105, 0.022, smoothstep(1.46, 1.36, q.y));
+        const tie = smoothstep(0.0012, -0.0006, abs(q.x).sub(tieHalf)).mul(o.hasTie).mul(step(q.y, 1.478));
+        const buttonY = abs(abs(q.y.sub(1.282)).sub(0.04));
+        const buttons = smoothstep(0.0065, 0.0045, length(vec2(q.x, buttonY))).mul(step(q.y, 1.33)).mul(chestFront);
+        topCol.assign(topCol.mul(float(1.0).sub(lapel.mul(0.25)).sub(buttons.mul(0.55))));
+        const shirt = mix(colB.mul(float(1.0).sub(collarEdge.mul(0.3))), unpackColor(fLook.accent).mul(mix(1.0, 0.82, step(1.448, q.y))), tie);
+        topCol.assign(mix(topCol, shirt, shirtV));
+        // The shirt's collar stands up around the neck
+        neckLine.assign(1.49);
+        collarTop.assign(1.512);
+        shirtCollar.assign(smoothstep(1.49, 1.494, q.y));
+      })
+        .ElseIf(o.isZip.greaterThan(0.5), () => {
+          const zip = smoothstep(0.006, 0.0025, abs(q.x)).mul(chestFront);
+          const collarBand = smoothstep(1.455, 1.48, q.y);
+          topCol.assign(topCol.mul(float(1.0).sub(zip.mul(0.4)).sub(collarBand.mul(0.15))));
+        })
+        .Else(() => {
+          // Crew necks: a ribbed band round the neckline, ribbed hems on sweaters, stripes or a print on T-shirts
+          neckLine.assign(float(1.492).sub(chestFront.mul(0.02)));
+          collarTop.assign(neckLine);
+          const crewRib = smoothstep(neckLine.sub(0.016), neckLine.sub(0.012), q.y);
+          topCol.assign(topCol.mul(float(1.0).sub(crewRib.mul(0.14))));
+          If(o.isKnit.greaterThan(0.5), () => {
+            const knitRib = smoothstep(hemY.add(0.05), hemY.add(0.045), q.y);
+            const ribLines = mix(float(0.5), wave(atan(q.x, q.z).mul(24.0)), fine);
+            topCol.assign(topCol.mul(float(1.0).sub(knitRib.mul(ribLines.mul(0.1).add(0.06)))));
+          })
+            .ElseIf(o.hasStripes.greaterThan(0.5), () => {
+              const stripe = smoothstep(0.45, 0.55, fract(q.y.mul(15.0))).mul(step(q.y, 1.44));
+              topCol.assign(mix(topCol, unpackColor(fLook.accent), stripe.mul(0.92)));
+            })
+            .ElseIf(o.hasPrint.greaterThan(0.5), () => {
+              const print = smoothstep(0.003, 0.0, max(abs(q.x).sub(0.06), abs(q.y.sub(1.31)).sub(0.045))).mul(chestFront);
+              const ink = mix(float(0.55), smoothstep(0.3, 0.7, wave(q.x.mul(25.0)).mul(wave(q.y.mul(21.0))).mul(1.6)), fine);
+              topCol.assign(mix(topCol, unpackColor(fLook.accent).mul(ink.mul(0.35).add(0.75)), print));
+            });
+        });
+      outCol.assign(topCol);
 
-    // Head: skin, hairline (none for the bald), eyes, brows, lips
-    const hd = normalize(vec2(q.x, q.z.add(0.01)));
-    const bald = step(lane(41.0), 0.08).mul(float(1.0).sub(female));
-    const hairline = hd.y.mul(0.055).add(1.62).sub(hd.x.mul(hd.x).sub(hd.y.mul(hd.y)).mul(0.005)).add(bald.mul(0.3));
-    const hairMask = smoothstep(hairline.sub(0.004), hairline.add(0.004), q.y);
-    const front = smoothstep(0.06, 0.08, q.z);
-    const eyeX = abs(abs(q.x).sub(0.031));
-    const eyes = smoothstep(0.011, 0.006, eyeX).mul(smoothstep(0.0055, 0.002, abs(q.y.sub(1.627)))).mul(front);
-    const brows = smoothstep(0.016, 0.01, eyeX).mul(smoothstep(0.0035, 0.0012, abs(q.y.sub(1.646)))).mul(front);
-    const mouth = smoothstep(0.022, 0.014, abs(q.x)).mul(smoothstep(0.0045, 0.0015, abs(q.y.sub(1.549)))).mul(front);
-    const faceCol = mix(
-      skinCol.mul(float(1.0).sub(eyes.mul(0.7)).sub(brows.mul(0.45))),
-      skinCol.mul(color(0xb06a5c)).mul(1.15),
-      mouth.mul(0.7)
-    );
-    const headCol = mix(faceCol, hairCol, hairMask);
-    const hairStrands = hairCol.mul(sin(q.x.mul(170.0).add(q.z.mul(130.0))).mul(0.06).add(0.97));
-    const hairPartCol = mix(hairStrands, skinCol, bald.mul(step(q.y, 1.755)));
+      // Below the hem: trousers, with a belt under a tucked-in T-shirt and stitched back pockets on jeans
+      If(q.y.lessThan(hemY.add(0.005)), () => {
+        const trousers = unpackColor(fLook.legs).toVar();
+        const fly = smoothstep(0.003, 0.001, abs(q.x.sub(0.012))).mul(smoothstep(0.05, 0.08, q.z)).mul(step(0.87, q.y)).mul(step(q.y, 0.965));
+        trousers.assign(trousers.mul(float(1.0).sub(fly.mul(0.25))));
+        If(o.isJeans.greaterThan(0.5), () => {
+          const pocketEdge = max(abs(abs(q.x).sub(0.08)).sub(0.045), abs(q.y.sub(0.912)).sub(0.042));
+          const pocket = smoothstep(0.0028, 0.0008, abs(pocketEdge)).mul(smoothstep(-0.03, -0.06, q.z));
+          trousers.assign(trousers.mul(float(1.0).sub(pocket.mul(0.3))));
+        });
+        If(hemY.greaterThan(0.97), () => {
+          const belt = smoothstep(hemY.sub(0.036), hemY.sub(0.032), q.y);
+          const buckle = smoothstep(0.02, 0.016, abs(q.x)).mul(smoothstep(0.04, 0.07, q.z)).mul(belt);
+          trousers.assign(mix(mix(trousers, color(0x2a1d15), belt), color(0x8f8a80), buckle));
+        });
+        outCol.assign(mix(trousers, topCol, smoothstep(hemY.sub(0.004), hemY.add(0.004), q.y)));
+      });
+      // The neck above the collar
+      If(q.y.greaterThan(neckLine.sub(0.005)), () => {
+        const neck = smoothstep(collarTop.sub(0.004), collarTop.add(0.004), q.y);
+        outCol.assign(mix(mix(outCol, colB.mul(0.96), shirtCollar), unpackColor(fLook.skin), neck));
+      });
+    })
+      .ElseIf(pId.lessThan(1.5), () => {
+        // Trouser legs: front crease on trousers, faded fronts & an outer seam on jeans, folds at the knees and where
+        // the hems break over the shoes; shorts end above bare calves and socks
+        const front = smoothstep(0.0, 0.04, gz);
+        const legCol = colA.toVar();
+        If(o.isJeans.greaterThan(0.5), () => {
+          const fade = front.mul(smoothstep(0.55, 0.7, q.y).mul(smoothstep(0.9, 0.76, q.y)).add(smoothstep(0.06, 0.0, abs(q.y.sub(0.49))).mul(0.6)));
+          const seam = smoothstep(0.003, 0.001, abs(gz)).mul(step(0.0, gx.mul(limbSide))).mul(fine);
+          legCol.assign(legCol.mul(fade.mul(0.22).add(1.0)));
+          legCol.assign(mix(legCol, legCol.mul(color(0xd8a868)).mul(1.6), seam.mul(0.5)));
+        }).Else(() => {
+          const crease = smoothstep(0.004, 0.0, abs(abs(q.x).sub(HIP_X))).mul(step(0.0, q.z));
+          legCol.assign(legCol.mul(float(1.0).sub(crease.mul(0.08))));
+        });
+        const kneeFolds = smoothstep(0.0, -0.03, gz).mul(smoothstep(0.05, 0.0, abs(q.y.sub(0.5)))).mul(wave(q.y.mul(41.0)));
+        legCol.assign(legCol.mul(float(1.0).sub(kneeFolds.mul(0.1))));
+        If(o.isShorts.greaterThan(0.5), () => {
+          const bareBelow = fLook.bareBelow;
+          const bare = smoothstep(bareBelow.add(0.003), bareBelow.sub(0.003), q.y);
+          const hemBand = smoothstep(bareBelow, bareBelow.add(0.004), q.y).mul(smoothstep(bareBelow.add(0.022), bareBelow.add(0.018), q.y));
+          const sock = smoothstep(0.152, 0.146, q.y);
+          const knee = smoothstep(0.035, 0.0, abs(q.y.sub(0.5))).mul(front);
+          const bareCol = mix(colB.mul(float(1.0).sub(knee.mul(0.08))), fLook.sockCol, sock);
+          outCol.assign(mix(legCol.mul(float(1.0).sub(hemBand.mul(0.18))), bareCol, bare));
+        }).Else(() => {
+          const breakFolds = smoothstep(0.26, 0.2, q.y).mul(wave(q.y.mul(27.0).add(gx.mul(9.5))));
+          outCol.assign(legCol.mul(float(1.0).sub(breakFolds.mul(0.09))));
+        });
+      })
+      .ElseIf(pId.lessThan(2.5), () => {
+        // Shoes: sneakers or leather, soles, laces over the instep
+        const isSneaker = param0;
+        const sole = smoothstep(0.024, 0.016, q.y);
+        const laces = smoothstep(0.6, 0.75, fract(q.z.mul(80.0)))
+          .mul(step(abs(abs(q.x).sub(HIP_X)), 0.016))
+          .mul(step(0.0, q.z))
+          .mul(step(q.z, 0.09))
+          .mul(step(0.075, q.y))
+          .mul(isSneaker);
+        outCol.assign(mix(mix(colA, colB, sole), color(0xb8b4aa), laces.mul(0.6)));
+      })
+      .ElseIf(pId.lessThan(3.5), () => {
+        // Sleeves: the cuff (shirt cuff, ribbed cuff or bare forearm out of a T-shirt's hem), folds inside the elbow
+        const cuffStart = fLook.cuffStart;
+        const cuff = smoothstep(cuffStart, cuffStart.add(0.015), along);
+        const teeHem = smoothstep(cuffStart.sub(0.03), cuffStart.sub(0.025), along).mul(float(1.0).sub(cuff)).mul(o.isTee);
+        const ribCuff = smoothstep(0.86, 0.87, along).mul(o.isKnit);
+        const elbow = smoothstep(0.0, 0.03, gz).mul(smoothstep(0.08, 0.0, abs(along.sub(0.56))));
+        const folds = elbow.mul(wave(along.mul(24.0))).mul(float(1.0).sub(o.isTee));
+        const sleeve = colA.mul(float(1.0).sub(teeHem.mul(0.16)).sub(ribCuff.mul(0.12)).sub(folds.mul(0.12)));
+        outCol.assign(mix(sleeve, colB, cuff));
+      })
+      .ElseIf(pId.greaterThan(5.5), () => {
+        // Hair: strands combed back from the hairline (and down the long hair), clumps catching the light, or a bald
+        // scalp
+        const isLong = step(PART.LONG_HAIR - 0.5, pId);
+        const az = atan(q.x, q.z.add(mix(0.012, 0.03, isLong)));
+        const strands = wave(az.mul(11.0).add(wave(az.mul(1.4)).mul(0.25))).mul(2.0).sub(1.0);
+        const clumps = wave(az.mul(2.1).add(q.y.mul(5.6))).mul(2.0).sub(1.0);
+        const hairShade = mix(float(0.0), strands, fine).mul(0.06).add(clumps.mul(0.07)).add(0.97);
+        outCol.assign(mix(colA.mul(hairShade), colB, param0.mul(step(q.y, 1.755))));
+      })
+      .ElseIf(pId.greaterThan(4.5), () => {
+        // Head: hairline, then on the face eyes (whites, irises & lash lines in their sockets), brows, nostrils, lips,
+        // a flush on the cheeks, stubble or a beard & sunglasses; ears & sideburns on the sides
+        const hd = normalize(vec2(q.x, q.z.add(0.01)));
+        const hairline = hd.y.mul(0.055).add(1.62).sub(hd.x.mul(hd.x).sub(hd.y.mul(hd.y)).mul(0.005)).add(param0.mul(0.3));
+        const hairMask = smoothstep(hairline.sub(0.004), hairline.add(0.004), q.y);
+        const skinCol = colA.toVar();
+        const beardCol = colB.mul(0.85);
+        If(q.z.greaterThan(0.035), () => {
+          const front = smoothstep(0.05, 0.075, q.z);
+          const ex = abs(q.x).sub(0.031);
+          const ey = q.y.sub(1.627);
+          const eyeR = length(vec2(ex.div(0.0122), ey.add(ex.mul(ex).mul(4.0)).div(0.0056)));
+          const eyeOpen = smoothstep(1.0, 0.82, eyeR).mul(front);
+          const iris = smoothstep(0.0056, 0.0044, length(vec2(ex.add(0.001), ey))).mul(eyeOpen);
+          const lash = smoothstep(1.4, 1.02, eyeR).mul(float(1.0).sub(eyeOpen)).mul(smoothstep(-0.002, 0.0015, ey)).mul(front);
+          const bx = ex.add(0.002).div(0.018);
+          const browY = float(1.6455).add(float(0.0032).mul(float(1.0).sub(bx.mul(bx))));
+          const brow = smoothstep(mix(0.0034, 0.0022, o.female), mix(0.0012, 0.0008, o.female), abs(q.y.sub(browY)))
+            .mul(smoothstep(0.021, 0.015, abs(ex.add(0.002))))
+            .mul(front);
+          const nostril = smoothstep(0.0042, 0.0022, length(vec2(abs(q.x).sub(0.0085), q.y.sub(1.5865).mul(1.4)))).mul(front);
+          const mx = abs(q.x).div(0.0215);
+          const curve = max(float(1.0).sub(mx.mul(mx)), 0.2);
+          const dy = q.y.sub(1.549);
+          const below = float(1.549).sub(q.y);
+          const upperLip = smoothstep(0.0, 0.001, dy).mul(smoothstep(0.006, 0.004, dy.div(curve)));
+          const lowerLip = smoothstep(0.0, 0.001, below).mul(smoothstep(0.008, 0.0055, below.div(curve)));
+          const lips = max(upperLip.mul(0.9), lowerLip).mul(smoothstep(1.0, 0.8, mx)).mul(front);
+          const mouthLine = smoothstep(0.0013, 0.0003, abs(dy)).mul(smoothstep(1.0, 0.85, mx)).mul(front);
+          const cheek = smoothstep(0.024, 0.0, length(vec2(abs(q.x).sub(0.047), q.y.sub(1.586))));
+          skinCol.assign(skinCol.mul(mix(vec3(1.0), vec3(1.08, 0.9, 0.88), cheek.mul(0.6))));
+          skinCol.assign(mix(skinCol, skinCol.mul(vec3(0.92, 0.62, 0.6)), lips.mul(mix(0.65, 0.9, o.female))));
+          skinCol.assign(skinCol.mul(float(1.0).sub(nostril.mul(0.55)).sub(mouthLine.mul(0.45))));
+          // Stubble or a full beard over the jaw, chin & upper lip
+          If(o.beard.greaterThan(0.5), () => {
+            const jaw = smoothstep(1.594, 1.575, q.y).mul(float(1.0).sub(lips));
+            const moustache = smoothstep(1.553, 1.556, q.y).mul(smoothstep(1.57, 1.566, q.y)).mul(smoothstep(0.026, 0.02, abs(q.x))).mul(front);
+            const grain = mix(float(0.5), wave(atan(q.x, q.z).mul(14.0).add(q.y.mul(22.0))), fine);
+            const amount = max(jaw, moustache).mul(float(1.0).sub(eyeOpen)).mul(mix(float(0.3), grain.mul(0.12).add(0.86), step(1.5, o.beard)));
+            skinCol.assign(mix(skinCol, beardCol, amount));
+          });
+          const eyes = mix(mix(skinCol, color(0xcfc6b9), eyeOpen.mul(0.85)), fLook.eyeCol, iris);
+          skinCol.assign(mix(mix(eyes, color(0x1c1512), lash.mul(0.7)), colB.mul(0.55), brow.mul(0.85)));
+          // Sunglasses: two dark lenses and a bridge
+          If(o.glasses.greaterThan(0.5), () => {
+            const lens = smoothstep(0.0015, 0.0, max(abs(ex.add(0.001)).sub(0.019), abs(ey.add(0.001)).sub(0.011))).mul(smoothstep(0.045, 0.065, q.z));
+            const bridge = smoothstep(0.0022, 0.0012, abs(q.y.sub(1.632))).mul(step(abs(q.x), 0.014)).mul(front);
+            skinCol.assign(mix(skinCol, color(0x0c0d0f), max(lens, bridge)));
+          });
+        }).Else(() => {
+          const ear = smoothstep(0.075, 0.085, abs(q.x)).mul(smoothstep(0.04, 0.02, abs(q.y.sub(1.607))));
+          skinCol.assign(skinCol.mul(mix(vec3(1.0), vec3(1.08, 0.9, 0.88), ear.mul(0.6))));
+          // The beard up the jaw to the sideburns, the sunglasses' arms back to the ears
+          If(o.beard.greaterThan(0.5), () => {
+            const jaw = smoothstep(1.594, 1.575, q.y).mul(smoothstep(-0.035, -0.005, q.z));
+            const sideburn = smoothstep(0.066, 0.074, abs(q.x)).mul(smoothstep(1.625, 1.615, q.y)).mul(smoothstep(-0.03, -0.012, q.z));
+            skinCol.assign(mix(skinCol, beardCol, max(jaw, sideburn).mul(mix(0.3, 0.9, step(1.5, o.beard)))));
+          });
+          If(o.glasses.greaterThan(0.5), () => {
+            const temple = smoothstep(0.0024, 0.0014, abs(q.y.sub(1.633))).mul(smoothstep(0.05, 0.06, abs(q.x))).mul(smoothstep(-0.05, -0.03, q.z));
+            skinCol.assign(mix(skinCol, color(0x0c0d0f), temple));
+          });
+        });
+        outCol.assign(mix(skinCol, colB, hairMask));
+      });
 
-    // Torso: collar & neck, tailored jacket (lapels, shirt V) or casual coat (zip, collar band), hem, trousers below
-    const tailored = step(0.42, lane(89.0));
-    const hemY = mix(mix(0.955, 1.0, lane(61.0)), mix(0.88, 1.0, lane(61.0)), female);
-    const chestFront = smoothstep(0.035, 0.075, q.z);
-    const opening = q.y.sub(1.33).mul(0.42);
-    const shirtV = smoothstep(1.33, 1.35, q.y).mul(smoothstep(0.004, 0.0, abs(q.x).sub(opening))).mul(chestFront).mul(tailored);
-    const lapel = smoothstep(0.024, 0.009, abs(abs(q.x).sub(opening)))
-      .mul(smoothstep(1.32, 1.37, q.y))
-      .mul(chestFront)
-      .mul(tailored)
-      .mul(float(1.0).sub(shirtV));
-    const zip = smoothstep(0.006, 0.0025, abs(q.x)).mul(chestFront).mul(float(1.0).sub(tailored));
-    const collarBand = smoothstep(1.455, 1.48, q.y).mul(float(1.0).sub(tailored));
-    const neckLine = mix(1.5, 1.49, tailored);
-    const neck = smoothstep(neckLine.sub(0.004), neckLine.add(0.004), q.y);
-    const hem = smoothstep(hemY.sub(0.004), hemY.add(0.004), q.y);
-    const hemShade = smoothstep(hemY.add(0.035), hemY, q.y).mul(0.12);
-    const jacketCol = mix(
-      coatCol.mul(float(1.0).sub(lapel.mul(0.25)).sub(zip.mul(0.4)).sub(collarBand.mul(0.15)).sub(hemShade)),
-      shirtCol,
-      shirtV
-    );
-    const torsoCol = mix(mix(legsCol, jacketCol, hem), skinCol, neck);
-
-    // Sleeves: cuffs (shirt cuff under a tailored jacket)
-    const cuff = smoothstep(0.93, 0.96, along);
-    const sleeveCol = mix(coatCol, mix(coatCol.mul(0.72), shirtCol, tailored), cuff);
-
-    // Trousers: subtle front crease
-    const crease = smoothstep(0.004, 0.0, abs(abs(q.x).sub(HIP_X))).mul(step(0.0, q.z)).mul(0.08);
-    const trouserCol = legsCol.mul(float(1.0).sub(crease));
-
-    // Shoes: sneakers or leather, soles, laces over the instep
-    const sneaker = step(0.4, lane(5.0));
-    const leatherCol = mix(color(0x201e1c), color(0x4a3524), lane(23.0));
-    const sneakerCol = mix(color(0x252b32), color(0xc8c3b8), step(0.55, lane(31.0)));
-    const upperCol = mix(leatherCol, sneakerCol, sneaker);
-    const sole = smoothstep(0.024, 0.016, q.y);
-    const soleCol = mix(color(0x191816), color(0xd5d1c8), sneaker);
-    const laceCoord = q.z.mul(80.0);
-    const laces = smoothstep(0.6, 0.75, fract(laceCoord))
-      .mul(step(abs(abs(q.x).sub(HIP_X)), 0.016))
-      .mul(step(0.0, q.z))
-      .mul(step(q.z, 0.09))
-      .mul(step(0.075, q.y))
-      .mul(sneaker);
-    const shoeCol = mix(mix(upperCol, soleCol, sole), color(0xb8b4aa), laces.mul(0.6));
-
-    return mix(
-      mix(
-        mix(
-          mix(
-            mix(mix(torsoCol, trouserCol, isPart(partId, PART.LEG)), shoeCol, isPart(partId, PART.SHOE)),
-            sleeveCol,
-            isPart(partId, PART.ARM)
-          ),
-          skinCol,
-          isPart(partId, PART.HAND)
-        ),
-        headCol,
-        isPart(partId, PART.HEAD)
-      ),
-      hairPartCol,
-      step(PART.HAIR - 0.5, partId)
-    );
+    // Cloth catches light at grazing angles (fibres standing off the surface); contact shading darkens the creases
+    const cloth = float(1.0).sub(max(fSkin, fHair));
+    const grazing = float(1.0).sub(ndv);
+    const sheen = grazing.mul(grazing).mul(grazing).mul(0.28).mul(cloth);
+    // Light scattered under the skin comes back out redder than its surface: warm the face & hands a little, so cool
+    // sky light doesn't leave them grey
+    const warm = mix(vec3(1.0), vec3(1.07, 0.97, 0.9), fSkin);
+    return outCol.mul(warm).mul(sheen.add(1.0)).mul(occlusion.mul(0.45).add(0.55));
   })();
 
-  mat.roughnessNode = Fn(() => {
-    const partId = partOf();
-    const skin = max(isPart(partId, PART.HAND), isPart(partId, PART.HEAD));
-    const leather = isPart(partId, PART.SHOE).mul(step(lane(5.0), 0.4));
-    return mix(mix(mix(float(0.86), float(0.55), skin), float(0.74), step(PART.HAIR - 0.5, partId)), float(0.38), leather);
-  })();
+  mat.aoNode = occlusion;
+  // Cloth matte, skin a little glossier, hair in between, leather shoes polished
+  const fragSkin = max(isPartF(pId, PART.HAND), isPartF(pId, PART.HEAD));
+  mat.roughnessNode = mix(
+    mix(mix(float(0.86), float(0.55), fragSkin), float(0.74), step(PART.HAIR - 0.5, pId)),
+    float(0.38),
+    isPartF(pId, PART.SHOE).mul(float(1.0).sub(fLook.sneaker))
+  );
 
   return mat;
 }
+
 
 // ============================================================================
 // 4. CROWD: ONE INSTANCED, SKINNED DRAW PER LEVEL OF DETAIL
@@ -898,15 +1290,18 @@ class PersonCrowd {
    */
   constructor(maxCount, { farDistance = 34, castShadow = true } = {}) {
     this.farDistance = farDistance;
-    this.lods = [1, 0].map((detail) => {
+    this.updates = 0;
+    const levels = Number.isFinite(farDistance) ? [1, 0] : [1];
+    this.lods = levels.map((detail) => {
       const pose = attributeArray(maxCount * STRIDE, 'vec4').toReadOnly();
-      const mesh = new THREE.Mesh(buildPersonGeometry(detail), createPersonMaterial(pose));
+      const mesh = new THREE.Mesh(buildPersonGeometry(detail), createPersonMaterial(pose, detail));
       mesh.name = detail ? 'PeopleNear' : 'PeopleFar';
-      mesh.count = 1; // one (degenerate) person until the first frame, so the pipelines compile up front
+      mesh.count = 1; // one (degenerate) person until warm-up finishes, so the pipelines compile up front
       mesh.frustumCulled = false;
-      mesh.castShadow = castShadow;
+      mesh.castShadow = Boolean(castShadow && detail > 0);
       mesh.receiveShadow = true;
-      return { pose, mesh, count: 0, max: maxCount };
+      mesh.matrixAutoUpdate = false;
+      return { pose, mesh, count: 0, max: maxCount, hasZero: true };
     });
     this.meshes = this.lods.map((l) => l.mesh);
   }
@@ -916,16 +1311,36 @@ class PersonCrowd {
   }
 
   add(rig, distance = 0) {
-    const l = this.lods[distance > this.farDistance ? 1 : 0];
+    const l = this.lods.length > 1 && distance > this.farDistance ? this.lods[1] : this.lods[0];
     if (l.count >= l.max) return;
     l.pose.value.array.set(rig.pose, l.count * STRIDE * 4);
     l.count++;
   }
 
   end() {
+    const hideEmpty = ++this.updates > 2;
     for (const l of this.lods) {
+      if (l.count === 0) {
+        if (!hideEmpty) {
+          if (!l.hasZero) {
+            const attr = l.pose.value;
+            attr.array.fill(0, 0, STRIDE * 4);
+            attr.clearUpdateRanges();
+            attr.addUpdateRange(0, STRIDE * 4);
+            attr.needsUpdate = true;
+            l.hasZero = true;
+          }
+          l.mesh.count = 1;
+          l.mesh.visible = true;
+        } else {
+          l.mesh.count = 0;
+          l.mesh.visible = false;
+        }
+        continue;
+      }
+      l.hasZero = false;
       l.mesh.count = l.count;
-      if (l.count === 0) continue;
+      l.mesh.visible = true;
       const attr = l.pose.value;
       attr.clearUpdateRanges();
       attr.addUpdateRange(0, l.count * STRIDE * 4);
@@ -937,29 +1352,96 @@ class PersonCrowd {
 // ============================================================================
 // 5. PERSON RIG: PLANTED FOOTSTEPS, TWO-BONE IK & A GAIT THAT FOLLOWS THE FEET
 // ============================================================================
+// Reference walk (% of the gait cycle from heel strike): the knee bends ~15-20 degrees taking the weight, straightens
+// by mid-stance, bends ~40 degrees while the heel rises before toe-off at ~60% and peaks near 60 degrees early in the
+// swing. The pelvis rides highest over the stance foot and lowest just after each heel strike, ~4 cm apart.
 const GAIT = {
   dutyWalk: 0.6, // share of the gait cycle each foot spends on the ground (a walk always has a foot down)
-  dutyRun: 0.29, // ...and running (both feet off the ground in between)
-  minCadence: 0.95, // gait cycles per second stepping on the spot
-  startCadence: 0.72,
-  turnRate: 3.4, // rad/s
+  dutyRun: 0.35, // ...and jogging/running (both feet off the ground in flight)
+  minCadence: 1.05, // gait cycles per second stepping on the spot or settling to rest
+  startCadence: 0.74,
+  turnRate: 3.4, // rad/s standing, turning on the spot...
+  walkTurnRate: 7, // ...and walking (the body faces where it goes within a step)
   spread: 0.074, // each foot's distance from the line of travel
-  toeOut: 0.09,
-  heelStrike: -0.26, // foot pitch at heel strike (toes up) and toe-off (heel up)
-  toeOff: 0.72,
+  toeOut: 0.08,
+  heelStrike: -0.28, // foot pitch at heel strike (toes up) and toe-off (heel up)
+  toeOffWalk: 0.72,
+  toeOffRun: 0.98,
   heelRoll: 0.14, // share of the stance spent rolling onto the sole, and when the heel comes up
-  heelOff: 0.5
+  heelOffWalk: 0.44,
+  heelOffRun: 0.34,
+  landLeadWalk: 0.36, // feet land this share of the stance's travel ahead of the hips
+  landLeadRun: 0.35,
+  bob: 0.025, // walking pelvis dip after each heel strike at a 0.72 m step (m, for a 1.75 m person)
+  maxDrop: 0.12, // planted feet never pull the pelvis lower than this below standing height (the foot slips instead)
+  armLag: 0.06, // s the arm swing trails the legs
+  // Turning: quicker, shorter steps the sharper the turn; hurried steps when a planted foot is left out of reach;
+  // feet stay on their own side of each other; a lean into the turn
+  turnQuicken: 0.4,
+  turnShorten: 0.45,
+  footGap: 0.1, // closest the ankles pass side by side (m)
+  maxBank: 0.1
 };
+// Standing: weight rests on one leg for a while (hips shifted over it and tilted up on its side, the other knee
+// loose), then moves to the other or settles on both
+const IDLE = { shift: 0.045, roll: 0.055, drop: 0.008, minHold: 3.5, maxHold: 11 };
 const HEEL = new THREE.Vector3(0, -ANKLE_H, -0.07); // heel contact, from the ankle
 const TOE_JOINT = new THREE.Vector3(0, 0.02 - ANKLE_H, 0.135);
 
+const PEDESTRIAN_DIVE_DURATION = 2.5;
+// Time, pelvis height/pitch, chest/head pitch, hand height/forward/spread, left and right ankle height/forward,
+// foot pitch. The hands catch the landing; a short prone pause leads into a push-up, one knee under the body,
+// and a staggered rise. Positions are metres in the escape direction, before each person's height scaling.
+const DIVE_POSES = [
+  [0,    0.957, 0.035, 0.05, 0.05, 0.82, 0.03, 0.23, 0.08, 0,     0.08, 0,     0],
+  [0.12, 0.79,  0.38,  0.50, 0.10, 0.76, 0.42, 0.27, 0.08, -0.06, 0.08, 0.10,  0.15],
+  [0.30, 1.10,  0.88,  1.05, 0.65, 0.92, 0.76, 0.29, 0.61, -0.55, 0.72, -0.52, 0.9],
+  [0.55, 0.50,  1.45,  1.46, 1.05, 0.10, 0.72, 0.32, 0.32, -0.70, 0.41, -0.64, 1.35],
+  [0.72, 0.135, 1.49,  1.45, 1.10, 0.08, 0.60, 0.32, 0.16, -0.80, 0.19, -0.76, 1.4],
+  [1.15, 0.135, 1.49,  1.45, 1.10, 0.08, 0.60, 0.32, 0.16, -0.80, 0.19, -0.76, 1.4],
+  [1.55, 0.40,  1.10,  1.00, 0.25, 0.11, 0.57, 0.30, 0.10, -0.44, 0.12, -0.50, 0.9],
+  [1.90, 0.65,  0.55,  0.60, 0.10, 0.62, 0.40, 0.27, 0.08, 0.15,  0.12, -0.35, 0.3],
+  [2.20, 0.83,  0.20,  0.30, 0.08, 0.80, 0.20, 0.25, 0.08, 0.03,  0.08, -0.03, 0],
+  [PEDESTRIAN_DIVE_DURATION, 0.957, 0.035, 0.05, 0.05, 0.82, 0.03, 0.23, 0.08, 0, 0.08, 0, 0]
+];
+
 const wrap = (a) => a - Math.round(a / (Math.PI * 2)) * Math.PI * 2;
 const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+const clampAbs = (x, m) => (x < -m ? -m : x > m ? m : x);
 const smooth = (e0, e1, x) => {
   const t = clamp01((x - e0) / (e1 - e0));
   return t * t * (3 - 2 * t);
 };
 const lerp = (a, b, t) => a + (b - a) * t;
+const ease = (dt, tau) => 1 - Math.exp(-dt / tau); // share of the way a first-order lag covers in dt
+let _easeDt = -1;
+let _e03 = 0, _e045 = 0, _e07 = 0, _e10 = 0, _e12 = 0, _e15 = 0, _e22 = 0, _e35 = 0;
+function syncEase(dt) {
+  if (dt === _easeDt) return;
+  _easeDt = dt;
+  _e03 = ease(dt, 0.03);
+  _e045 = ease(dt, 0.045);
+  _e07 = ease(dt, GAIT.armLag);
+  _e10 = ease(dt, 0.1);
+  _e12 = ease(dt, 0.12);
+  _e15 = ease(dt, 0.15);
+  _e22 = ease(dt, 0.22);
+  _e35 = ease(dt, 0.35);
+}
+const smin = (a, b, k) => {
+  const h = Math.max(k - Math.abs(a - b), 0) / k;
+  return Math.min(a, b) - h * h * k * 0.25;
+};
+const hash01 = (x) => {
+  const v = Math.sin(x * 12.9898) * 43758.5453;
+  return v - Math.floor(v);
+};
+// Highest a hip at (hx, hz) can be with a leg of length `reach` down to the ankle at (ax, ay, az)
+const reachTop = (ax, ay, az, hx, hz, reach) => {
+  const dx = ax - hx;
+  const dz = az - hz;
+  return ay + Math.sqrt(Math.max(0, reach * reach - (dx * dx + dz * dz)));
+};
 
 const _q = new THREE.Quaternion();
 const _q2 = new THREE.Quaternion();
@@ -970,6 +1452,7 @@ const _qUpper = new THREE.Quaternion();
 const _qRoot = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _dir = new THREE.Vector3();
 const _pelvis = new THREE.Vector3();
 const _chest = new THREE.Vector3();
 const _shoulder = new THREE.Vector3();
@@ -978,11 +1461,13 @@ const _knee = new THREE.Vector3();
 const _ankle = new THREE.Vector3();
 const _target = new THREE.Vector3();
 const _pole = new THREE.Vector3();
+const _bend = new THREE.Vector3();
 const _front = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _bx = new THREE.Vector3();
 const _by = new THREE.Vector3();
 const _bz = new THREE.Vector3();
+const _ux = new THREE.Vector3();
 const _m = new THREE.Matrix4();
 const _rootPos = new THREE.Vector3();
 const AX = new THREE.Vector3(1, 0, 0);
@@ -998,12 +1483,24 @@ function makeFoot(side) {
     swing: false,
     // planted: ground point under the ankle (foot flat), heading
     px: 0, py: 0, pz: 0, yaw: 0,
-    // current ankle, foot pitch (+ heel up), toe bend (relative), ground contact 0..1
-    ax: 0, ay: 0, az: 0, pitch: 0, toe: 0, contact: 1,
-    // lift-off state and landing target during a swing
-    w: 0, lx: 0, ly: 0, lz: 0, lyaw: 0, lpitch: 0, ltoe: 0, lground: 0,
-    tx: 0, ty: 0, tz: 0, tyaw: 0
+    // current ankle, foot pitch (+ heel up), toe bend (relative), heading while swinging, ground contact 0..1,
+    // stance progress (0 at the ends, 1 at mid-stance)
+    ax: 0, ay: 0, az: 0, pitch: 0, toe: 0, swingYaw: 0, contact: 1, stance: 0,
+    // swing progress, lift-off state (world + body-relative rx/ry/rz), landing target and the ankle at touchdown
+    w: 0, w0: 0, lx: 0, ly: 0, lz: 0, rx: 0, ry: 0, rz: 0, lyaw: 0, lpitch: 0, ltoe: 0, lground: 0,
+    tx: 0, ty: 0, tz: 0, tyaw: 0, ex: 0, ey: 0, ez: 0
   };
+}
+
+// Ankle of a foot standing at ground point (px, py, pz) heading `yaw`, pitched by `pitch` about `pivot` (heel or toe
+// joint, from the ankle) for a person of scale s
+function ankleAt(px, py, pz, yaw, pitch, pivot, s, out) {
+  const pyl = pivot.y * s;
+  const pzl = pivot.z * s;
+  const cp = Math.cos(pitch);
+  const sp = Math.sin(pitch);
+  const forward = pzl - pyl * sp - pzl * cp;
+  return out.set(px + Math.sin(yaw) * forward, py + pyl + ANKLE_H * s - pyl * cp + pzl * sp, pz + Math.cos(yaw) * forward);
 }
 
 class PersonRig {
@@ -1016,7 +1513,6 @@ class PersonRig {
     this.s = scale;
     this.female = female ? 1 : 0;
     this.girth = girth;
-    this.hair = hair;
     this.armSwing = armSwing;
     this.stride = stride;
     this.bind = BIND[this.female];
@@ -1026,16 +1522,47 @@ class PersonRig {
     this.yaw = 0;
     this.vx = 0;
     this.vz = 0;
+    this.tvx = 0; // velocity as footsteps plan with it: it follows the path round corners at once
+    this.tvz = 0;
     this.speed = 0;
     this.gait = 0; // how much of the walking motion shows (0 standing .. 1 walking)
     this.run = 0;
-    this.phase = 0.05;
+    this.sprint = 0;
+    this.phase = 0; // gait cycle: the left heel strikes at 0, the right at 0.5
     this.pelvisY = 0;
-    this.sway = 0;
-    this.air = 0;
+    this.basePelvisY = 0;
+    this.standY = 0; // pelvis height standing straight on the ground under the feet (eased)
+    this.pelvisYaw = 0;
+    this.pelvisRoll = 0;
+    this.pelvisTilt = 0.035;
+    this.sway = 0; // pelvis shift to the left of the line of travel
+    this.spreadF = 0; // how far the left foot is ahead of the right (per metre of height)
+    this.thighSplit = 0; // actual solved knee/ankle split driving contralateral arm & pelvis counter-rotation
+    this.arm = 0; // smoothed contralateral arm drive
+    this.yawRate = 0; // smoothed body turn rate (rad/s)
+    this.back = 0; // backward motion blend (0 forward .. 1 backward)
+    this.wasAirborne = false;
+    this.airBlend = 0; // airborne jump blend (0 grounded .. 1 airborne)
+    this.prevAir = 0;
+    this.airVel = 0; // vertical velocity while airborne (m/s)
+    this.airPelvisOff = 0; // pelvis height above jump base (m)
+    this.jumpPrep = 0; // pre-takeoff crouch/backswing progress [0..1]
+    this.jumpLead = 1; // +1 left leg leads jump, -1 right leg leads
+    this.landDrop = 0; // spring-damped landing knee compression (m)
+    this.landVel = 0;
+    this.landRoll = 0; // forefoot-to-heel cushion roll on standing/walking landings
+    this.headTurn = 0; // the head leads into turns
+    this.bank = 0; // lean into the turn (rad, + to the right)
+    this.lean = 0; // standing weight: +1 on the left leg .. -1 on the right
+    this.leanTarget = 0;
+    this.leanCount = 0;
     this.time = seed * 7.3;
+    this.leanAt = this.time + IDLE.minHold * hash01(seed + 0.5);
+    this.diving = false;
+    this.diveGround = 0;
     this.feet = [makeFoot(1), makeFoot(-1)];
     this.pose = new Float32Array(STRIDE * 4);
+    this.pose.set(personAppearance(seed, this.female), APPEARANCE * 4);
     this.pose.set([seed, this.female, girth, hair], (STRIDE - 1) * 4);
   }
 
@@ -1043,27 +1570,41 @@ class PersonRig {
     return (THIGH + SHIN) * this.s;
   }
 
+  // Pelvis height standing straight over feet at ground height y
+  standingHeight(y) {
+    return y + ANKLE_H * this.s + this.legLength * 0.997 + (PELVIS_Y - HIP_Y) * this.s;
+  }
+
   // Standing still at (x, z) facing yaw, feet side by side on the ground
   reset(x, z, yaw, ground, owner = null) {
-    const s = this.s;
     this.x = x;
     this.z = z;
     this.yaw = yaw;
-    this.vx = this.vz = this.speed = 0;
-    this.gait = this.run = this.sway = this.air = 0;
-    this.phase = 0.05;
+    this.vx = this.vz = this.tvx = this.tvz = this.speed = 0;
+    this.gait = this.run = this.sprint = this.sway = 0;
+    this.wasAirborne = false;
+    this.yawRate = this.back = this.airBlend = this.prevAir = this.airVel = this.airPelvisOff = this.jumpPrep = 0;
+    this.landDrop = this.landVel = this.landRoll = 0;
+    this.jumpLead = 1;
+    this.pelvisYaw = this.pelvisRoll = this.spreadF = this.thighSplit = this.arm = this.headTurn = this.bank = this.lean = 0;
+    this.pelvisTilt = 0.025;
+    this.diving = false;
+    this.phase = 0;
     for (const foot of this.feet) {
       this.restPoint(foot, x, z, yaw, _v);
       foot.px = _v.x;
       foot.pz = _v.z;
       foot.py = ground(owner, _v.x, _v.z);
-      foot.yaw = yaw + foot.side * GAIT.toeOut;
+      foot.yaw = foot.swingYaw = yaw + foot.side * GAIT.toeOut;
       foot.swing = false;
-      foot.pitch = foot.toe = 0;
+      foot.w = foot.w0 = foot.pitch = foot.toe = foot.stance = 0;
       foot.contact = 1;
-      this.footAnkle(foot, 0, HEEL);
+      this.plant(foot, 0, HEEL);
+      foot.rx = foot.ax - x;
+      foot.ry = foot.ay - foot.py;
+      foot.rz = foot.az - z;
     }
-    this.pelvisY = (this.feet[0].py + this.feet[1].py) * 0.5 + ANKLE_H * s + this.legLength * 0.997 + (PELVIS_Y - HIP_Y) * s;
+    this.pelvisY = this.basePelvisY = this.standY = this.standingHeight((this.feet[0].py + this.feet[1].py) * 0.5);
     this.placed = true;
     this.solve();
   }
@@ -1073,20 +1614,12 @@ class PersonRig {
     return out.set(x + Math.cos(yaw) * d, 0, z - Math.sin(yaw) * d);
   }
 
-  // Ankle of a foot planted at (px, py, pz) heading foot.yaw, pitched by `pitch` about `pivot` (heel or toe joint)
-  footAnkle(foot, pitch, pivot) {
-    const s = this.s;
-    const sn = Math.sin(foot.yaw);
-    const cs = Math.cos(foot.yaw);
-    const pyl = pivot.y * s;
-    const pzl = pivot.z * s;
-    const cp = Math.cos(pitch);
-    const sp = Math.sin(pitch);
-    const vy = -pyl * cp + pzl * sp;
-    const vz = -pyl * sp - pzl * cp;
-    foot.ax = foot.px + sn * (pzl + vz);
-    foot.ay = foot.py + pyl + ANKLE_H * s + vy;
-    foot.az = foot.pz + cs * (pzl + vz);
+  // Ankle of the planted foot, pitched by `pitch` about `pivot`
+  plant(foot, pitch, pivot) {
+    ankleAt(foot.px, foot.py, foot.pz, foot.yaw, pitch, pivot, this.s, _v);
+    foot.ax = _v.x;
+    foot.ay = _v.y;
+    foot.az = _v.z;
     foot.pitch = pitch;
   }
 
@@ -1094,219 +1627,591 @@ class PersonRig {
    * Walk the body to ground position (x, z), turning towards `heading`. `ground(owner, x, z)` gives the walking
    * surface's height anywhere around. `air` lifts the body off the ground (jumps). Set `updatePose` false for hidden
    * pedestrians: their gait and planted feet still advance, while bone transforms wait until they are drawn.
+   * `diveTime` is elapsed seconds in an evasive dive, or -1 for ordinary locomotion.
    */
-  update(dt, x, z, heading, ground, owner = null, air = 0, updatePose = true) {
-    if (!this.placed || Math.hypot(x - this.x, z - this.z) > 3) {
+  update(dt, x, z, heading, ground, owner = null, air = 0, updatePose = true, diveTime = -1) {
+    const dx = x - this.x;
+    const dz = z - this.z;
+    if (!this.placed || dx * dx + dz * dz > 9) {
       this.reset(x, z, heading, ground, owner);
-      return;
+      if (diveTime < 0) return;
     }
     dt = Math.min(Math.max(dt, 1e-4), 0.1);
-    const s = this.s;
     this.time += dt;
 
-    // Body velocity (smoothed) and heading
-    const kv = 1 - Math.exp(-dt / 0.1);
-    this.vx += ((x - this.x) / dt - this.vx) * kv;
-    this.vz += ((z - this.z) / dt - this.vz) * kv;
-    this.x = x;
-    this.z = z;
-    const speed = (this.speed = Math.hypot(this.vx, this.vz));
-    const yawErr = wrap(heading - this.yaw);
-    this.yaw = wrap(this.yaw + Math.max(-GAIT.turnRate * dt, Math.min(GAIT.turnRate * dt, yawErr)));
-    const sinY = Math.sin(this.yaw);
-    const cosY = Math.cos(this.yaw);
-    const fwdSpeed = this.vx * sinY + this.vz * cosY;
-
-    this.gait += (Math.min(1, speed / 0.9) - this.gait) * (1 - Math.exp(-dt / 0.22));
-    this.run += (smooth(2.3, 3.6, speed) - this.run) * (1 - Math.exp(-dt / 0.3));
-    const run = this.run;
-    const duty = lerp(GAIT.dutyWalk, GAIT.dutyRun - 0.07 * smooth(4.5, 8, speed), run);
-
-    // Airborne (jumping): legs tuck under the body, feet land wherever they come down
-    this.air += (air - this.air) * (1 - Math.exp(-dt / 0.04));
-    if (air > 0.03) {
-      for (const foot of this.feet) {
-        this.restPoint(foot, x, z, this.yaw, _v);
-        foot.swing = false;
-        foot.px = _v.x;
-        foot.pz = _v.z;
-        foot.py = ground(owner, _v.x, _v.z) + air * 0.85 + 0.04 * s;
-        foot.yaw = this.yaw + foot.side * GAIT.toeOut;
-        foot.contact = 0;
-        this.footAnkle(foot, 0.25, HEEL);
-        foot.toe = 0;
-      }
-      this.pelvisY = ground(owner, x, z) + air + ANKLE_H * s + this.legLength * 0.97 + (PELVIS_Y - HIP_Y) * s;
-      if (updatePose) this.solve();
+    if (diveTime >= 0) {
+      if (!this.diving) this.diveGround = ground(owner, this.x, this.z);
+      // Crossing a curb in flight changes the landing surface, without stepping the whole airborne body.
+      // Travel ends before .55 s; settle exactly onto the surface by the prone pose at .72 s.
+      this.diveGround += (ground(owner, x, z) - this.diveGround) * (diveTime >= 0.72 ? 1 : ease(dt, 0.06));
+      this.diving = true;
+      this.x = x;
+      this.z = z;
+      this.yaw = wrap(this.yaw + clampAbs(wrap(heading - this.yaw), 10 * dt));
+      this.vx = this.vz = this.tvx = this.tvz = this.speed = this.gait = this.run = 0;
+      if (updatePose) this.solveDive(diveTime, this.diveGround);
+      return;
+    }
+    if (this.diving) {
+      this.reset(x, z, this.yaw, ground, owner);
       return;
     }
 
-    // Cadence: the walking gait cycle shortens with speed (step length ~0.61 v^0.57 m); running ~1.5 cycles/s jogging,
-    // ~2 sprinting
-    const moving = speed > 0.08;
-    let f = 0;
-    if (moving) {
-      const walkF = Math.pow(speed, 0.43) / (1.22 * s * this.stride);
-      const runF = (1.3 + 0.13 * (speed - 3)) / Math.sqrt(s);
-      f = Math.max(GAIT.startCadence, lerp(walkF, runF, run));
+    syncEase(dt);
+    // Body velocity (smoothed), heading and how much walking & running show; the body leans into turns
+    const rvx = (x - this.x) / dt;
+    const rvz = (z - this.z) / dt;
+    this.vx += (rvx - this.vx) * _e10;
+    this.vz += (rvz - this.vz) * _e10;
+    this.tvx += (rvx - this.tvx) * _e03;
+    this.tvz += (rvz - this.tvz) * _e03;
+    this.x = x;
+    this.z = z;
+    const speed = (this.speed = Math.sqrt(this.vx * this.vx + this.vz * this.vz));
+    const yawErr = wrap(heading - this.yaw);
+    const yawStep = clampAbs(yawErr, lerp(GAIT.turnRate, GAIT.walkTurnRate, this.gait) * dt);
+    this.yaw = wrap(this.yaw + yawStep);
+    this.yawRate += ((yawStep / dt) - this.yawRate) * _e10;
+    const headLead = 0.6 * wrap(heading - this.yaw) + 0.16 * this.yawRate;
+    this.headTurn += (clampAbs(headLead, 0.75) - this.headTurn) * _e15;
+    this.bank += (clampAbs(-0.55 * speed * this.yawRate / 9.81, GAIT.maxBank) - this.bank) * _e15;
+    const fwdVel = this.vx * Math.sin(this.yaw) + this.vz * Math.cos(this.yaw);
+    const backTarget = speed > 0.12 ? smooth(-0.08, -0.45, fwdVel / speed) : 0;
+    this.back += (backTarget - this.back) * _e15;
+    this.gait += (Math.min(1, speed / 0.9) - this.gait) * _e22;
+    this.run += (smooth(2.0, 3.1, speed) - this.run) * _e22;
+    this.sprint += (smooth(3.5, 8.2, speed) * this.run - this.sprint) * _e15;
+    this.updateLean();
+
+    const prepRaw = air < -1e-4 ? clamp01(-air) : 0;
+    air = Math.max(0, air);
+    const airborne = air > 0.005;
+    if (airborne) {
+      this.jumpPrep = 0;
+      if (!this.wasAirborne) {
+        this.wasAirborne = true;
+        this.airVel = Math.max(air / dt, 4.8 * this.s);
+        const gndY = ground(owner, x, z);
+        const baseY = gndY + air;
+        this.airPelvisOff = this.pelvisY - gndY - air * 0.25;
+        const sinY = Math.sin(this.yaw);
+        const cosY = Math.cos(this.yaw);
+        const zl = (this.feet[0].ax - x) * sinY + (this.feet[0].az - z) * cosY + (this.feet[0].swing ? 0.06 * this.s : 0);
+        const zr = (this.feet[1].ax - x) * sinY + (this.feet[1].az - z) * cosY + (this.feet[1].swing ? 0.06 * this.s : 0);
+        this.jumpLead = zl >= zr ? 1 : -1;
+        for (const foot of this.feet) {
+          foot.rx = foot.ax - x;
+          foot.rz = foot.az - z;
+          foot.ry = foot.ay - baseY;
+        }
+      } else {
+        this.airVel += (((air - this.prevAir) / dt) - this.airVel) * _e03;
+      }
+    } else if (this.wasAirborne) {
+      this.wasAirborne = false;
+      this.jumpPrep = 0;
+      const fallSpeed = Math.max(1.2 * this.s, -this.airVel);
+      const impact = clamp01(fallSpeed / (5.2 * this.s));
+      const gndY = ground(owner, x, z);
+      const standH = this.standingHeight(gndY);
+      this.standY = standH;
+      const contDrop = Math.max(0, standH - (gndY + this.airPelvisOff));
+      this.landDrop = Math.max((0.03 + 0.016 * impact) * this.s, Math.min(0.085 * this.s, contDrop));
+      this.basePelvisY = standH - lerp(0.004, 0.018, this.run) * this.s;
+      this.pelvisY = this.basePelvisY - this.landDrop;
+      this.landVel = lerp(3.15, 1.35, this.run) * impact * this.s;
+      this.landRoll = (1 - 0.75 * this.run) * 0.3 * impact;
+      this.airVel = 0;
+
+      // Plant feet cleanly at touchdown: two-foot absorption when standing, lead-foot strike + trail swing when moving
+      const sinY = Math.sin(this.yaw);
+      const cosY = Math.cos(this.yaw);
+      const zl = (this.feet[0].ax - x) * sinY + (this.feet[0].az - z) * cosY;
+      const zr = (this.feet[1].ax - x) * sinY + (this.feet[1].az - z) * cosY;
+      const leadIdx = zl >= zr ? 0 : 1;
+      const leadFoot = this.feet[leadIdx];
+      const trailFoot = this.feet[1 - leadIdx];
+      leadFoot.swing = false;
+      leadFoot.w0 = 0;
+      leadFoot.px = leadFoot.ax;
+      leadFoot.pz = leadFoot.az;
+      leadFoot.py = ground(owner, leadFoot.px, leadFoot.pz);
+      this.phase = speed > 0.25 ? (leadIdx * 0.5 + 0.04) % 1 : 0;
+      const duty = lerp(GAIT.dutyWalk, lerp(GAIT.dutyRun, 0.225, this.sprint), this.run);
+      const trailLp = (this.phase + (1 - leadIdx) * 0.5) % 1;
+      if (speed > 0.25 && trailLp >= duty) {
+        this.liftOff(trailFoot, x, z, (trailLp - duty) / (1 - duty));
+        trailFoot.lground = ground(owner, trailFoot.ax, trailFoot.az);
+        trailFoot.ly = trailFoot.lground + ANKLE_H * this.s;
+      } else {
+        trailFoot.swing = false;
+        trailFoot.w0 = 0;
+        trailFoot.px = trailFoot.ax;
+        trailFoot.pz = trailFoot.az;
+        trailFoot.py = ground(owner, trailFoot.px, trailFoot.pz);
+      }
     } else {
-      let unsettled = Math.abs(yawErr) > 0.12;
+      this.jumpPrep = prepRaw > 0 ? prepRaw : this.jumpPrep * (1 - _e045);
+    }
+    this.prevAir = air;
+    this.airBlend += ((airborne ? 1 : 0) - this.airBlend) * (airborne ? _e045 : _e10);
+    if (!airborne && (this.landDrop > 1e-4 || Math.abs(this.landVel) > 1e-4)) {
+      const steps = dt > 0.025 ? 2 : 1;
+      const h = dt / steps;
+      for (let k = 0; k < steps; k++) {
+        const springAcc = -210 * this.landDrop - 27 * this.landVel;
+        this.landVel += springAcc * h;
+        this.landDrop = Math.max(0, Math.min(0.16 * this.s, this.landDrop + this.landVel * h));
+      }
+      if (this.landDrop < 1e-4 && this.landVel <= 0) this.landDrop = this.landVel = 0;
+    } else if (airborne) {
+      this.landDrop *= 1 - _e10;
+      this.landVel = 0;
+    }
+    this.landRoll *= 1 - _e045;
+
+    if (airborne) this.updateAirborne(dt, x, z, ground, owner, air);
+    else this.updateGait(dt, x, z, heading, yawErr, ground, owner);
+    if (updatePose) this.solve();
+  }
+
+  // Airborne (jumping): continuous velocity-clocked launch push -> soaring apex tuck/leap -> downward landing reach
+  updateAirborne(dt, x, z, ground, owner, air) {
+    const s = this.s;
+    const sinY = Math.sin(this.yaw);
+    const cosY = Math.cos(this.yaw);
+    const groundY = ground(owner, x, z);
+    const baseY = groundY + air;
+
+    const vyNorm = clampAbs(this.airVel / (5.2 * s), 1.25);
+    // Linear-in-time arc progress: 0 at launch (+vy), 0.5 at apex (vy=0), 1.0 approaching touchdown (-vy)
+    const prog = clamp01(0.5 - 0.5 * clampAbs(vyNorm, 1));
+    const launchPush = (1 - smooth(0, 0.26, prog)) * smooth(0.15, 0.75, vyNorm);
+    const reachPhase = smooth(0.5, 0.96, prog);
+    const tuckBell = Math.sin(Math.PI * smooth(0.03, 0.97, prog)) * smooth(0.04 * s, 0.32 * s, air);
+
+    const moveJump = smooth(0.3, 3.2, this.speed);
+    const sprintJump = this.sprint;
+    const fwdSign = 1 - 1.55 * this.back;
+    const followXZ = ease(dt, 0.05);
+    const followY = ease(dt, 0.04);
+    const followPitch = launchPush > 0.25 ? ease(dt, 0.02) : followXZ;
+
+    for (let i = 0; i < 2; i++) {
+      const foot = this.feet[i];
+      const footSign = i === 0 ? 1 : -1;
+      const isLead = footSign * this.jumpLead > 0;
+      const lat = foot.side * GAIT.spread * s;
+
+      // Standing jump: crisp plantarflexed toe push-off -> athletic heel-back tuck -> forefoot landing reach
+      const standZ = ((-0.115 + 0.028 * footSign) * tuckBell + 0.025 * reachPhase) * s;
+      const standY = ANKLE_H * s + (-0.035 * launchPush + 0.215 * tuckBell + 0.012 * reachPhase) * s;
+      const standPitch = 0.62 * launchPush + 0.26 * tuckBell + 0.3 * reachPhase;
+
+      // Moving / running jump: open diagonal split-leap — rear leg extends on push-off, sweeps back through apex,
+      // then cycles under the hip on descent while the lead leg drives its knee high then reaches out to land
+      let moveZ, moveY, movePitch;
+      if (isLead) {
+        const driveZ = (0.16 + 0.06 * sprintJump) * (1 - 0.3 * launchPush) * (1 - 0.35 * reachPhase)
+          + (0.27 + 0.07 * sprintJump) * reachPhase;
+        moveZ = driveZ * fwdSign * s;
+        moveY = ANKLE_H * s + (0.03 * launchPush + (0.24 + 0.06 * sprintJump) * tuckBell + 0.015 * reachPhase) * s;
+        movePitch = 0.16 * launchPush + 0.1 * tuckBell + lerp(0.14, -0.1, sprintJump) * reachPhase;
+      } else {
+        const sweepBack = (0.34 + 0.13 * sprintJump) * (0.55 * launchPush + 0.9 * tuckBell);
+        const cycleUnder = (0.13 + 0.04 * sprintJump) * reachPhase;
+        moveZ = -(sweepBack * (1 - 0.65 * reachPhase) + cycleUnder) * fwdSign * s;
+        moveY = ANKLE_H * s + (-0.04 * launchPush + (0.2 + 0.07 * sprintJump) * tuckBell + 0.065 * reachPhase) * s;
+        movePitch = 0.68 * launchPush + 0.52 * tuckBell + 0.24 * reachPhase;
+      }
+
+      const localZ = lerp(standZ, moveZ, moveJump);
+      const targetRx = cosY * lat + sinY * localZ;
+      const targetRz = -sinY * lat + cosY * localZ;
+      const targetRy = lerp(standY, moveY, moveJump);
+      const targetPitch = lerp(standPitch, movePitch, moveJump);
+
+      foot.swing = false;
+      foot.rx += (targetRx - foot.rx) * followXZ;
+      foot.rz += (targetRz - foot.rz) * followXZ;
+      foot.ry += (targetRy - foot.ry) * followY;
+
+      foot.ax = x + foot.rx;
+      foot.az = z + foot.rz;
+      const footGround = ground(owner, foot.ax, foot.az);
+      foot.pitch += (targetPitch - foot.pitch) * followPitch;
+      const soleDepth = (ANKLE_H * Math.cos(foot.pitch) + Math.max(0.208 * Math.sin(foot.pitch), -0.088 * Math.sin(foot.pitch))) * s;
+      foot.ay = Math.max(footGround + soleDepth, baseY + foot.ry);
+      foot.px = foot.ax;
+      foot.pz = foot.az;
+      foot.py = footGround;
+      foot.yaw = foot.swingYaw = this.yaw + foot.side * GAIT.toeOut;
+      foot.toe *= 1 - followXZ;
+      foot.contact = foot.stance = 0;
+    }
+
+    this.standY = this.standingHeight(groundY);
+    const standOff = this.standingHeight(0);
+    const targetPelvisOff = standOff + (0.01 * launchPush - (0.036 + 0.016 * moveJump) * tuckBell - 0.028 * reachPhase) * s;
+    this.airPelvisOff += (targetPelvisOff - this.airPelvisOff) * followY;
+    this.basePelvisY = this.standY;
+    this.pelvisY = baseY + this.airPelvisOff;
+
+    const targetTilt = 0.025 + (-0.025 * launchPush + (0.035 + 0.095 * moveJump) * tuckBell + 0.045 * reachPhase) * fwdSign;
+    this.pelvisTilt += (targetTilt - this.pelvisTilt) * _e12;
+    this.pelvisRoll *= 1 - _e15;
+    this.pelvisYaw += (clampAbs(-0.11 * moveJump * this.jumpLead * tuckBell, 0.13) - this.pelvisYaw) * _e12;
+    this.sway *= 1 - _e12;
+  }
+
+  // Standing weight shifts from leg to leg every few seconds (deterministic per person)
+  updateLean() {
+    if (this.time >= this.leanAt) {
+      const n = ++this.leanCount;
+      const r = hash01(this.seed * 3.71 + n * 1.13);
+      const side = this.leanTarget ? -Math.sign(this.leanTarget) : r < 0.5 ? 1 : -1;
+      this.leanTarget = r < 0.18 ? 0 : side * (0.55 + 0.45 * hash01(this.seed * 5.3 + n * 2.71));
+      this.leanAt = this.time + lerp(IDLE.minHold, IDLE.maxHold, hash01(this.seed * 1.9 + n * 0.77));
+    }
+    this.lean += (this.leanTarget * (1 - this.gait) - this.lean) * _e35;
+  }
+
+  updateGait(dt, x, z, heading, yawErr, ground, owner) {
+    const s = this.s;
+    const g = this.gait;
+    const run = this.run;
+    const sprint = this.sprint;
+    const speed = this.speed;
+    const sinY = Math.sin(this.yaw);
+    const cosY = Math.cos(this.yaw);
+    const duty = lerp(GAIT.dutyWalk, lerp(GAIT.dutyRun, 0.225, sprint), run);
+    const turnSignal = Math.max(Math.abs(yawErr), Math.abs(this.yawRate) * 0.35);
+    const turning = smooth(0.15, 1.2, turnSignal); // how sharp a turn the body is making
+    const settleSq = (0.07 * s) * (0.07 * s);
+
+    // Cadence: the walking gait cycle shortens with speed (step length ~0.68 m at 1.45 m/s); running scales from
+    // ~1.45 Hz jogging to ~2.1 Hz sprinting so ground contact sweep stays matched to leg length while flight lengthens.
+    let f = 0;
+    if (speed > 0.08) {
+      const walkF = Math.pow(speed, 0.48) / (1.12 * s * this.stride);
+      const runF = (1.42 + 0.12 * Math.max(0, speed - 2.4)) / Math.sqrt(s);
+      const turnQ = GAIT.turnQuicken * (1 - 0.65 * run);
+      f = Math.max(GAIT.startCadence, lerp(walkF, runF, run)) * (1 + turnQ * turning);
+    } else {
+      let unsettled = false;
+      let anySwing = false;
+      const stopSettleSq = (0.12 * s) * (0.12 * s);
       for (const foot of this.feet) {
         this.restPoint(foot, x, z, this.yaw, _v);
-        if (Math.hypot(foot.px - _v.x, foot.pz - _v.z) > 0.07 * s) unsettled = true;
-        if (Math.abs(wrap(foot.yaw - this.yaw - foot.side * GAIT.toeOut)) > 0.25) unsettled = true;
-        if (foot.swing) unsettled = true;
+        const fdx = foot.px - _v.x;
+        const fdz = foot.pz - _v.z;
+        const tolSq = this.gait > 0.05 ? stopSettleSq : settleSq;
+        if (foot.swing) anySwing = true;
+        if (foot.swing
+          || fdx * fdx + fdz * fdz > tolSq
+          || Math.abs(wrap(foot.yaw - this.yaw - foot.side * GAIT.toeOut)) > 0.25) unsettled = true;
       }
-      if (unsettled) f = GAIT.minCadence;
+      if (unsettled) f = anySwing ? GAIT.minCadence * 1.25 : GAIT.minCadence;
     }
-    if (Math.abs(yawErr) > 0.12) f = Math.max(f, GAIT.minCadence);
+    // turning on the spot in quick steps of ~45-60 degrees
+    if (Math.abs(yawErr) > 0.12 || Math.abs(this.yawRate) > 0.35) {
+      f = Math.max(f, GAIT.minCadence * (1 + 0.6 * turning));
+    }
+    // Only hurry cadence when a planted foot is genuinely stranded sideways or far out of reach round a corner
+    const reach = this.legLength * 0.997;
+    if (f > 0 && run < 0.5) {
+      for (const foot of this.feet) {
+        if (foot.swing) continue;
+        const hx = x + cosY * foot.side * HIP_X * s;
+        const hz = z - sinY * foot.side * HIP_X * s;
+        const drop = this.standY - (reachTop(foot.ax, foot.ay, foot.az, hx, hz, reach) + (PELVIS_Y - HIP_Y) * s);
+        f *= 1 + 1.5 * (1 - run * 2) * smooth(0.14 * s, 0.22 * s, drop);
+      }
+    }
 
     // Advance the cycle: feet lift off when their phase passes the duty factor, land when it wraps
     const prev = this.phase;
     this.phase = (this.phase + f * dt) % 1;
     const tSwing = f > 0 ? (1 - duty) / f : 0.4;
     const tStance = f > 0 ? duty / f : 0.6;
-    const landFrac = lerp(0.33, 0.33, run); // feet land a third of the stance's travel ahead of the hips
-    const g = this.gait;
-
+    const turningInPlace = Math.abs(yawErr) > 0.12 || Math.abs(this.yawRate) > 0.35;
     for (let i = 0; i < 2; i++) {
       const foot = this.feet[i];
-      const off = i === 0 ? 0 : 0.5;
-      const lp0 = (prev + off) % 1;
-      const lp = (this.phase + off) % 1;
+      const other = this.feet[1 - i];
+      const lp0 = (prev + i * 0.5) % 1;
+      const lp = (this.phase + i * 0.5) % 1;
       if (f > 0 && foot.swing && lp < lp0) {
-        // touch down on the target
-        foot.swing = false;
-        foot.px = foot.tx;
-        foot.py = foot.ty;
-        foot.pz = foot.tz;
-        foot.yaw = foot.tyaw;
+        this.touchDown(foot);
       } else if (f > 0 && !foot.swing && lp >= duty && lp >= lp0) {
-        // lift off
-        foot.swing = true;
-        foot.lx = foot.ax;
-        foot.ly = foot.ay;
-        foot.lz = foot.az;
-        foot.lyaw = foot.yaw;
-        foot.lpitch = foot.pitch;
-        foot.ltoe = foot.toe;
-        foot.lground = foot.py;
-      }
-
-      if (foot.swing) {
-        const w = (foot.w = clamp01((lp - duty) / (1 - duty)));
-        // Where to land: under the hips' future position, ahead by the share of the next stance's travel
-        const tRem = (1 - w) * tSwing;
-        const yawPred = this.yaw + Math.max(-GAIT.turnRate * tRem, Math.min(GAIT.turnRate * tRem, wrap(heading - this.yaw)));
-        const sn = Math.sin(yawPred);
-        const cs = Math.cos(yawPred);
-        const lead = fwdSpeed * tStance * landFrac;
-        const lat = foot.side * GAIT.spread * s;
-        foot.tx = x + this.vx * tRem + sn * lead + cs * lat;
-        foot.tz = z + this.vz * tRem + cs * lead - sn * lat;
-        foot.ty = ground(owner, foot.tx, foot.tz);
-        foot.tyaw = yawPred + foot.side * GAIT.toeOut;
-
-        // Landing pose (heel strike), then the swing from the lift-off pose to it
-        const sx = foot.px, sy = foot.py, sz = foot.pz, syaw = foot.yaw;
-        foot.px = foot.tx;
-        foot.py = foot.ty;
-        foot.pz = foot.tz;
-        foot.yaw = foot.tyaw;
-        const strike = GAIT.heelStrike * g * (1 - run * 0.5);
-        this.footAnkle(foot, strike, HEEL);
-        const ex = foot.ax, ey = foot.ay, ez = foot.az;
-        foot.px = sx;
-        foot.py = sy;
-        foot.pz = sz;
-        foot.yaw = syaw;
-
-        const e = lerp(w * w * (3 - 2 * w), smooth(0.12, 1, w), run);
-        const stepLen = Math.hypot(ex - foot.lx, ez - foot.lz);
-        // foot clearance; running, the heel flicks up behind early in the swing
-        const clearance =
-          (0.03 + 0.055 * Math.min(1, stepLen / (0.9 * s))) * s * (1 - run) + run * 0.3 * s + Math.max(0, foot.ty - foot.lground) * 1.15;
-        const bump = lerp(Math.sin(Math.PI * w) * (1.12 - 0.3 * w), Math.sin(Math.PI * Math.pow(w, 0.6)), run);
-        foot.ax = lerp(foot.lx, ex, e);
-        foot.ay = lerp(foot.ly, ey, e) + clearance * bump;
-        foot.az = lerp(foot.lz, ez, e);
-        foot.pitch = foot.lpitch * (1 - smooth(0, 0.5, w)) + strike * smooth(0.35, 1, w) - 0.12 * g * Math.sin(Math.PI * w) * (1 - run);
-        foot.toe = foot.ltoe * (1 - smooth(0, 0.3, w));
-        foot.swingYaw = foot.lyaw + wrap(foot.tyaw - foot.lyaw) * e;
-        foot.contact = Math.max(0.25 * (1 - smooth(0, 0.2, w)), smooth(0.82, 1, w));
-      } else {
-        // Stance: roll onto the sole, then up onto the toes (handing the body's weight over to the other foot)
-        const u = clamp01(lp / duty);
-        let pitch = 0;
-        let pivot = HEEL;
-        if (u < GAIT.heelRoll) {
-          const t = 1 - u / GAIT.heelRoll;
-          pitch = GAIT.heelStrike * g * (1 - run * 0.5) * t * t;
-        } else if (u > GAIT.heelOff) {
-          const t = (u - GAIT.heelOff) / (1 - GAIT.heelOff);
-          pitch = GAIT.toeOff * g * Math.pow(t, 1.6);
-          pivot = TOE_JOINT;
+        // When stopping, don't start an extra micro-step if this foot is already settled near rest
+        let needLift = speed > 0.14 || turningInPlace || other.swing;
+        if (!needLift) {
+          this.restPoint(foot, x, z, this.yaw, _v);
+          const fdx = foot.px - _v.x;
+          const fdz = foot.pz - _v.z;
+          const stopSettleSq = (0.15 * s) * (0.15 * s);
+          needLift = fdx * fdx + fdz * fdz > stopSettleSq
+            || Math.abs(wrap(foot.yaw - this.yaw - foot.side * GAIT.toeOut)) > 0.25;
         }
-        this.footAnkle(foot, pitch, pivot);
-        foot.toe = pitch > 0 ? -pitch : 0;
-        foot.swingYaw = foot.yaw;
-        // running, a foot carries the body only until mid-stance; behind the hips the leg just pushes off
-        foot.contact = 1 - 0.75 * smooth(lerp(GAIT.heelOff, 0.3, run), lerp(1, 0.62, run), u) * Math.max(g, run);
-        foot.stance = Math.sin(Math.PI * u);
+        if (needLift) this.liftOff(foot, x, z, 0);
       }
-      if (foot.swing) foot.stance = 0;
+      if (foot.swing) this.swingFoot(foot, other, clamp01((lp - duty) / (1 - duty)), tSwing, tStance, x, z, heading, turning, ground, owner);
+      else this.stanceFoot(foot, clamp01(lp / duty), x, z);
     }
 
-    // Pelvis: as high as the planted legs reach, never above a slightly bent standing height; sways over the foot
-    // carrying the weight
+    // Pelvis: sways over the foot carrying the weight (or the leg the person stands on), turns with the stride and
+    // drops on the side of the swinging leg
     const left = this.feet[0];
     const right = this.feet[1];
+    const idle = 1 - g;
     const zl = (left.ax - x) * sinY + (left.az - z) * cosY;
     const zr = (right.ax - x) * sinY + (right.az - z) * cosY;
-    const spreadF = (zl - zr) / s; // > 0 with the left foot ahead
+    const spreadF = (zl - zr) / s;
     const latL = (left.ax - x) * cosY - (left.az - z) * sinY;
     const latR = (right.ax - x) * cosY - (right.az - z) * sinY;
     const cSum = left.contact + right.contact;
-    const swayTarget = cSum > 0.01 ? ((left.contact * latL + right.contact * latR) / cSum) * 0.42 * g * (1 - run * 0.6) : 0;
-    this.sway += (swayTarget - this.sway) * (1 - Math.exp(-dt / 0.12));
-
-    this.pelvisYaw = Math.max(-0.13, Math.min(0.13, -0.13 * spreadF * g));
-    this.pelvisRoll = 0.045 * g * (left.contact - right.contact) * (1 - run * 0.5);
-    this.pelvisTilt = 0.035 + 0.035 * g + 0.12 * run;
+    const weightLat = cSum > 0.01 ? (left.contact * latL + right.contact * latR) / cSum : 0;
+    const swayTarget = weightLat * 0.4 * g * (1 - run * 0.65) - this.bank * 0.45 * s
+      + (IDLE.shift * this.lean + 0.004 * Math.sin(this.time * 0.7)) * s * idle;
+    this.sway += (swayTarget - this.sway) * _e12;
+    const activeSplit = this.thighSplit || spreadF;
+    const targetPelvisYaw = clampAbs(-0.13 * activeSplit * g, 0.14);
+    this.pelvisYaw += (targetPelvisYaw - this.pelvisYaw) * _e07;
+    const targetPelvisRoll = 0.042 * g * (left.contact - right.contact) * (1 - run * 0.55) + IDLE.roll * this.lean * idle;
+    this.pelvisRoll += (targetPelvisRoll - this.pelvisRoll) * _e10;
+    const fwdLean = 1 - 1.15 * this.back;
+    const prepSquat = smooth(0, 0.78, this.jumpPrep) * (1 - 0.55 * smooth(0.82, 1, this.jumpPrep));
+    const prepPush = smooth(0.76, 1, this.jumpPrep);
+    const targetPelvisTilt = 0.025 + (0.02 * g + (0.055 + 0.035 * sprint) * run) * fwdLean
+      + 0.14 * prepSquat * (1 - 0.5 * run);
+    this.pelvisTilt += (targetPelvisTilt - this.pelvisTilt) * (this.jumpPrep > 0.01 ? _e045 : _e15);
     this.spreadF = spreadF;
+    const turnArm = Math.sin(2 * Math.PI * this.phase) * 0.22 * smooth(0.4, 2.2, Math.abs(this.yawRate)) * (1 - g);
+    this.arm += (activeSplit + turnArm - this.arm) * _e045;
     this.setPelvisRotation();
 
-    const groundAvg = cSum > 0.01 ? (left.contact * left.py + right.contact * right.py) / cSum : (left.py + right.py) * 0.5;
-    const bend = lerp(lerp(0.997, 0.989, g), 0.965, run); // knees all but straight standing, ~15 degrees at mid-stance
-    // running: the legs give under the landing (lowest at mid-stance), the body floats between steps
-    const compress = run * s * (0.075 * Math.max(left.stance || 0, right.stance || 0) - 0.015);
-    let target = groundAvg + ANKLE_H * s + this.legLength * bend + (PELVIS_Y - HIP_Y) * s - compress;
-    const reach = this.legLength * 0.997;
-    const hard = [Infinity, Infinity];
+    // Height: walking follows Contact -> Down (~13% phase) -> Passing -> Up (~38% phase); running follows spring-mass
+    // mechanics (lowest at mid-stance compression, highest in aerial flight).
+    const stepWeights = left.contact + right.contact;
+    const footGround = stepWeights > 0.01 ? (left.contact * left.py + right.contact * right.py) / stepWeights : (left.py + right.py) * 0.5;
+    const groundAvg = lerp(footGround, ground(owner, x, z), 0.35 * g + 0.35 * run);
+    this.standY += (this.standingHeight(groundAvg) - this.standY) * ease(dt, 0.085);
+    const stepRatio = f > 0 ? Math.min(1.2, speed / (2 * f * 0.72 * s)) : 0;
+    const walkWave = 0.5 + 0.5 * Math.cos(4 * Math.PI * (this.phase - 0.13));
+    const walkDrop = s * g * GAIT.bob * stepRatio * walkWave;
+    const runWave = 0.5 + 0.5 * Math.cos(4 * Math.PI * (this.phase - duty * 0.45));
+    const runAmp = lerp(0.036, 0.02, sprint);
+    const runBase = lerp(0.014, 0.022, sprint);
+    const runDrop = s * (runBase + runAmp * runWave);
+    let y = this.standY - lerp(walkDrop, runDrop, run) - IDLE.drop * s * Math.abs(this.lean) * idle;
+
+    // ...never higher than the legs reach: planted feet hold the hips down during support, releasing smoothly at
+    // push-off as the leg enters aerial flight so trailing feet never yank the pelvis downward mid-air.
+    const lowest = this.standY - GAIT.maxDrop * s;
+    const k = s * (0.004 + 0.03 * Math.max(g, run)); // smooth where the constraints hand over in a stride
+    const swingRelease = 1.4 + 4.0 * run;
+    const landPrep = lerp(0.55, 4.0, run);
+    const runAir = run * s;
     for (let i = 0; i < 2; i++) {
       const foot = this.feet[i];
       this.hipOffset(i, _v);
       const hx = x + cosY * this.sway + _v.x;
       const hz = z - sinY * this.sway + _v.z;
-      const d = Math.hypot(foot.ax - hx, foot.az - hz);
-      const top = foot.ay + Math.sqrt(Math.max(0, reach * reach - d * d)) - _v.y;
-      if (foot.contact > 0.97) hard[i] = top;
-      target = Math.min(target, top + (1 - foot.contact) * lerp(0.35, 1.5, run));
+      if (foot.swing) {
+        const w = foot.w;
+        const tRem = (1 - w) * tSwing;
+        const flightFree = runAir * (0.18 + 0.25 * smooth(0, 0.1, w)) * (1 - 0.85 * smooth(0.9, 1, w));
+        const fromLiftOff = reachTop(foot.ax, foot.ay, foot.az, hx, hz, reach) + flightFree + swingRelease * s * w * w;
+        const toLanding = reachTop(foot.ex, foot.ey, foot.ez, hx + this.tvx * tRem, hz + this.tvz * tRem, reach) + flightFree + landPrep * s * (1 - w) * (1 - w);
+        const swingFloor = this.standingHeight(Math.min(foot.lground, foot.ty)) - GAIT.maxDrop * s;
+        y = smin(y, Math.max(Math.min(lowest, swingFloor), Math.min(fromLiftOff, toLanding) - _v.y), k);
+      } else {
+        const stanceRelease = (0.018 * g + 0.18 * run) * s * smooth(0.45, 1.0, 1 - foot.contact)
+          + 0.03 * run * s * (1 - smooth(0, 0.28, foot.stance));
+        const stanceFloor = this.standingHeight(foot.py) - GAIT.maxDrop * s;
+        y = smin(y, Math.max(Math.min(lowest, stanceFloor), reachTop(foot.ax, foot.ay, foot.az, hx, hz, reach) + stanceRelease - _v.y), k);
+      }
     }
-    this.pelvisY += (target - this.pelvisY) * (1 - Math.exp(-dt / 0.045));
-    this.pelvisY = Math.min(this.pelvisY, hard[0], hard[1]);
-    if (updatePose) this.solve();
+    this.basePelvisY += (y - this.basePelvisY) * _e045;
+    const prepDrop = s * lerp(0.115, 0.048, run) * prepSquat - s * 0.018 * prepPush;
+    this.pelvisY = this.basePelvisY - this.landDrop - prepDrop;
+  }
+
+  touchDown(foot) {
+    foot.swing = false;
+    foot.w0 = 0;
+    foot.px = foot.tx;
+    foot.py = foot.ty;
+    foot.pz = foot.tz;
+    foot.yaw = foot.tyaw;
+  }
+
+  liftOff(foot, x, z, w0 = 0) {
+    foot.swing = true;
+    foot.w0 = w0;
+    foot.lx = foot.ax;
+    foot.ly = foot.ay;
+    foot.lz = foot.az;
+    foot.rx = foot.ax - x;
+    foot.rz = foot.az - z;
+    foot.lyaw = foot.yaw;
+    foot.lpitch = foot.pitch;
+    foot.ltoe = foot.toe;
+    foot.lground = foot.py;
+  }
+
+  // Stance (u: 0 contact .. 1 push-off): forward walks roll heel-to-toe with early heel rise before opposite contact;
+  // runs cushion onto midfoot and drive off the ball of the foot; backward steps roll forefoot-to-heel
+  stanceFoot(foot, u, x, z) {
+    const g = this.gait;
+    const run = this.run;
+    const sprint = this.sprint;
+    const stepScale = smooth(0.15, 1.35, this.speed);
+    const heelOff = lerp(GAIT.heelOffWalk, GAIT.heelOffRun, run);
+    const toeOff = lerp(GAIT.toeOffWalk, GAIT.toeOffRun, run);
+    const strikePitch = GAIT.heelStrike * g * (1 - run * (0.52 + 0.36 * sprint));
+    let fPitch = 0;
+    if (u < GAIT.heelRoll) {
+      const t = 1 - u / GAIT.heelRoll;
+      fPitch = strikePitch * t * t;
+    } else if (u > heelOff) {
+      const t = (u - heelOff) / (1 - heelOff);
+      fPitch = toeOff * g * (0.45 + 0.55 * stepScale) * Math.pow(t, lerp(1.22, 1.35, run));
+    }
+    // Backward walk/jog: ball-of-foot touchdown (positive pitch) -> flat -> slight heel rock (negative pitch)
+    let bPitch = 0;
+    if (u < 0.26) {
+      const t = 1 - u / 0.26;
+      bPitch = 0.24 * g * (0.5 + 0.5 * stepScale) * t * t;
+    } else if (u > 0.72) {
+      const t = (u - 0.72) / 0.28;
+      bPitch = -0.08 * g * (1 - run * 0.5) * t * t;
+    }
+    const landCushion = this.landRoll * (1 - smooth(0.35, 1.8, this.speed))
+      + 0.36 * smooth(0.58, 1, this.jumpPrep) * (1 - 0.45 * run);
+    const pitch = lerp(fPitch, bPitch, this.back) + landCushion;
+    this.plant(foot, pitch, pitch > 0 ? TOE_JOINT : HEEL);
+    foot.rx = foot.ax - x;
+    foot.rz = foot.az - z;
+    foot.toe = pitch > 0 ? -pitch : 0;
+    foot.swingYaw = foot.yaw;
+    // running, a foot carries the body only until mid-stance; behind the hips the leg drives push-off
+    foot.contact = 1 - 0.75 * smooth(lerp(GAIT.heelOffWalk, 0.32, run), lerp(1, 0.65, run), u) * Math.max(g, run);
+    foot.stance = Math.sin(Math.PI * u);
+  }
+
+  // Swing (w: 0 toe-off .. 1 touchdown) carried smoothly in body-relative space towards the future foothold on the
+  // path, folding the heel high in running recovery, driving the front knee forward, and retracting into contact
+  swingFoot(foot, other, rawW, tSwing, tStance, x, z, heading, turning, ground, owner) {
+    const s = this.s;
+    const g = this.gait;
+    const run = this.run;
+    const sprint = this.sprint;
+    const w = foot.w0 !== 0 ? clamp01((rawW - foot.w0) / Math.max(0.05, 1 - foot.w0)) : rawW;
+    foot.w = w;
+    foot.stance = 0;
+    const tRem = (1 - rawW) * tSwing;
+    const yawPred = this.yaw + clampAbs(wrap(heading - this.yaw) + this.yawRate * tRem * 0.35, lerp(GAIT.turnRate, GAIT.walkTurnRate, g) * tRem);
+    const sn = Math.sin(yawPred);
+    const cs = Math.cos(yawPred);
+    const lat = foot.side * GAIT.spread * s;
+    const baseLead = lerp(GAIT.landLeadWalk, lerp(GAIT.landLeadRun, 0.37, sprint), run);
+    const leadShare = lerp(baseLead, 0.56, this.back) * (1 - GAIT.turnShorten * turning);
+    const leadTime = tStance * leadShare;
+    foot.tx = x + this.tvx * (tRem + leadTime) + cs * lat;
+    foot.tz = z + this.tvz * (tRem + leadTime) - sn * lat;
+    // left of the other foot for the left foot, right for the right (in the body's predicted frame)
+    const gap = GAIT.footGap * s;
+    const across = ((foot.tx - other.ax) * cs - (foot.tz - other.az) * sn) * foot.side;
+    if (!other.swing && across < gap) {
+      foot.tx += cs * foot.side * (gap - across);
+      foot.tz -= sn * foot.side * (gap - across);
+    }
+    foot.ty = ground(owner, foot.tx, foot.tz);
+    foot.tyaw = yawPred + foot.side * GAIT.toeOut;
+
+    const stepScale = smooth(0.15, 1.35, this.speed);
+    const fStrike = GAIT.heelStrike * g * (1 - run * (0.52 + 0.36 * sprint));
+    const bStrike = 0.22 * g * (0.5 + 0.5 * stepScale);
+    const strike = lerp(fStrike, bStrike, this.back);
+    ankleAt(foot.tx, foot.ty, foot.tz, foot.tyaw, strike, strike > 0 ? TOE_JOINT : HEEL, s, _v);
+    foot.ex = _v.x;
+    foot.ey = _v.y;
+    foot.ez = _v.z;
+
+    // Body-relative horizontal Hermite swing: brief toe-off follow-through, energetic mid-swing knee drive, and active
+    // terminal retraction (pawback) into touchdown without backward mid-air skating or forward goose-stepping
+    const futX = x + this.tvx * tRem;
+    const futZ = z + this.tvz * tRem;
+    const r1x = foot.ex - futX;
+    const r1z = foot.ez - futZ;
+    const drx = r1x - foot.rx;
+    const drz = r1z - foot.rz;
+    const v0Scale = lerp(0.26, 0.08, run) * (1 - 0.65 * this.back);
+    const m0x = clampAbs(-this.vx * tSwing * v0Scale, Math.abs(drx) * 0.45 + 0.04 * s);
+    const m0z = clampAbs(-this.vz * tSwing * v0Scale, Math.abs(drz) * 0.45 + 0.04 * s);
+    const m1Scale = lerp(0.32, 0.58, run) * (1 - 0.55 * this.back);
+    const m1x = clampAbs(-this.vx * tSwing * m1Scale, Math.abs(drx) * 1.05 + 0.04 * s);
+    const m1z = clampAbs(-this.vz * tSwing * m1Scale, Math.abs(drz) * 1.05 + 0.04 * s);
+    const w2 = w * w;
+    const w3 = w2 * w;
+    const h00 = 2 * w3 - 3 * w2 + 1;
+    const h10 = w3 - 2 * w2 + w;
+    const h01 = -2 * w3 + 3 * w2;
+    const h11 = w3 - w2;
+    foot.ax = x + h00 * foot.rx + h10 * m0x + h01 * r1x + h11 * m1x;
+    foot.az = z + h00 * foot.rz + h10 * m0z + h01 * r1z + h11 * m1z;
+
+    // Vertical swing: walking lifts early via knee flexion and arcs smoothly onto the heel at w=1; running folds the
+    // heel up in recovery while ramping down through late swing so the foot opens naturally towards the ground
+    const stepDown = foot.ty < foot.lground - 0.02;
+    const walkEY = stepDown ? smooth(0.36, 1, w) : smooth(0, 0.96, w);
+    const eY = lerp(walkEY, w2 * (3 - 2 * w), run);
+    const stepLen = Math.hypot(drx, drz);
+    const liveRun = smooth(1.8, 3.2, this.speed) * run;
+    const runClear = lerp(0.18, 0.28, sprint) * (1 - 0.45 * this.back) * s;
+    const stepChange = Math.max(0, foot.ty - foot.lground) * 1.15 + Math.max(0, foot.lground - foot.ty) * 0.25;
+    const walkClear = (0.022 + 0.036 * Math.min(1, stepLen / (0.8 * s))) * s;
+    const walkBump = 0.72 * Math.sin(Math.PI * Math.pow(w, 0.72)) + 0.28 * Math.sin(Math.PI * w);
+    const runBump = Math.sin(Math.PI * Math.pow(w, 0.68)) * (1 - 0.22 * w2);
+    foot.ay = lerp(foot.ly, foot.ey, eY) + lerp(walkClear * walkBump, runClear * runBump, liveRun) + stepChange * Math.sin(Math.PI * w);
+
+    // swing round the planted foot rather than through it
+    const pass = ((foot.ax - other.ax) * cs - (foot.az - other.az) * sn) * foot.side;
+    const along = Math.abs((foot.ax - other.ax) * sn + (foot.az - other.az) * cs);
+    if (!other.swing && pass < gap) {
+      const out = (gap - pass) * Math.sin(Math.PI * w) * (1 - smooth(0.12 * s, 0.3 * s, along));
+      foot.ax += cs * foot.side * out;
+      foot.az -= sn * foot.side * out;
+    }
+
+    // Base swing foot pitch from push-off to touchdown (refined against actual shin angle in solve())
+    const midLift = lerp(-0.12 * (1 - run), 0.06, this.back) * g * Math.sin(Math.PI * w);
+    foot.pitch = foot.lpitch * (1 - smooth(0, 0.5, w)) + strike * smooth(0.55, 1, w) + midLift;
+    foot.toe = lerp(foot.ltoe, 0, smooth(0, 0.3, w));
+    const eYaw = w2 * (3 - 2 * w);
+    foot.swingYaw = foot.lyaw + wrap(foot.tyaw - foot.lyaw) * eYaw;
+    const solePitch = Math.sin(foot.pitch);
+    const minAnkleY = ground(owner, foot.ax, foot.az) + ANKLE_H * s + Math.max(solePitch * 0.14 * s, -solePitch * 0.08 * s);
+    if (foot.ay < minAnkleY) foot.ay = minAnkleY;
+    foot.contact = Math.max(0.25 * (1 - smooth(0, 0.2, w)), smooth(0.82, 1, w));
   }
 
   setPelvisRotation() {
     qY(_qPelvis, this.yaw + this.pelvisYaw);
-    _qPelvis.multiply(qZ(_q, this.pelvisRoll)).multiply(qX(_q, this.pelvisTilt));
+    _qPelvis.multiply(qZ(_q, this.pelvisRoll + this.bank)).multiply(qX(_q, this.pelvisTilt));
   }
 
   // Hip joint relative to the pelvis joint (out.y < 0: the hips are below it)
   hipOffset(i, out) {
     const j = this.bind;
     return out.copy(j[LIMB.thigh[i]]).sub(j[BONE.PELVIS]).multiplyScalar(this.s).applyQuaternion(_qPelvis);
+  }
+
+  // Joint `child` of a bone rotated by q whose joint `parent` is at parentPos
+  jointFrom(parent, child, q, parentPos, out) {
+    const j = this.bind;
+    return out.copy(j[child]).sub(j[parent]).multiplyScalar(this.s).applyQuaternion(q).add(parentPos);
   }
 
   writeBone(b, q, p) {
@@ -1324,100 +2229,254 @@ class PersonRig {
     a[o + 7] = s;
   }
 
+  // Foot at `ankle` rotated by qFoot, toes bent by `toeBend` (+ down) at the ball of the foot
+  writeFoot(i, ankle, qFoot, toeBend) {
+    this.writeBone(LIMB.foot[i], qFoot, ankle);
+    this.jointFrom(LIMB.foot[i], LIMB.toe[i], qFoot, ankle, _v);
+    _q2.copy(qFoot).multiply(qX(_q, toeBend));
+    this.writeBone(LIMB.toe[i], _q2, _v);
+  }
+
   // Bone rotation whose +Y points `up` (from the child joint to this one) and +Z towards `front`
   basis(up, front, out) {
     _by.copy(up).normalize();
     _bz.copy(front).addScaledVector(_by, -front.dot(_by));
-    if (_bz.lengthSq() < 1e-8) _bz.set(0, 0, 1).addScaledVector(_by, -_by.z);
+    if (_bz.lengthSq() < 1e-8) {
+      if (Math.abs(_by.z) < 0.9) _bz.set(0, 0, 1).addScaledVector(_by, -_by.z);
+      else _bz.set(0, 1, 0).addScaledVector(_by, -_by.y);
+    }
     _bz.normalize();
     _bx.crossVectors(_by, _bz);
     _m.makeBasis(_bx, _by, _bz);
     return out.setFromRotationMatrix(_m);
   }
 
-  // Two-bone leg IK; kneeLift raises the knee pole for a low, recumbent pedal-boat seat.
+  /**
+   * Two-bone IK from `root` towards `target`, the middle joint bending towards `pole`. Writes both bones (+Z towards
+   * `front`, keeping the lower segment on the upper segment's hinge axis, then turned back by the limb's bind-pose tilt
+   * about Z) and returns the end joint reached (in _ankle).
+   */
+  limb(upper, lower, root, target, l1, l2, pole, front, tilt = 0, soft = 0) {
+    _dir.subVectors(target, root);
+    const length = _dir.length();
+    _dir.divideScalar(length || 1);
+    const maxLen = l1 + l2;
+    let dist;
+    if (soft > 0) {
+      const margin = maxLen * soft;
+      const free = maxLen * (1 - soft * 1.15);
+      dist = length <= free
+        ? length
+        : free + margin * (1 - Math.exp(-(length - free) / margin));
+    } else {
+      dist = Math.min(maxLen * 0.9999, length);
+    }
+    dist = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min(maxLen * 0.9999, dist));
+    _bend.copy(pole).addScaledVector(_dir, -pole.dot(_dir));
+    if (_bend.lengthSq() < 1e-8) _bend.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+    _bend.normalize();
+    const cosA = (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist);
+    _knee.copy(root).addScaledVector(_dir, l1 * cosA).addScaledVector(_bend, l1 * Math.sqrt(Math.max(0, 1 - cosA * cosA)));
+    _ankle.copy(root).addScaledVector(_dir, dist);
+    this.basis(_v2.subVectors(root, _knee), front, _qUpper);
+    _ux.copy(_bx);
+    if (tilt) _qUpper.multiply(qZ(_q, -tilt));
+    this.writeBone(upper, _qUpper, root);
+
+    // Lower segment shares the upper segment's lateral hinge axis (_ux), preventing 180° twist flips on high kicks
+    _by.subVectors(_knee, _ankle).normalize();
+    _bz.crossVectors(_ux, _by);
+    if (_bz.lengthSq() < 1e-8) {
+      this.basis(_v2.subVectors(_knee, _ankle), front, _q2);
+    } else {
+      _bz.normalize();
+      _bx.crossVectors(_by, _bz);
+      _m.makeBasis(_bx, _by, _bz);
+      _q2.setFromRotationMatrix(_m);
+    }
+    if (tilt) _q2.multiply(qZ(_q, -tilt));
+    this.writeBone(lower, _q2, _knee);
+    return _ankle;
+  }
+
+  // Leg from the hip to the ankle target, knee towards the foot's heading, with soft full-extension cushion;
+  // kneeLift raises the knee pole for a low, recumbent seat (the cargo bike's rider)
   solveLeg(i, hip, ankleTarget, footYaw, kneeLift = 0) {
     const s = this.s;
-    const l1 = THIGH * s;
-    const l2 = SHIN * s;
-    _v.subVectors(ankleTarget, hip);
-    let dist = _v.length();
-    const dn = _v.divideScalar(dist || 1);
-    dist = Math.max(Math.abs(l1 - l2) + 1e-3, Math.min((l1 + l2) * 0.9999, dist));
     _pole.set(Math.sin(footYaw) + Math.sin(this.yaw), kneeLift, Math.cos(footYaw) + Math.cos(this.yaw));
-    _pole.addScaledVector(dn, -_pole.dot(dn));
-    if (_pole.lengthSq() < 1e-8) _pole.set(Math.sin(this.yaw), 0, Math.cos(this.yaw));
-    _pole.normalize();
-    const cosA = (l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist);
-    const sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-    _knee.copy(hip).addScaledVector(dn, l1 * cosA).addScaledVector(_pole, l1 * sinA);
-    _ankle.copy(hip).addScaledVector(dn, dist);
-    this.reachError = Math.max(this.reachError || 0, _ankle.distanceTo(ankleTarget));
-    if (this.feet[i].contact > 0.97) this.stanceReachError = Math.max(this.stanceReachError || 0, _ankle.distanceTo(ankleTarget));
-    const front = _front.set(Math.sin(footYaw), 0, Math.cos(footYaw)).add(_pole);
-    this.writeBone(LIMB.thigh[i], this.basis(_v2.subVectors(hip, _knee), front, _q), hip);
-    this.writeBone(LIMB.shin[i], this.basis(_v2.subVectors(_knee, _ankle), front, _q), _knee);
-    return _ankle;
+    _front.set(Math.sin(footYaw), 0, Math.cos(footYaw)).addScaledVector(_pole, 0.5);
+    return this.limb(LIMB.thigh[i], LIMB.shin[i], hip, ankleTarget, THIGH * s, SHIN * s, _pole, _front, 0, 0.012);
+  }
+
+  // Grounded escape animation, independent of the walking gait and evaluated only for visible people.
+  solveDive(time, groundY) {
+    const s = this.s;
+    let frame = 0;
+    while (frame < DIVE_POSES.length - 2 && time > DIVE_POSES[frame + 1][0]) frame++;
+    const a = DIVE_POSES[frame];
+    const b = DIVE_POSES[frame + 1];
+    const t = smooth(a[0], b[0], time);
+    const key = (k) => lerp(a[k], b[k], t);
+    const pitch = key(2);
+    const footPitch = key(12);
+    const footClearance = ANKLE_H * Math.cos(footPitch) + 0.208 * Math.sin(footPitch);
+    // a point given in the escape frame (metres before scaling), on the ground under the person
+    const local = (out, lx, ly, lz) => {
+      out.set(lx, ly, lz).multiplyScalar(s).applyQuaternion(_qRoot);
+      out.x += this.x;
+      out.y += groundY;
+      out.z += this.z;
+      return out;
+    };
+    qY(_qRoot, this.yaw);
+    _qPelvis.copy(_qRoot).multiply(qX(_q, pitch));
+    _pelvis.set(this.x, groundY + key(1) * s, this.z);
+    this.pelvisY = _pelvis.y;
+    this.writeBone(BONE.PELVIS, _qPelvis, _pelvis);
+    _qChest.copy(_qRoot).multiply(qX(_q, key(3)));
+    this.writeBone(BONE.CHEST, _qChest, this.jointFrom(BONE.PELVIS, BONE.CHEST, _qPelvis, _pelvis, _chest));
+    _qa.copy(_qRoot).multiply(qX(_q, key(4)));
+    this.writeBone(BONE.HEAD, _qa, this.jointFrom(BONE.CHEST, BONE.HEAD, _qChest, _chest, _v));
+    _front.set(0, 0, 1).applyQuaternion(_qChest);
+
+    for (let i = 0; i < 2; i++) {
+      const side = SIDES[i];
+      this.jointFrom(BONE.CHEST, LIMB.upperArm[i], _qChest, _chest, _shoulder);
+      local(_target, side * key(7), key(5), key(6));
+      _pole.set(side * 0.9, 0.25, -0.5).applyQuaternion(_qRoot);
+      this.limb(LIMB.upperArm[i], LIMB.forearm[i], _shoulder, _target, UPPER_ARM * s, (FOREARM + 0.07) * s, _pole, _front, side * ARM_BIND_ABDUCTION);
+
+      this.jointFrom(BONE.PELVIS, LIMB.thigh[i], _qPelvis, _pelvis, _hip);
+      local(_target, side * GAIT.spread, Math.max(footClearance, key(8 + i * 2)), key(9 + i * 2));
+      // Knees fold towards the chest, then tuck beneath the hips for the rise. A little outward bend keeps
+      // the knees clear of the pavement when the body is lying flat.
+      _pole.set(side * 0.45 * Math.sin(pitch), -0.2 * Math.sin(pitch), Math.cos(pitch)).applyQuaternion(_qRoot);
+      const ankle = this.limb(LIMB.thigh[i], LIMB.shin[i], _hip, _target, THIGH * s, SHIN * s, _pole, _front);
+      this.writeFoot(i, ankle, _qa.copy(_qRoot).multiply(qX(_q, footPitch)), 0);
+    }
   }
 
   // Bones of the whole body from the feet, pelvis and gait state (world space)
   solve() {
     const s = this.s;
-    const j = this.bind;
     const g = this.gait;
     const run = this.run;
+    const sprint = this.sprint;
+    const airB = this.airBlend;
     const yaw = this.yaw;
-    if (this.pelvisYaw === undefined) {
-      this.pelvisYaw = this.pelvisRoll = 0;
-      this.pelvisTilt = 0.035;
-      this.spreadF = 0;
-    }
+    const sinY = Math.sin(yaw);
+    const cosY = Math.cos(yaw);
+    const idle = (1 - g) * (1 - airB);
+    const fwdLean = 1 - 1.15 * this.back;
     this.setPelvisRotation();
-    _pelvis.set(this.x + Math.cos(yaw) * this.sway, this.pelvisY, this.z - Math.sin(yaw) * this.sway);
+    _pelvis.set(this.x + cosY * this.sway, this.pelvisY, this.z - sinY * this.sway);
     this.writeBone(BONE.PELVIS, _qPelvis, _pelvis);
 
-    // Chest counter-rotates against the pelvis, leans into the walk; the head stays level, looking ahead
-    const idle = 1 - g;
-    const breathe = Math.sin(this.time * 1.7) * 0.008 * idle;
-    _qChest.copy(_qPelvis)
-      .multiply(qY(_q, -1.75 * this.pelvisYaw))
-      .multiply(qX(_q, 0.015 + 0.03 * g + 0.14 * run + breathe))
-      .multiply(qZ(_q, -0.8 * this.pelvisRoll));
-    _chest.copy(j[BONE.CHEST]).sub(j[BONE.PELVIS]).multiplyScalar(s).applyQuaternion(_qPelvis).add(_pelvis);
-    this.writeBone(BONE.CHEST, _qChest, _chest);
-
-    const look = Math.sin(this.time * 0.37 + this.seed) * 0.25 * idle * idle;
-    qY(_qa, this.lookYaw ?? yaw + look).multiply(qX(_q, 0.05 - 0.1 * run));
-    _v.copy(j[BONE.HEAD]).sub(j[BONE.CHEST]).multiplyScalar(s).applyQuaternion(_qChest).add(_chest);
-    this.writeBone(BONE.HEAD, _qa, _v);
-
-    // Arms swing against the legs (elbows bend more on the forward swing, ~90 degrees running)
-    const swingAmp = 0.42 * this.armSwing * g * (1 + run * 0.6);
-    for (let i = 0; i < 2; i++) {
-      const side = SIDES[i];
-      const flex = 0.06 - side * this.spreadF * swingAmp + idle * 0.02;
-      const abduction = 0.1 + (this.girth - 1) * 0.35 + run * 0.08 + (this.armOut || 0);
-      _shoulder.copy(j[LIMB.upperArm[i]]).sub(j[BONE.CHEST]).multiplyScalar(s).applyQuaternion(_qChest).add(_chest);
-      _qUpper.copy(_qChest).multiply(qZ(_q, side * (abduction - ARM_BIND_ABDUCTION))).multiply(qX(_q, -flex));
-      this.writeBone(LIMB.upperArm[i], _qUpper, _shoulder);
-      const elbow = 0.2 + 0.55 * Math.max(0, flex) + 0.1 * g + run * 1.05;
-      _v.copy(j[LIMB.forearm[i]]).sub(j[LIMB.upperArm[i]]).multiplyScalar(s).applyQuaternion(_qUpper).add(_shoulder);
-      _q2.copy(_qUpper).multiply(qX(_q, -elbow));
-      this.writeBone(LIMB.forearm[i], _q2, _v);
-    }
-
-    // Legs: IK to the ankles, then the feet & toes
+    // Solve legs first so actual world knee & ankle separation drives zero-lag contralateral arm & chest motion
+    let kneeSplit = 0;
+    let ankleSplit = 0;
     for (let i = 0; i < 2; i++) {
       const foot = this.feet[i];
       const footYaw = foot.swing ? foot.swingYaw : foot.yaw;
-      _hip.copy(j[LIMB.thigh[i]]).sub(j[BONE.PELVIS]).multiplyScalar(s).applyQuaternion(_qPelvis).add(_pelvis);
-      _target.set(foot.ax, foot.ay, foot.az);
-      const ankle = this.solveLeg(i, _hip, _target, footYaw);
-      qY(_qa, footYaw).multiply(qX(_q, foot.pitch));
-      this.writeBone(LIMB.foot[i], _qa, ankle);
-      _v.copy(j[LIMB.toe[i]]).sub(j[LIMB.foot[i]]).multiplyScalar(s).applyQuaternion(_qa).add(ankle);
-      qY(_q2, footYaw).multiply(qX(_q, foot.pitch + foot.toe));
-      this.writeBone(LIMB.toe[i], _q2, _v);
+      this.jointFrom(BONE.PELVIS, LIMB.thigh[i], _qPelvis, _pelvis, _hip);
+      const ankle = this.solveLeg(i, _hip, _target.set(foot.ax, foot.ay, foot.az), footYaw);
+      const sign = i === 0 ? 1 : -1;
+      kneeSplit += sign * ((_knee.x - this.x) * sinY + (_knee.z - this.z) * cosY);
+      ankleSplit += sign * ((ankle.x - this.x) * sinY + (ankle.z - this.z) * cosY);
+      let pitch = foot.pitch;
+      const toe = foot.toe;
+      if (foot.swing || (this.wasAirborne && airB > 0.05)) {
+        const shinFwd = (_knee.x - ankle.x) * Math.sin(footYaw) + (_knee.z - ankle.z) * Math.cos(footYaw);
+        const shinPitch = Math.atan2(shinFwd, _knee.y - ankle.y);
+        if (foot.swing) {
+          const w = foot.w;
+          const followW = Math.sin(Math.PI * w) * (0.5 + 0.5 * run) * (1 - 0.55 * this.back);
+          const naturalPitch = shinPitch * 0.9 + 0.12 * run * (1 - this.back);
+          pitch = lerp(pitch, naturalPitch, followW);
+          pitch = Math.max(shinPitch - 0.42, Math.min(shinPitch + 0.6, pitch));
+        } else {
+          const airClear = smooth(0.06 * s, 0.22 * s, ankle.y - (foot.py + ANKLE_H * s));
+          const airNatural = Math.max(shinPitch - 0.36, Math.min(shinPitch + 0.68, pitch + shinPitch * 0.45));
+          pitch = lerp(pitch, airNatural, airB * airClear);
+        }
+      }
+      this.writeFoot(i, ankle, qY(_qa, footYaw).multiply(qX(_q, pitch)), toe);
+    }
+    this.thighSplit = clampAbs(0.62 * (kneeSplit / (THIGH * s)) + 0.38 * (ankleSplit / (0.62 * s)), 1.35);
+
+    // Chest counter-rotates against the pelvis and leans athletically into the walk/run/landing; the head stays level
+    const vyNorm = clampAbs(this.airVel / (5.2 * s), 1.25);
+    const jumpProg = clamp01(0.5 - 0.5 * clampAbs(vyNorm, 1));
+    const ascentArc = Math.sin(Math.PI * Math.pow(jumpProg, 0.54)); // rises briskly on launch, sweeps down through descent
+    const descendReach = smooth(0.32, 0.92, jumpProg);
+    const prepSquat = smooth(0, 0.78, this.jumpPrep) * (1 - 0.55 * smooth(0.82, 1, this.jumpPrep));
+    const prepBackswing = Math.sin(Math.PI * smooth(0, 0.88, this.jumpPrep)) * (1 - 0.55 * run);
+    const prepDrive = smooth(0.7, 1, this.jumpPrep) * (1 - 0.55 * run);
+    const landNorm = this.landDrop / s;
+    const breathe = Math.sin(this.time * 1.7) * 0.008 * idle;
+    const chestLean = 0.012 + (0.018 * g + (0.065 + 0.035 * sprint) * run) * fwdLean
+      + 0.2 * prepSquat * (1 - 0.5 * run) - 0.07 * airB * clamp01(vyNorm) + 1.15 * landNorm;
+    _qChest.copy(_qPelvis)
+      .multiply(qY(_q, -1.75 * this.pelvisYaw))
+      .multiply(qX(_q, chestLean + breathe))
+      .multiply(qZ(_q, -0.8 * this.pelvisRoll));
+    this.writeBone(BONE.CHEST, _qChest, this.jointFrom(BONE.PELVIS, BONE.CHEST, _qPelvis, _pelvis, _chest));
+    const look = Math.sin(this.time * 0.37 + this.seed) * 0.22 * idle * idle;
+    const headPitch = 0.015 * idle - 0.02 * run * (1 - this.back) - 0.16 * prepSquat - 0.04 * airB * clamp01(vyNorm) - 0.38 * landNorm;
+    qY(_qa, this.lookYaw ?? yaw + this.headTurn + look).multiply(qX(_q, headPitch));
+    this.writeBone(BONE.HEAD, _qa, this.jointFrom(BONE.CHEST, BONE.HEAD, _qChest, _chest, _v));
+
+    // Arms: relaxed symmetric pendulum in walk; energetic "cheek-to-hip-pocket" pump in run; backswing -> upward punch
+    // -> open downward sweep in jumps (or contralateral hurdle sail in running jumps); soft counterweight on landing
+    const armSignal = lerp(this.arm, this.thighSplit, 0.65 * g);
+    const armScale = this.armSwing * Math.max(g, 0.35 * smooth(0.4, 2.2, Math.abs(this.yawRate)));
+    const fwdRun = run * (1 - 0.6 * this.back);
+    const moveJump = smooth(0.75, 3.3, this.speed) * (1 - 0.45 * this.back);
+    const backScale = 1 - 0.42 * this.back;
+    for (let i = 0; i < 2; i++) {
+      const side = SIDES[i];
+      const drive = -side * armSignal * armScale;
+      const posD = 0.5 * (drive + Math.sqrt(drive * drive + 0.015));
+      const negD = posD - drive;
+      const walkFlex = drive * 0.46;
+      const runFlex = -0.03 + posD * (0.58 + 0.1 * sprint) - negD * (0.64 + 0.12 * sprint);
+      const prepArmFlex = (-0.52 * prepBackswing + 0.42 * prepDrive) * backScale;
+      const landArmFlex = landNorm * 0.78 * (1 - 0.65 * run) * (1 - 0.5 * this.back);
+      const groundFlex = lerp(walkFlex, runFlex, fwdRun) + idle * 0.01 + prepArmFlex + landArmFlex;
+
+      const oppLead = -side * this.jumpLead;
+      // Standing/walking jump: explosive upward punch on launch (`prepDrive -> launchUp`), peaking early in ascent
+      // before sweeping open and down beside the hips through apex and descent (no horizontal mid-air hold!)
+      const launchUp = 1 - smooth(0.06, 0.56, jumpProg);
+      const jumpStandFlex = ((0.64 * launchUp + 0.16 * ascentArc) * (1 - descendReach) - 0.18 * descendReach) * backScale;
+      // Running jump: contralateral hurdle lift on ascent, smoothly counter-swinging into landing stride on descent
+      const jumpRunFlex = oppLead > 0
+        ? lerp(0.88, 0.22, descendReach)
+        : lerp(-0.56, -0.14, descendReach);
+      const airFlex = lerp(jumpStandFlex, jumpRunFlex, moveJump);
+      const flex = lerp(groundFlex, airFlex, airB);
+
+      const jumpAbd = 0.14 + 0.2 * Math.sin(Math.PI * jumpProg) + (oppLead < 0 ? 0.08 * moveJump : 0);
+      const abduction = 0.095 + (this.girth - 1) * 0.35 + run * (0.06 + 0.03 * sprint) + this.back * run * 0.05
+        + 0.1 * prepSquat + airB * jumpAbd + landNorm * 1.65 + (this.armOut || 0); // (armOut: balancing on skates or a board)
+      const crossIn = -side * ((0.05 * g + (0.16 + 0.08 * sprint) * fwdRun) * Math.min(1.1, posD) * (1 - airB)
+        + (0.1 * (1 - moveJump) + 0.18 * moveJump) * airB * Math.max(0, airFlex));
+      this.jointFrom(BONE.CHEST, LIMB.upperArm[i], _qChest, _chest, _shoulder);
+      _qUpper.copy(_qChest)
+        .multiply(qZ(_q, side * (abduction - ARM_BIND_ABDUCTION)))
+        .multiply(qY(_q, crossIn))
+        .multiply(qX(_q, -flex));
+      this.writeBone(LIMB.upperArm[i], _qUpper, _shoulder);
+      const walkElbow = 0.14 * idle + 0.075 * g + 0.42 * posD;
+      const runElbow = (1.14 + 0.08 * sprint) + posD * (0.38 + 0.1 * sprint) - negD * 0.1;
+      const prepElbow = 0.42 * prepBackswing + 1.15 * prepDrive;
+      const groundElbow = lerp(walkElbow, runElbow, fwdRun) + prepElbow + landNorm * 1.95 * (1 - 0.65 * run);
+      const standAirElbow = (1.28 * launchUp + 0.48 * ascentArc) * (1 - 0.8 * descendReach) + 0.2 * descendReach;
+      const runAirElbow = oppLead > 0 ? lerp(1.38, 1.1, descendReach) : lerp(0.95, 1.08, descendReach);
+      const airElbow = lerp(standAirElbow, runAirElbow, moveJump);
+      const elbow = lerp(groundElbow, airElbow, airB);
+      this.jointFrom(LIMB.upperArm[i], LIMB.forearm[i], _qUpper, _shoulder, _v);
+      this.writeBone(LIMB.forearm[i], _q2.copy(_qUpper).multiply(qX(_q, -elbow)), _v);
     }
   }
 
@@ -1642,4 +2701,5 @@ class PersonRig {
   }
 }
 
-export { BONE as PERSON_BONES, buildPersonGeometry, createPersonMaterial, PersonCrowd, PersonRig };
+
+export { BONE as PERSON_BONES, buildPersonGeometry, createPersonMaterial, PersonCrowd, PersonRig, PEDESTRIAN_DIVE_DURATION };

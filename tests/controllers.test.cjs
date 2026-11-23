@@ -980,3 +980,60 @@ test('a skater running into a wall loses the speed into it', () => {
   controller.updatePerson(0.1);
   assert.equal(p.speed, 0);
 });
+
+// The walker (slop-newyork 63df441 / 536a907): curbs stepped on the ground, a crouch before each jump, no speed piling up
+// against a wall
+function walkerHarness({ ground = () => 0, wall = false } = {}) {
+  const { controller } = keyboardHarness();
+  const shadow = { position: { y: 0.02 }, scale: { x: 1, set(x) { this.x = x; } } };
+  const airs = [];
+  const p = { position: { x: 0, y: ground(0, 0), z: 0 }, heading: 0, speed: 0, verticalVel: 0, jumping: false, jumpPrep: 0,
+    avatar: 'man', shadow, rig: { update(_dt, _x, _z, _h, _g, _o, air) { airs.push(air); } },
+    crowd: { begin() {}, add() {}, end() {} } };
+  controller.activeMode = 'person';
+  controller.entities = { person: p, cyclist: null, cargobike: null };
+  controller.hideInactive = true;
+  controller.getGroundHeight = (x, z) => ground(x, z);
+  controller.resolveHorizontalCollision = wall ? (pos, r, c, e, prev) => { pos.x = prev.x; pos.z = prev.z; } : () => {};
+  const frame = () => { controller.updatePerson(1 / 60); controller.poseCharacters(1 / 60); };
+  return { controller, p, shadow, airs, frame };
+}
+
+test('the walker steps down a curb on the ground, without a jump', () => {
+  const { controller, p, airs, frame } = walkerHarness({ ground: (x, z) => (z < 0.5 ? 0.13 : 0) });
+  controller.keys.forward = true;
+  for (let i = 0; i < 70; i++) { // (the walker gets going gradually: past the curb after about 0.6 s)
+    frame();
+    assert.equal(p.jumping, false);
+  }
+  assert.ok(p.position.z > 0.5 && Math.abs(p.position.y) < 1e-3, `down at ${p.position.y}`);
+  assert.ok(airs.every((a) => a === 0), 'the rig is told it stands on the ground');
+});
+
+test('a jump crouches first, then leaves the ground, its shadow staying on the pavement', () => {
+  const { controller, p, shadow, airs, frame } = walkerHarness();
+  controller.keys.up = true;
+  frame();
+  controller.keys.up = false;
+  assert.ok(p.jumpPrep > 0 && !p.jumping && p.position.y === 0, 'still on the ground, crouching');
+  for (let i = 0; i < 18; i++) frame();
+  assert.ok(airs.some((a) => a < 0), 'the rig crouched (negative air)');
+  assert.ok(p.jumping && p.position.y > 0.5, `in the air at ${p.position.y}`);
+  assert.ok(Math.abs(p.position.y + shadow.position.y - 0.02) < 1e-9, 'the shadow stays on the ground');
+  assert.ok(shadow.scale.x < 0.85, 'and shrinks under the jump');
+  for (let i = 0; i < 60; i++) frame();
+  assert.equal(p.jumping, false);
+  assert.equal(p.position.y, 0);
+});
+
+test('walking into a wall builds up no speed, so backing away is immediate', () => {
+  const { controller, p } = walkerHarness({ wall: true });
+  controller.keys.forward = true;
+  for (let i = 0; i < 120; i++) controller.updatePerson(1 / 60);
+  assert.ok(p.speed < 0.05, `held at ${p.speed}`);
+  controller.keys.forward = false;
+  controller.keys.backward = true;
+  controller.resolveHorizontalCollision = () => {};
+  controller.updatePerson(1 / 60);
+  assert.ok(p.speed < 0, 'backing away at once');
+});

@@ -32,6 +32,7 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 
 // Spawn by the Kortdage venue (Aalborg Kongres & Kultur Center); main.js places every mode at TELEPORT_LOCATIONS.akkc on boot
 const SPAWN_Z = TELEPORT_LOCATIONS.akkc.z;
+const JUMP_LEAD = 0.085; // s: the walker's crouch before a jump leaves the ground
 const groundCollider = { type: 'ground' };
 
 // The drone: 60 km/h, 75 km/h in sport (Shift); at most 120 m above the ground (the EU open-category limit); teleports arrive 40 m up
@@ -463,6 +464,14 @@ class ThirdPersonControllerManager {
     ent.speed = 0;
     if (this.activeMode === 'person') {
       ent.verticalVel = 0;
+      ent.jumping = false;
+      ent.jumpPrep = 0;
+      ent.prevX = ent.position.x;
+      ent.prevZ = ent.position.z;
+      if (ent.shadow) {
+        ent.shadow.position.y = 0.02;
+        ent.shadow.scale.set(1, 1, 1);
+      }
       ent.rig.reset(ent.position.x, ent.position.z, ent.heading, personGround, this);
       ent.crowd.begin();
       ent.crowd.add(ent.rig, 0);
@@ -598,6 +607,7 @@ class ThirdPersonControllerManager {
       type: 'person',
       label: PERSON_AVATARS.man.label,
       mesh: root,
+      shadow: pedShadow,
       crowd,
       rig,
       rigs,
@@ -610,6 +620,8 @@ class ThirdPersonControllerManager {
       heading: 0,
       speed: 0,
       verticalVel: 0,
+      jumping: false,
+      jumpPrep: 0, // s left of the crouch before a jump leaves the ground (slop-newyork 536a907)
       cameraTargetOffset: new THREE.Vector3(0, 1.55, 0),
       chaseDistance: 4.3,
       chaseHeight: 1.95
@@ -1860,16 +1872,28 @@ class ThirdPersonControllerManager {
   // pedals, helmet on its head
   poseCharacters(dt) {
     const p = this.entities.person;
-    const air = p.position.y - this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
-    const ride = PERSON_AVATARS[p.avatar]?.ride;
-    if (ride) this.poseSkater(dt, p, ride, air > 0.02 ? air : 0);
-    else p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, air > 0.02 ? air : 0);
-    p.crowd.begin();
-    p.crowd.add(p.rig, 0);
-    p.crowd.end();
+    if (!this.hideInactive || this.activeMode === 'person') {
+      const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
+      const air = p.position.y - groundY;
+      const ride = PERSON_AVATARS[p.avatar]?.ride;
+      if (ride) this.poseSkater(dt, p, ride, air > 0.02 ? air : 0);
+      else {
+        const jumpAir = p.jumping ? Math.max(0.006, air) : p.jumpPrep > 0 ? -(1 - p.jumpPrep / JUMP_LEAD) : air > 0.3 ? air : 0;
+        if (p.shadow) {
+          p.shadow.position.y = groundY - p.position.y + 0.02;
+          const scale = Math.max(0.45, 1 - Math.max(0, jumpAir) * 0.35);
+          p.shadow.scale.set(scale, scale, 1);
+        }
+        p.rig.update(dt, p.position.x, p.position.z, p.heading, personGround, this, jumpAir);
+      }
+      p.crowd.begin();
+      p.crowd.add(p.rig, 0);
+      p.crowd.end();
+    }
 
     for (const mode of ['cyclist', 'cargobike']) {
       const bike = this.entities[mode];
+      if (this.hideInactive && this.activeMode !== mode) continue; // (hidden: nothing to pose)
       if (this.activeMode !== mode) {
         bike.standAmount += (0 - bike.standAmount) * Math.min(1, dt * 3);
         bike.bikeFrame.upright = bike.standAmount;
@@ -1925,8 +1949,8 @@ class ThirdPersonControllerManager {
 
     if (this.activeMode === 'person') {
       this.updatePerson(dt, elapsed);
-    } else {
-      // Keep the sidewalk pedestrian walking naturally when not actively controlled
+    } else if (!this.hideInactive) {
+      // Keep the sidewalk pedestrian walking naturally when not actively controlled (until the boot warm-up hides it)
       const p = this.entities.person;
       const walkSpeed = 1.48;
       p.speed = walkSpeed;
@@ -1988,22 +2012,58 @@ class ThirdPersonControllerManager {
     if (this.keys.left) p.heading += turnRate * dt * this.keys.left;
     if (this.keys.right) p.heading -= turnRate * dt * this.keys.right;
 
-    p.speed += (targetSpeed - p.speed) * Math.min(1, dt * 10);
+    if (dt <= 0) return;
+    const accelerating = Math.abs(targetSpeed) > Math.abs(p.speed) && p.speed * targetSpeed >= 0;
+    const acceleration = accelerating ? 5.5 * Math.abs(targetSpeed) / 8.2 : 12;
+    p.speed += Math.max(-acceleration * dt, Math.min(acceleration * dt, targetSpeed - p.speed));
 
     const previousPosition = { x: p.position.x, z: p.position.z };
-    p.position.x += Math.sin(p.heading) * p.speed * dt;
-    p.position.z += Math.cos(p.heading) * p.speed * dt;
+    p.prevX = previousPosition.x;
+    p.prevZ = previousPosition.z;
+    const sinH = Math.sin(p.heading), cosH = Math.cos(p.heading);
+    const nextX = previousPosition.x + sinH * p.speed * dt;
+    const nextZ = previousPosition.z + cosH * p.speed * dt;
+    p.position.x = nextX;
+    p.position.z = nextZ;
     this.resolveHorizontalCollision(p.position, 0.48, null, p, previousPosition);
+    // held back by a wall or the water: no speed building up against it
+    if (Math.abs(p.position.x - nextX) > 1e-6 || Math.abs(p.position.z - nextZ) > 1e-6) {
+      const actual = ((p.position.x - previousPosition.x) * sinH + (p.position.z - previousPosition.z) * cosH) / dt;
+      if (p.speed > 0 && actual < p.speed) p.speed = Math.max(0, actual);
+      else if (p.speed < 0 && actual > p.speed) p.speed = Math.min(0, actual);
+    }
 
     const groundY = this.getGroundHeight(p.position.x, p.position.z, 'person', p.position.y);
-    if (this.keys.up && p.position.y <= groundY + 0.02) {
-      p.verticalVel = 5.2;
+    const settle = () => {
+      // up and down ordinary curbs on the ground, so the planted footsteps carry the body smoothly
+      p.position.y += (groundY - p.position.y) * (1 - Math.exp(-dt * 18));
+      if (Math.abs(groundY - p.position.y) < 1e-3) p.position.y = groundY;
+    };
+    if (this.keys.up && p.position.y <= groundY + 0.02 && !p.jumping && !(p.jumpPrep > 0)) p.jumpPrep = JUMP_LEAD;
+    if (p.jumpPrep > 0) {
+      p.jumpPrep = Math.max(0, p.jumpPrep - dt);
+      settle();
+      if (p.jumpPrep === 0) {
+        p.verticalVel = 5.2;
+        p.jumping = true;
+      }
     }
-    p.verticalVel -= 14.5 * dt;
-    p.position.y += p.verticalVel * dt;
-    if (p.position.y < groundY) {
-      p.position.y = groundY;
+    if (p.jumping || p.position.y > groundY + 0.3) {
+      if (p.position.y > groundY + 0.3) {
+        p.jumping = true;
+        p.jumpPrep = 0;
+      }
+      p.verticalVel -= 14.5 * dt;
+      p.position.y += p.verticalVel * dt;
+      if (p.position.y <= groundY) {
+        p.position.y = groundY;
+        p.verticalVel = 0;
+        p.jumping = false;
+      }
+    } else if (!(p.jumpPrep > 0)) {
+      settle();
       p.verticalVel = 0;
+      p.jumping = false;
     }
   }
 
