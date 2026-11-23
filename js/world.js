@@ -916,6 +916,7 @@ async function buildStreamedWorld(scene, store, { markInit, debug, water, treeDa
     const networkOptions = {
       walkable: walk.walkable, onSidewalk: walk.onSidewalk, blockAt: walk.blockAt,
       roadAt: walkLimits.roadAt, hazardAt: walkLimits.hazardAt, parkPaths: walkLimits.parkPaths,
+      carriagewayAt: walkLimits.carriagewayAt,
       // walking lines step round the near tiles' furniture (bike racks, trees, benches)
       obstruction: (ax, az, bx, bz) => collisionStage.obstructedLength(ax, az, bx, bz),
       // pedestrians walk outside the cycle track beside a carriageway

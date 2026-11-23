@@ -89,6 +89,12 @@ export function createWalkLimits({ deckAt = null, hotspots = null } = {}) {
     return found && !onDeck(x, z) ? found : null;
   }
 
+  /** Is (x, z) on a carriageway, a bridge deck's included? (Where traffic may swerve or be shoved, js/traffic.js.) */
+  function carriagewayAt(x, z) {
+    for (const t of tiles.values()) if (t.roads.at(x, z).depth > 0.02) return true;
+    return false;
+  }
+
   /** Is (x, z) in the water or on the railway? */
   function hazardAt(x, z) {
     for (const t of tiles.values()) {
@@ -99,5 +105,5 @@ export function createWalkLimits({ deckAt = null, hotspots = null } = {}) {
 
   // the paths change when the hotspots do (the nightlife data arrives after the first tiles): js/pedestrian-routes.js rebuilds on a new stamp
   parkPaths.stamp = () => (hotspots ? hotspots() : null);
-  return { add, remove: (tag) => tiles.delete(tag), has: (tag) => tiles.has(tag), roadAt, hazardAt, parkPaths };
+  return { add, remove: (tag) => tiles.delete(tag), has: (tag) => tiles.has(tag), roadAt, carriagewayAt, hazardAt, parkPaths };
 }
