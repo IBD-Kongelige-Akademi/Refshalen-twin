@@ -46,6 +46,8 @@ import {
   normalize,
   reflect,
   pow,
+  log2,
+  exp2,
   sign,
   fwidth,
   texture,
@@ -53,7 +55,6 @@ import {
   mrt,
   If,
   sqrt,
-  exp2,
   specularColor,
   specularColorBlended,
   specularF90
@@ -80,23 +81,33 @@ const cityUniforms = {
   uCanyonBounce: uniform(0.52)
 };
 
-// Fast deterministic 2D -> 1D hash in TSL
-const hash2D = Fn(([p]) => {
-  return fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
-});
+// The leaf helpers below with a layout (setLayout) are WGSL functions, built once per shader; without one, a Fn's body is
+// built again into the shader at every call (slop-newyork 5756a76: the shaders' WGSL shrinks and they compile faster)
 
-// Smooth 2D value noise in TSL
+// Deterministic 2D -> [0, 1) hash: fract(sin(dot(p, k)) * 43758.5) on the input wrapped (exactly) into [0, 1024), so sin's
+// argument stays below ~4e5. Unwrapped, it reaches the millions for centimetre detail a few hundred metres from the origin,
+// where sin loses its precision and the hash breaks down into rows & stripes of repeats (slop-newyork 3074b1f; the
+// constants are kept, so inputs already in [0, 1024), the facades' cells, hash as before)
+const hash2D = Fn(([p]) => {
+  return hashWrapped(fract(vec2(p).mul(1.0 / 1024.0)).mul(1024.0));
+}).setLayout({ name: 'hash2D', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
+const hashWrapped = (q) => fract(sin(dot(q, vec2(127.1, 311.7))).mul(43758.5453));
+
+// Smooth 2D value noise in TSL (its lattice wraps every 1024 cells, like hash2D's: the cell is wrapped once and its far
+// corners wrap round to 0 with it, so the noise stays continuous across the wrap)
 const noise2D = Fn(([p]) => {
   const pv = vec2(p).toVar();
   const i = floor(pv).toVar();
   const f = fract(pv).toVar();
   const u = f.mul(f).mul(float(3.0).sub(f.mul(2.0))).toVar();
-  const a = hash2D(i);
-  const b = hash2D(i.add(vec2(1.0, 0.0)));
-  const c = hash2D(i.add(vec2(0.0, 1.0)));
-  const d = hash2D(i.add(vec2(1.0, 1.0)));
+  const i0 = fract(i.mul(1.0 / 1024.0)).mul(1024.0).toVar();
+  const i1 = i0.add(1.0).mul(step(i0, vec2(1022.5))).toVar();
+  const a = hashWrapped(i0);
+  const b = hashWrapped(vec2(i1.x, i0.y));
+  const c = hashWrapped(vec2(i0.x, i1.y));
+  const d = hashWrapped(i1);
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-});
+}).setLayout({ name: 'noise2D', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
 /**
  * Mikkelsen's Surface-Gradient Hardware Derivative Bump Mapping (ported from CityGeneratorUtils.js)
@@ -152,6 +163,10 @@ const filteredPulse = Fn(([x, a, b, w]) => {
   const hw = max(float(w), 0.0001).mul(0.5).toVar();
   const integral = (t) => floor(t).mul(hi.sub(lo)).add(clamp(fract(t), lo, hi).sub(lo));
   return integral(p.add(hw)).sub(integral(p.sub(hw))).div(hw.mul(2.0));
+}).setLayout({
+  name: 'filteredPulse',
+  type: 'float',
+  inputs: [{ name: 'x', type: 'float' }, { name: 'a', type: 'float' }, { name: 'b', type: 'float' }, { name: 'w', type: 'float' }]
 });
 
 // Danish-format brick (228 x 108 x 54 mm, 10 mm joints): 238 mm per brick, 6.7 courses per 0.4 m
@@ -166,6 +181,27 @@ const brickMortar = (u, v, joint = 0.010) => {
   const head = gridLine(col.mul(BRICK_L), BRICK_L, joint).mul(float(1.0).sub(bed));
   return { mortar: max(bed, head), row, col };
 };
+
+// Keep distant lit windows in 1–2 pixel clusters. Adjacent world-anchored scales cross-fade, and
+// the half-width inset leaves room for filtering at cell edges while preserving mean brightness.
+const distantWindowLight = Fn(([grid, fw, probability, seed, lod]) => {
+  const light = float(probability).toVar();
+  If(cityUniforms.uInteriorGlow.greaterThan(0.5).and(lod.greaterThan(0.0)), () => {
+    const level = log2(max(max(fw.x, fw.y).mul(4.0), 2.0)).toVar();
+    const scale = exp2(floor(level)).toVar();
+    const cluster = (size) => {
+      const p = grid.div(size).toVar();
+      const width = fw.div(size).toVar();
+      const lit = step(float(1.0).sub(probability), hash2D(floor(p).add(vec2(seed, 73.1))));
+      const coverage = filteredPulse(fract(p.x), 0.25, 0.75, width.x)
+        .mul(filteredPulse(fract(p.y), 0.25, 0.75, width.y));
+      return lit.mul(coverage).mul(4.0);
+    };
+    const clustered = mix(cluster(scale), cluster(scale.mul(2.0)), smoothstep(0.0, 1.0, fract(level)));
+    light.assign(mix(probability, clustered, smoothstep(0.5, 1.2, cityUniforms.uInteriorGlow)));
+  });
+  return light;
+});
 
 /**
  * Occlusion-Aware Urban Canyon Sky Visibility (aoNode)
@@ -209,11 +245,11 @@ const apartmentLight = (pick) => mix(color(0xff9e59), color(0xffb375), pick); //
  *   set back behind the facade so neighbouring windows look into the same full-sized room.
  * - Includes left & right fabric drapes hung just inside the window frame (`winUV`) from a 6-swatch
  *   domestic palette that block interior glow (`emit = 0.20`) so drapes silhouette against lit rooms.
- * - Once windows shrink to a pixel or two (`fwNode`: pixel footprint in cells) rooms glow at the mean lit level (with
- *   a lit room's tint), drapes at their mean coverage & lamps fade out, so distant towers don't twinkle in motion.
+ * - Once windows shrink to a pixel or two (`fwNode`: pixel footprint in cells), lit rooms merge into filtered
+ *   clusters, drapes settle to their mean coverage & lamps fade out, so distant towers don't twinkle in motion.
  * - Returns `vec4(roomColor, litEmit)`.
  */
-const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, floorHNode, seedNode, warmthNode, litProbNode, fwNode, wallTanNode, cphNode, setbackNode]) => {
+const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, floorHNode, seedNode, warmthNode, litProbNode, fwNode, wallTanNode, cphNode, setbackNode, drapeFwNode]) => {
   const u = float(uCoord).toVar();
   const v = float(vCoord).toVar();
   const wUV = vec2(winUV).toVar();
@@ -342,7 +378,7 @@ const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, 
   const lw = sL.mul(sL).mul(0.48); // Left drape width (0..48% of window width)
   const rw = sR.mul(sR).mul(0.48); // Right drape width (0..48% of window width)
   // Drape edges widen to the pixel footprint & pleats fade to their mean shade once they'd shrink below a few pixels
-  const cFw = fwidth(cUVx).toVar();
+  const cFw = float(drapeFwNode).toVar(); // (fwidth(cUVx), see interiorDrapeFootprint)
   const drapeAA = cFw.add(0.015).toVar();
   const inLeftDrape = smoothstep(lw.add(drapeAA), lw.sub(drapeAA), cUVx).mul(step(0.03, lw));
   const inRightDrape = smoothstep(float(1.0).sub(rw).sub(drapeAA), float(1.0).sub(rw).add(drapeAA), cUVx).mul(step(0.03, rw));
@@ -370,8 +406,41 @@ const evaluateApartmentInterior = Fn(([uCoord, vCoord, winUV, cellId, winWNode, 
   const roomWarmth = mix(vec3(1.0), lightCol, lit.mul(0.85));
   const finalRoomCol = bestCol.mul(roomWarmth).mul(mix(float(0.85), float(1.35), lit));
 
-  return vec4(finalRoomCol, mix(litRoom, litProbNode, lod).mul(bestEmit));
+  const distantLit = distantWindowLight(vec2(gridU, v.div(fH)), fwNode, litProbNode, seedNode, lod);
+  return vec4(finalRoomCol, mix(litRoom, distantLit, lod).mul(bestEmit));
 });
+
+// Pixel footprint of the drapes' parallax-shifted coordinate (`cUVx` in evaluateApartmentInterior), on the same view ray
+// across the wall (its own tangent where it has one). Derivatives need uniform control flow, so it is taken before the
+// branch in apartmentInteriorBehind() (slop-newyork f3635e7)
+const interiorDrapeFootprint = Fn(([winUV, wallTanNode]) => {
+  const rayWorld = normalize(positionWorld.sub(cameraPosition));
+  const tSign = mix(sign(facadeWorldNormal.z).negate(), sign(facadeWorldNormal.x), facadeAlongZ);
+  const legacyTan = vec3(facadeWorldNormal.z.negate(), 0.0, facadeWorldNormal.x).mul(tSign);
+  const hasTan = step(0.5, dot(wallTanNode, wallTanNode));
+  const dirX = dot(rayWorld, mix(legacyTan, wallTanNode, hasTan));
+  const dirZ = max(abs(dot(rayWorld, facadeWorldNormal)), 0.05);
+  return fwidth(clamp(vec2(winUV).x.add(dirX.div(dirZ).mul(0.06)), 0.0, 1.0));
+});
+
+/**
+ * The apartment interior, raycast only where `coverage` (the share of the pixel that is glazing) is non-zero. Walls,
+ * frames, spandrels and roofs skip it (a median 0.6 ms a frame on an M1 in slop-newyork): their outputs weight the
+ * interior by that coverage, or by a narrower mask.
+ */
+function apartmentInteriorBehind(coverage, uCoord, vCoord, winUV, cellId, winW, floorH, seed, warmth, litProb, fw, wallTan, cph, setback) {
+  const drapeFootprint = interiorDrapeFootprint(winUV, wallTan);
+  return Fn(() => {
+    // both derivative-based inputs are evaluated here, outside the branch
+    const fwv = vec2(fw).toVar();
+    const drapeFw = float(drapeFootprint).toVar();
+    const room = vec4(0.0).toVar();
+    If(coverage.greaterThan(0.0), () => {
+      room.assign(evaluateApartmentInterior(uCoord, vCoord, winUV, cellId, winW, floorH, seed, warmth, litProb, fwv, wallTan, cph, setback, drapeFw));
+    });
+    return room;
+  })();
+}
 
 /**
  * Treatment of each wall of a box-local facade box (createFacadeBoxes `faces`, read by facadeCell). shop: street front
@@ -638,17 +707,16 @@ function createCurtainWallMaterial(opts = {}) {
     vec2(0.0),
     vec2(1.0)
   );
-  const aptRoom = evaluateApartmentInterior(uCoord, vCoord, winUV, cellId, bayWidth, facade.floorH, uSeed, uWarmth, wallAttr ? apartmentOccupancy() : uLitProbability.mul(0.65), fw, facade.wallTan, float(wallAttr ? 1 : 0), float(0.12));
+  // No glass in a storey the box cuts short (solid spandrel instead) nor behind the coping; the emissive pane mask lies inside it
+  const isGlassPane = filteredPulse(cellUV.x, mullionThickness * 0.5, 1.0 - mullionThickness * 0.5, fw.x)
+    .mul(filteredPulse(cellUV.y, spandrelRatio + 0.015, 1.0 - mullionThickness * 0.5, fw.y))
+    .mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(partial)).mul(float(1.0).sub(coping));
+  const aptRoom = apartmentInteriorBehind(isGlassPane, uCoord, vCoord, winUV, cellId, bayWidth, facade.floorH, uSeed, uWarmth, wallAttr ? apartmentOccupancy() : uLitProbability.mul(0.65), fw, facade.wallTan, float(wallAttr ? 1 : 0), float(0.12));
   const shopLit = step(0.24, hash2D(cellId.add(vec2(uSeed, 19.4))));
   const floorIdx = floor(gridV);
   const isMechFloor = float(1.0).sub(step(1.0, mod(floorIdx.add(uSeed), 16.0))).mul(step(4.0, floorIdx));
 
   mat.colorNode = Fn(() => {
-    // No glass in a storey the box cuts short (solid spandrel instead) nor behind the coping
-    const isGlassPane = filteredPulse(cellUV.x, mullionThickness * 0.5, 1.0 - mullionThickness * 0.5, fw.x)
-      .mul(filteredPulse(cellUV.y, spandrelRatio + 0.015, 1.0 - mullionThickness * 0.5, fw.y))
-      .mul(float(1.0).sub(isRoof)).mul(float(1.0).sub(partial)).mul(float(1.0).sub(coping));
-
     const louverStripes = sin(vCoord.mul(22.0)).mul(0.5).add(0.5);
 
     // Per-Pane Thermal/Wind Glass Warble & Pillow Distortion
@@ -911,7 +979,9 @@ function createPreWarBuildingMaterial(opts = {}) {
     .mul(float(1).sub(corniceBand)).mul(float(1).sub(stringCourse));
   const glazingMask = openingMask.mul(throughReveal).mul(glassInner).mul(float(1).sub(danishSash));
   const occupancy = CPH ? apartmentOccupancy() : uLitProbability.mul(0.62);
-  const aptRoom = evaluateApartmentInterior(CPH ? uCoord.add(shift.x) : uCoord, vCoord, winUV, cellId, bayWidth, facade.floorH,
+  // (Copenhagen-frame facades build their glass and glow masks from openingMask; the older path's own window mask isn't
+  // provably inside it, so its interior is evaluated everywhere as before)
+  const aptRoom = apartmentInteriorBehind(CPH ? openingMask : float(1.0), CPH ? uCoord.add(shift.x) : uCoord, vCoord, winUV, cellId, bayWidth, facade.floorH,
     uSeed, uWarmth, occupancy, fw, facade.wallTan, float(CPH ? 1 : 0), float(CPH ? 0 : 0.12));
   const shopLit = step(0.24, hash2D(cellId.add(vec2(uSeed, 19.4))));
   const bulbCol = CPH ? apartmentLight(hash2D(cellId.add(vec2(uSeed, 83.1))))
