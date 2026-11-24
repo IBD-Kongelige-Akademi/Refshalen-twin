@@ -119,6 +119,12 @@ async function initApp() {
 
   // 4. Initialize Third-Person Controllers (Person, Car, both Bikes, Drone) & Multi-Camera System
   const controllerManager = new ThirdPersonControllerManager(scene, allColliders);
+  // People knocked down land on the same ground as the player and bounce off the same buildings & street furniture
+  trafficSystem.setWorld?.({
+    ground: (x, z) => controllerManager.getGroundHeight(x, z, 'person'),
+    colliders: (x, z, r) => controllerManager.nearColliders(x, z, r),
+    contact: (c, x, y, z, r, out) => controllerManager.sphereContact(c, x, y, z, r, out)
+  });
   controllerManager.groundField = world.groundHeight || null;
   controllerManager.roofHeightAt = world.roofHeightAt || null;
   if (world.staticIndex) controllerManager.staticIndex = world.staticIndex; // streamed city: per-tile colliders

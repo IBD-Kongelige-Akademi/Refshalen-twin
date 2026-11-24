@@ -494,3 +494,17 @@ test('a hard hit leaves the driver shaken for 4 to 7 s, a nudge does not', () =>
   applyImpact(crashed, actor, other, -1, 0, 30);
   assert.ok(crashed.shaken >= 14 && crashed.shaken <= 17, `shaken until ${crashed.shaken}`);
 });
+
+test('drivers stop short of someone lying in their way, not of someone off to the side', () => {
+  const fallen = [];
+  const fallenGap = trafficFunction('fallenGap', { pedestrianSystem: { fallen }, LOOKAHEAD: 70, Math });
+  const car = { x: 0, z: 0, yaw: 0, half: 2.25, halfWidth: 0.9 };
+  assert.equal(fallenGap(car), Infinity, 'nobody down');
+  fallen.push({ x: 0.5, z: 20 });
+  const gap = fallenGap(car);
+  assert.ok(Math.abs(gap - (20 - 2.25 - 1.1)) < 1e-9, `stops a body's length short (${gap})`);
+  fallen[0].x = 4; // lying on the sidewalk beside the lane
+  assert.equal(fallenGap(car), Infinity);
+  fallen[0].x = 0; fallen[0].z = -10; // behind it
+  assert.equal(fallenGap(car), Infinity);
+});
