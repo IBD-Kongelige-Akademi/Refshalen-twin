@@ -243,3 +243,47 @@ test('teleport releases every camera pointer and ignores old gestures before acc
   close(h.camera.orbitYawOffset, -0.065);
   assert.equal(h.camera.isDragging, true);
 });
+
+test('the chase camera keeps the entity centred as it orbits around it', () => {
+  for (const type of ['person', 'car', 'cyclist', 'helicopter']) {
+    for (const heading of [0, 1.1, -2.4]) {
+      for (const yaw of [0, 0.7, Math.PI / 2, 2.6, Math.PI, -1.9]) {
+        const h = cameraHarness({
+          position: new Vector3(40, 3, 100), heading, speed: 0, type,
+          chaseDistance: 6.9, chaseHeight: 2.12, cameraTargetOffset: new Vector3(0, 1, 0)
+        });
+        h.camera.orbitYawOffset = yaw;
+        for (let i = 0; i < 300; i++) h.camera.update(1 / 60, i / 60);
+        const cam = h.camera.camera.position;
+        const target = h.camera.camera.target;
+        const p = h.entity.position;
+        // seen from above, the entity lies on the line of sight, between the camera and the point it looks at
+        const ex = p.x - cam.x, ez = p.z - cam.z, tx = target.x - cam.x, tz = target.z - cam.z;
+        assert.ok(Math.abs(ex * tz - ez * tx) < 1e-6 * Math.hypot(ex, ez) * Math.hypot(tx, tz), `${type} heading ${heading} orbit ${yaw}: entity off the line of sight`);
+        assert.ok(ex * tx + ez * tz > 0 && Math.hypot(tx, tz) > Math.hypot(ex, ez), `${type} heading ${heading} orbit ${yaw}: looks past the entity`);
+      }
+    }
+  }
+});
+
+test('the follow cameras keep their distance at speed and widen their field of view instead', () => {
+  for (const preset of ['chase', 'action']) {
+    const h = cameraHarness();
+    h.camera.setCameraPreset(preset, true);
+    const behind = () => Math.hypot(h.camera.camera.position.x - h.entity.position.x, h.camera.camera.position.z - h.entity.position.z);
+    for (let i = 0; i < 120; i++) h.camera.update(1 / 60, i / 60);
+    const restDistance = behind();
+    assert.equal(h.camera.camera.fov, preset === 'chase' ? 56 : 60);
+    h.entity.speed = 30;
+    for (let i = 0; i < 300; i++) {
+      h.entity.position.z += 30 / 60;
+      h.camera.update(1 / 60, 2 + i / 60);
+    }
+    close(behind(), restDistance);
+    assert.ok(Math.abs(h.camera.camera.fov - ((preset === 'chase' ? 56 : 60) + 30 * 0.35)) < 0.05, `${preset} fov ${h.camera.camera.fov}`);
+    // a scenic camera keeps its own field of view whatever the speed
+    h.camera.setCameraPreset('drone');
+    h.camera.update(1 / 60, 8);
+    assert.equal(h.camera.camera.fov, 50);
+  }
+});
