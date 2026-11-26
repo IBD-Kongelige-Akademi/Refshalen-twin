@@ -48,6 +48,23 @@ Result (snapshot 2026-11-22): 5,820 buildings in 30 tiles, 1,153 roads, 26 water
 entrances, ~12,000 trees (GeoDanmark, OSM and crowns detected in the point cloud, heights from the point cloud), 2,087 lamps, benches,
 bins, bollards, bike racks, bus stops and monuments, 90 nightlife venues (Nyhavn, Gothersgade, Reffen ...).
 
+Photo facades (the March/August 2021 Skråfoto flight; skraafoto-cdn.dataforsyningen.dk must be reachable):
+
+```sh
+export APPEARANCE_WORK=data/raw/appearance-2021
+uv run tools/geodata/appearance_city.py tones all --workers 3
+uv run tools/geodata/appearance_city_final.py calibrate
+uv run tools/geodata/appearance_city_final.py finalize --workers 3
+uv run tools/geodata/appearance_city_final.py register
+uv run tools/geodata/appearance_city_atlas.py atlas all --workers 3
+uv run --with pillow --with numpy --with scipy python tools/geodata/facade_layout.py run all --workers 4
+uv run tools/geodata/far_lod.py && uv run tools/geodata/build_city.py --stage index --stage report
+python3 tools/hosting/build_packs.py --out data-packs --offline --no-overrides
+```
+
+Result: observed wall and roof tones for the nine cells, 3,186 facade atlases (53 MB webp), measured window grids on 3,559 walls;
+the packed data is 52 files, 55 MB.
+
 Run locally with the packed data: `python tools/hosting/serve_range.py --port 8010`, then http://127.0.0.1:8010/?data=./data-packs
 
 ## Content
@@ -62,11 +79,6 @@ Run locally with the packed data: `python tools/hosting/serve_range.py --port 80
 ## Not done yet
 
 - **No LoD2 roofs**: the Aalborg roofs came from Ramboll's CityJSON; Copenhagen needs another LoD2 source (or roofs from the DHM point cloud).
-- **No Skråfoto facades** (photo colours, facade atlases, measured windows): the appearance pipeline (`appearance_city.py` ...) reads the
-  obliques from skraafoto-cdn.dataforsyningen.dk, which the cloud build environment cannot reach. It runs as is on a laptop with the
-  Dataforsyningen token in `.env`; until then the walls use the BBR-material tones and procedural windows.
-- The Plusbus still wears Aalborg's colours and runs no line here; the detail overrides (Utzon, Budolfi ...) are Aalborg's and simply absent.
-- Tiles with bridges keep small slivers of ground (up to ~150 m²) under the decks over the water.
 - 2,032 of the 5,820 footprints have no BBR record through `bbruuid` (Holmen, the Navy, many in Frederiksstaden): they get default use and
   year. A spatial join to BBR's building points would recover most.
 - The tile list's land share (`city_tiles.py`) is wrong for the larger box (the OSM-API coastline is cut at the request edges); nothing
