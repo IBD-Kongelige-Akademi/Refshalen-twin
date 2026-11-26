@@ -25,11 +25,11 @@ test('four tiles fill one LoD2 cell', () => {
   assert.deepEqual([...cells], [['6323_555', 4]]);
 });
 
-test('the district touches 4x4 tiles; edge contact does not leak', () => {
+test('the district touches 6x5 tiles; edge contact does not leak', () => {
   const [x0, z0, x1, z1] = CPH_FRAME.bbox;
   const ids = tilesForLocalBbox([x0, z0, x1, z1]);
-  assert.equal(ids.length, 16);
-  assert.ok(ids.includes('1452_12353') && ids.includes('1455_12356'));
+  assert.equal(ids.length, 30);
+  assert.ok(ids.includes('1450_12352') && ids.includes('1455_12356'));
   assert.deepEqual(tilesForBbox([727000, 6177500, 727500, 6178000]), ['1454_12355']);
   assert.equal(tilesForBbox([727000, 6177500, 727500, 6178000], 1).length, 9);
 });

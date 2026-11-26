@@ -23,8 +23,8 @@ def test_roundtrip():
 
 
 def test_bbox_corners_match_district():
-    assert frame.to_local(726000, 6178500) == (-1000.0, -1000.0)
-    assert frame.to_local(728000, 6176500) == (1000.0, 1000.0)
+    assert frame.to_local(725000, 6178500) == (-2000.0, -1000.0)
+    assert frame.to_local(728000, 6176000) == (1000.0, 1500.0)
 
 
 def test_ccw_in_map_plane_from_cw_input():

@@ -44,10 +44,9 @@ class Mirror:
 
     def con(self):
         if self._con is None:
-            import duckdb
+            import datagrundlag
 
-            self._con = duckdb.connect()
-            self._con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='eu-west-1';")
+            self._con = datagrundlag.duck_connect()
         return self._con
 
     def rows(self, source: str, table: str, suffix: str, sql: str, params: list, cols: list[str]) -> list[dict]:
@@ -57,7 +56,7 @@ class Mirror:
             return json.loads(p.read_text(encoding="utf-8"))
         url, date = DG.asset_url(source, table, "data")
         t0 = time.time()
-        out = [dict(zip(cols, r)) for r in self.con().execute(sql.format(src=f"read_parquet('{url}')"), params).fetchall()]
+        out = [dict(zip(cols, r)) for r in self.con().execute(sql.format(src=__import__("datagrundlag").parquet_src(self.con(), url)), params).fetchall()]
         DG._write(p, json.dumps(out, ensure_ascii=False, separators=(",", ":")))
         DG.record_snapshot(source, table, date, records=len(out))
         DG.log(f"[addresses] {source}.{table} ({date}): {len(out)} records ({time.time() - t0:.0f}s)")

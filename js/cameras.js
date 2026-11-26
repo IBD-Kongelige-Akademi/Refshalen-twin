@@ -15,6 +15,9 @@ const CAMERA_PRESETS = [
   { id: 'operaen', name: 'Operaen', short: 'Operaen',     category: 'scenic', fov: 54 },
   { id: 'akademiet', name: 'Det Kongelige Akademi', short: 'Akademiet',  category: 'scenic', fov: 56 },
   { id: 'cc', name: 'Copenhagen Contemporary', short: 'CC', category: 'scenic', fov: 56 },
+  { id: 'marmorkirken', name: 'Marmorkirken', short: 'Marmorkirken', category: 'scenic', fov: 50 },
+  { id: 'operaparken', name: 'Operaparken', short: 'Operaparken', category: 'scenic', fov: 56 },
+  { id: 'kai', name: 'KAI', short: 'KAI', category: 'scenic', fov: 56 },
   { id: 'banchina', name: 'La Banchina', short: 'Banchina',   category: 'scenic', fov: 56 },
   { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
 ];
@@ -28,6 +31,9 @@ const SCENIC_VIEWS = {
   operaen: { back: 25, up: 6, ahead: 40, lookY: 12, sway: 2 },
   akademiet: { back: 20, up: 5, ahead: 40, lookY: 8, sway: 2 },
   cc: { back: 20, up: 6, ahead: 40, lookY: 8, sway: 3 },
+  marmorkirken: { back: 30, up: 6, ahead: 110, lookY: 30, sway: 2 },
+  operaparken: { back: 20, up: 6, ahead: 35, lookY: 4, sway: 3 },
+  kai: { back: 20, up: 6, ahead: 45, lookY: 8, sway: 3 },
   banchina: { back: 15, up: 4, ahead: 60, lookY: 2, sway: 2 }
 };
 
@@ -311,6 +317,9 @@ class CameraSystem {
       case 'operaen':
       case 'akademiet':
       case 'cc':
+      case 'marmorkirken':
+      case 'operaparken':
+      case 'kai':
       case 'banchina': {
         const view = SCENIC_VIEWS[this.activePresetId];
         const loc = TELEPORT_LOCATIONS[this.activePresetId];

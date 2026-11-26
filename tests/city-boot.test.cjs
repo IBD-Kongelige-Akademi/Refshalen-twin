@@ -61,14 +61,14 @@ test('the Refshaleøen frame matches docs/cph-geodata-schema.md', async () => {
   const [e0, n0, h0] = CPH_FRAME.origin;
   assert.deepEqual([e0, n0], [727000.0, 6177500.0]);
   assert.equal(CPH_FRAME.epsg, 25832);
-  assert.deepEqual([...CPH_FRAME.bbox], [-1000, -1000, 1000, 1000]);
+  assert.deepEqual([...CPH_FRAME.bbox], [-2000, -1000, 1000, 1500]);
   assert.match(CPH_FRAME.axes, /x=east, z=south/);
   const p = toLocal(e0 + 100, n0 + 40, h0 + 3);
   assert.ok([p.x - 100, p.y - 3, p.z + 40].every((d) => Math.abs(d) < 1e-9), 'north is -z');
   const back = toEtrs(p.x, p.z, p.y);
   assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
-  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -1000, 1000, 1000]);
-  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['reffen', 'operaen', 'akademiet', 'mastekranen', 'bw', 'cc', 'banchina']);
+  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-2000, -1000, 1000, 1500]);
+  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['reffen', 'operaen', 'akademiet', 'mastekranen', 'bw', 'cc', 'marmorkirken', 'operaparken', 'kai', 'banchina']);
 });
 
 test('the city config is the Refshaleøen one', async () => {

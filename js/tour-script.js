@@ -59,7 +59,7 @@ const TOUR_STOPS = [
     title: 'B&W Hallerne',
     sub: 'The shipyard halls',
     beats: [
-      { express: true, hold: 10, caption: 'B&W Hallerne: the shipyard halls of Burmeister & Wain, now venues and studios.', do: [...GOLDEN, { mode: 'person' }, { camera: 'bw' }, { building: BW_ID }] },
+      { express: true, hold: 8, caption: 'B&W Hallerne: the shipyard halls of Burmeister & Wain, now venues and studios.', do: [...GOLDEN, { mode: 'person' }, { camera: 'bw' }, { building: BW_ID }] },
       { hold: 11, caption: 'Click any building for its data: address, year, heights, roof and where each value comes from.', do: [{ building: BW_ID }] },
       { hold: 11, caption: 'Building levels: the plain white massing from the footprints and heights…', do: [{ level: 'white' }] },
       { hold: 12, caption: '…and the full city with generated windows and doors. Press L to step through them yourself.', do: [{ level: 'full' }] }
@@ -70,7 +70,7 @@ const TOUR_STOPS = [
     title: 'Copenhagen Contemporary',
     sub: 'Art hall',
     beats: [
-      { express: true, hold: 10, caption: 'Copenhagen Contemporary at twilight in Copenhagen weather: overcast skies and wet roads that mirror the lights.', do: [{ time: 'twilight' }, { sky: 'overcast', wet: 0.85 }, { mode: 'person' }, { avatar: 'man' }, { camera: 'cc' }] },
+      { express: true, hold: 8, caption: 'Copenhagen Contemporary at twilight in Copenhagen weather: overcast skies and wet roads that mirror the lights.', do: [{ time: 'twilight' }, { sky: 'overcast', wet: 0.85 }, { mode: 'person' }, { avatar: 'man' }, { camera: 'cc' }] },
       { hold: 14, caption: 'And when the clouds clear, golden hour returns.', do: [...GOLDEN, { camera: 'cc' }] }
     ]
   },
@@ -79,7 +79,7 @@ const TOUR_STOPS = [
     title: 'La Banchina',
     sub: 'Harbour bath',
     beats: [
-      { express: true, hold: 10, caption: 'La Banchina: a swim and a sauna on the quay of Søndre Refshalebassin.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'skater' }, { camera: 'banchina' }] },
+      { express: true, hold: 8, caption: 'La Banchina: a swim and a sauna on the quay of Søndre Refshalebassin.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'skater' }, { camera: 'banchina' }] },
       { hold: 18, caption: 'Take the drone up yourself (key 4): it climbs to 120 m and lands on any roof.', do: [{ mode: 'drone' }, { camera: 'chase' }, { input: { up: 0.7 } }] }
     ]
   },
@@ -108,6 +108,30 @@ const TOUR_STOPS = [
     beats: [
       { express: true, hold: 10, caption: 'Operaen on Holmen, across the harbour from Amalienborg.', do: [...GOLDEN, { mode: 'person' }, { shot: { orbit: [-641.3, 953.7], radius: 220, height: 45, lookY: 15, from: 2.75, speed: 0.06 } }, { building: OPERAEN_ID }] },
       { hold: 16, caption: 'The map (M) shows the whole area. Shift-click a place and the GPS routes you there, by road or on foot.', do: [{ map: 'route' }] }
+    ]
+  },
+  {
+    id: 'operaparken',
+    title: 'Operaparken',
+    sub: 'The park by the opera',
+    beats: [
+      { express: true, hold: 8, caption: 'Operaparken: the new park behind the opera house, with its glasshouse café.', do: [...GOLDEN, { mode: 'person' }, { camera: 'operaparken' }] }
+    ]
+  },
+  {
+    id: 'kai',
+    title: 'KAI',
+    sub: 'The new swimming hall',
+    beats: [
+      { express: true, hold: 8, caption: 'KAI on Papirøen, the new swimming hall by the harbour (still under construction in the map data).', do: [...GOLDEN, { mode: 'person' }, { camera: 'kai' }] }
+    ]
+  },
+  {
+    id: 'marmorkirken',
+    title: 'Marmorkirken',
+    sub: 'The marble church',
+    beats: [
+      { express: true, hold: 8, caption: 'Marmorkirken at the end of Frederiksgade, seen along the axis from Amalienborg.', do: [...GOLDEN, { mode: 'person' }, { camera: 'marmorkirken' }] }
     ]
   },
   {

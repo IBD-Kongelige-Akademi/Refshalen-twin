@@ -26,7 +26,7 @@ LAZ_DIR = BC.DATA / "raw" / "lazwork"
 CLASSES = (2, 3, 4, 5, 6, 9, 17)
 WMS = "https://api.dataforsyningen.dk/orto_foraar_DAF"
 # inner city first: the district (frame.py, UTM metres)
-INNER = (726000, 6176500, 728000, 6178500)
+INNER = (725000, 6176000, 728000, 6178500)
 
 
 def cell_priority(cells: dict) -> list[str]:

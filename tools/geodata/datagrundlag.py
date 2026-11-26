@@ -155,6 +155,35 @@ def fetch_features(source: str, table: str, bbox=None, where: str | None = None,
     return fc
 
 
+_HTTPFS: set[int] = set()  # ids of duck_connect() connections with httpfs loaded
+
+
+def duck_connect():
+    """A DuckDB connection that reads remote GeoParquet: with the httpfs extension when it can be installed, else (`has_httpfs`
+    False) through pyarrow datasets registered as views (parquet_src), which DuckDB scans with filter pushdown over HTTP ranges."""
+    import duckdb
+
+    con = duckdb.connect()
+    try:
+        con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='eu-west-1';")
+        _HTTPFS.add(id(con))
+    except Exception:  # noqa: BLE001  (extension download blocked, e.g. behind a proxy)
+        pass
+    return con
+
+
+def parquet_src(con, url: str) -> str:
+    """The FROM expression for a remote parquet file on a duck_connect() connection."""
+    if id(con) in _HTTPFS:
+        return f"read_parquet('{url}')"
+    import fsspec
+    import pyarrow.dataset as ds
+
+    name = "pq_" + str(abs(hash(url)))
+    con.register(name, ds.dataset(url, filesystem=fsspec.filesystem("https", client_kwargs={"trust_env": True}), format="parquet"))
+    return name
+
+
 def fetch_bbr_bygning(kommunekode: str, force: bool = False) -> dict:
     """BBR bygning of one kommune, {id_lokalid: {use, year, wall, roof, storeys, status, wall_code, roof_code}}, from the
     GeoParquet with DuckDB. Column names are matched by their BBR field number (the mirror spells them with æ/ø/å)."""

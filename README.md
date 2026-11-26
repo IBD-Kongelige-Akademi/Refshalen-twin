@@ -1,8 +1,10 @@
 # Refshaleøen Twin
 
-A walkable, drivable and bikeable real-time 3D twin of **Refshaleøen and Holmen** in Copenhagen (the 2 × 2 km box E 726000–728000, N 6176500–6178500: Reffen, B&W Hallerne, Copenhagen Contemporary, La Banchina, Mastekranen on Nyholm, Det Kongelige Akademi and Operaen), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
+A walkable, drivable and bikeable real-time 3D twin of **Refshaleøen, Holmen and Frederiksstaden** in Copenhagen (the 3 × 2.5 km box E 725000–728000, N 6176000–6178500: Reffen, B&W Hallerne, Copenhagen Contemporary, La Banchina, Mastekranen on Nyholm, Det Kongelige Akademi, Operaen and Operaparken, Papirøen, Amalienborg and Marmorkirken), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
 
-Forked from [askonring/aalborg-twin](https://github.com/askonring/aalborg-twin) (Andreas' Aalborg twin) at `a8ef36f`; what changed for Copenhagen is in [docs/refshaleoen.md](docs/refshaleoen.md). The Aalborg README follows below; its commands work the same here.
+Forked from [askonring/aalborg-twin](https://github.com/askonring/aalborg-twin) (Andreas' Aalborg twin) at `a8ef36f`; what changed for Copenhagen is in [docs/refshaleoen.md](docs/refshaleoen.md).
+
+**Run it locally:** `python tools/hosting/serve_range.py --port 8010` (Windows: `py ...`), then open http://127.0.0.1:8010/?data=./data-packs (the packed data in `data-packs/`, not in git; without `?data=` it reads the unpacked `data/`). The Aalborg README follows below; its commands work the same here.
 
 ---
 

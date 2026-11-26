@@ -13,7 +13,7 @@ export const CPH_FRAME = Object.freeze({
   vertical: 'DVR90',
   origin: Object.freeze([ORIGIN_E, ORIGIN_N, ORIGIN_H]), // Refshaleøen (js/tile-grid.js)
   axes: 'x=east, z=south, y=up',
-  bbox: Object.freeze([-1000, -1000, 1000, 1000]) // [minX, minZ, maxX, maxZ]: E 726000-728000, N 6176500-6178500
+  bbox: Object.freeze([-2000, -1000, 1000, 1500]) // [minX, minZ, maxX, maxZ]: E 725000-728000, N 6176000-6178500
 });
 
 const [BX0, BZ0, BX1, BZ1] = CPH_FRAME.bbox;
@@ -70,6 +70,9 @@ const TELEPORT_LOCATIONS = {
   mastekranen: { name: 'Mastekranen', sub: 'Nyholm · the mast crane', x: -313.2, z: 234.2, heading: -1.49, pin: { x: -351.6, z: 237.3 } },
   bw: { name: 'B&W Hallerne', sub: 'Refshaleøen · the shipyard halls', x: 206.3, z: -349.5, heading: -0.25, pin: { x: 191.8, z: -293.1 } },
   cc: { name: 'Copenhagen Contemporary', sub: 'Refshaleøen · art hall', x: 74.3, z: -346.4, heading: 2.47, pin: { x: 98.2, z: -376.8 } },
+  marmorkirken: { name: 'Marmorkirken', sub: 'Frederiksstaden · from Amalienborg', x: -1260.0, z: 683.0, heading: -1.96, pin: { x: -1364.6, z: 640.1 } },
+  operaparken: { name: 'Operaparken', sub: 'Holmen · the park by the opera', x: -618.1, z: 1107.7, heading: -0.78, pin: { x: -640.0, z: 1130.0 } },
+  kai: { name: 'KAI', sub: 'Papirøen · the new swimming hall', x: -833.1, z: 1221.8, heading: 2.17, pin: { x: -800.0, z: 1199.0 } },
   banchina: { name: 'La Banchina', sub: 'Refshaleøen · harbour bath', x: -48.3, z: 49.5, heading: -0.28, pin: { x: -57.0, z: 80.0 } }
 };
 

@@ -10,7 +10,7 @@
 Outputs (EPSG:25832):
   data/city/boundary.geojson  kommune 0101 and the union (simplified to ~5 m)
   data/city/tiles.json        500 m tiles intersecting the boundary: `--area district` (default) keeps only the district's
-                              16 tiles (frame.DISTRICT_UTM_BBOX), `--area kommune` all of them (phase 8)
+                              tiles (frame.DISTRICT_UTM_BBOX), `--area kommune` all of them (phase 8)
 
 Inputs (cached under data/raw/city/, refetched with --refresh):
   dg_dagi_kommuneinddeling_0101.json  DAGI kommuneinddeling (datagrundlag.dk, no account)

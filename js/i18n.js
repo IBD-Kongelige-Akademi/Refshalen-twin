@@ -12,6 +12,15 @@ const DEFAULT_LANG = 'da';
 // English -> Danish. Keys are the exact English text (trimmed), as written in index.html (entities decoded) or in the code.
 const DA = {
   // Refshaleøen: teleports and tour
+  'Frederiksstaden · from Amalienborg': 'Frederiksstaden · set fra Amalienborg',
+  'Holmen · the park by the opera': 'Holmen · parken ved operaen',
+  'Papirøen · the new swimming hall': 'Papirøen · den nye svømmehal',
+  'The marble church': 'Marmorkirken',
+  'Marmorkirken at the end of Frederiksgade, seen along the axis from Amalienborg.': 'Marmorkirken for enden af Frederiksgade, set ad aksen fra Amalienborg.',
+  'The park by the opera': 'Parken ved operaen',
+  'Operaparken: the new park behind the opera house, with its glasshouse café.': 'Operaparken: den nye park bag operahuset med drivhuscaféen.',
+  'The new swimming hall': 'Den nye svømmehal',
+  'KAI on Papirøen, the new swimming hall by the harbour (still under construction in the map data).': 'KAI på Papirøen, den nye svømmehal ved havnen (stadig under opførelse i kortdataene).',
   'Or drive the Plusbus: the 24.7 m articulated electric bus.': 'Eller kør Plusbussen: den 24,7 m lange leddelte elbus.',
   "Refshaleøen · street food · start": "Refshaleøen · streetfood · start",
   "Holmen · the opera house": "Holmen · operahuset",
@@ -440,7 +449,7 @@ const DA = {
 
 // Text that reads the same in Danish: names, brands and units (kept here so tests can tell "same on purpose" from "missed")
 const KEEP = new Set([
-  'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina',
+  'Marmorkirken', 'Operaparken', 'KAI', 'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina',
   'Refshaleøen Twin', 'Ramboll', 'Det Kongelige Akademi · Refshaleøen', 'three.js · WebGPU · TSL ·', 'fps', 'km/h',
   'Refshaleøen Kongres & Kultur Center', 'Kongres & Kultur Center', 'Budolfi Domkirke', 'Jomfru Ane Gade', 'Utzon Center',
   'Musikkens Hus', 'Karolinelund', 'Hotel Det Hvide Hus', 'Plusbus', 'Drone', 'Bus', 'Skateboard', 'Skateboarder', 'Gamepad',

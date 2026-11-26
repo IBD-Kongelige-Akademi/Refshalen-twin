@@ -30,3 +30,6 @@ data/overrides/
 
 # wrangler (tools/hosting/upload_packs.py) local cache
 .wrangler/
+
+# packed data for local use (tools/hosting/build_packs.py): open the app with ?data=./data-packs
+data-packs/

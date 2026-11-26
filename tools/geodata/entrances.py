@@ -270,10 +270,9 @@ class DarDG:
 
     def con(self):
         if self._con is None:
-            import duckdb
+            import datagrundlag
 
-            self._con = duckdb.connect()
-            self._con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='eu-west-1';")
+            self._con = datagrundlag.duck_connect()
         return self._con
 
     def _parquet(self, source: str, table: str, suffix: str, sql: str, params: list, cols: list[str]) -> list[dict]:
@@ -281,7 +280,7 @@ class DarDG:
         if p.exists():
             return json.loads(p.read_text(encoding="utf-8"))
         url, date = self.DG.asset_url(source, table, "data")
-        rows = self.con().execute(sql.format(src=f"read_parquet('{url}')"), params).fetchall()
+        rows = self.con().execute(sql.format(src=__import__("datagrundlag").parquet_src(self.con(), url)), params).fetchall()
         out = [dict(zip(cols, r)) for r in rows]
         self.DG._write(p, json.dumps(out, ensure_ascii=False, separators=(",", ":")))
         self.DG.record_snapshot(source, table, date, records=len(out))

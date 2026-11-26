@@ -284,6 +284,7 @@ def build_trees(cells, bbox, buildings, water, token, roads=None):
             cf["height"] = "measured"
         else:
             height = rec.get("osm_height") or F.height_from_age(None, rec["genus"])
+            height = min(45.0, max(2.0, height))  # an OSM height tag of a sapling (1 m) or a typo stays within the engine's tree range
             cf["height"] = "inferred"
         if lab:
             r = math.sqrt(areas[lab] / per_label[lab] / math.pi)
