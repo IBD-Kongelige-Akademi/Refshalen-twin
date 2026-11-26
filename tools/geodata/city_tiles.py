@@ -1,19 +1,19 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["shapely>=2", "requests", "pyproj", "geopandas", "pyogrio"]
+# dependencies = ["shapely>=2", "requests", "pyproj", "geopandas", "pyogrio", "pyarrow", "fsspec", "aiohttp"]
 # ///
-"""Boundary and 500 m tile list for Aalborg Kommune (0851).
+"""Boundary and 500 m tile list for Københavns Kommune (0101).
 
     uv run tools/geodata/city_tiles.py [--area district|kommune] [--refresh]
 
 Outputs (EPSG:25832):
-  data/city/boundary.geojson  kommune 0851 and the union (simplified to ~5 m)
+  data/city/boundary.geojson  kommune 0101 and the union (simplified to ~5 m)
   data/city/tiles.json        500 m tiles intersecting the boundary: `--area district` (default) keeps only the district's
                               16 tiles (frame.DISTRICT_UTM_BBOX), `--area kommune` all of them (phase 8)
 
 Inputs (cached under data/raw/city/, refetched with --refresh):
-  dg_dagi_kommuneinddeling_0851.json  DAGI kommuneinddeling (datagrundlag.dk, no account)
+  dg_dagi_kommuneinddeling_0101.json  DAGI kommuneinddeling (datagrundlag.dk, no account)
   osm_coastline.json   OSM natural=coastline  (ODbL), land/sea split
   osm_water.json       OSM natural=water      (ODbL), lakes/canals/ponds
 
@@ -50,7 +50,7 @@ SIMPLIFY_M = 5.0
 UA = "aalborg-twin-geodata/0.1 (open-data compiler)"
 OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
             "https://overpass.private.coffee/api/interpreter"]
-KOMMUNER = {"0851": "Aalborg"}
+KOMMUNER = {"0101": "København"}
 _to_utm = Transformer.from_crs(4326, 25832, always_xy=True)
 _to_wgs = Transformer.from_crs(25832, 4326, always_xy=True)
 
@@ -91,7 +91,12 @@ def load_osm(name: str, query: str, refresh: bool, bbox: str) -> dict:
     p = RAW / f"osm_{name}.json"
     if p.exists() and not refresh:
         return json.loads(p.read_text())
-    d = overpass(f"[out:json][timeout:180][bbox:{bbox}];{query}out geom;")
+    if os.environ.get("OSM_SOURCE") == "api":  # Overpass unreachable: rebuild the answer from the OSM API map (osm_api.py)
+        import osm_api
+        s, w, n, e = (float(v) for v in bbox.split(","))
+        d = osm_api.emulate(name, osm_api.fetch_map(s, w, n, e, force=refresh))
+    else:
+        d = overpass(f"[out:json][timeout:180][bbox:{bbox}];{query}out geom;")
     RAW.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(d))
     return d

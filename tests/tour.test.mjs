@@ -65,8 +65,8 @@ function runFor(tour, seconds, step = 0.1) {
 }
 
 test('the tour starts and ends at AKKC and every stop has a location and a scenic camera', () => {
-  assert.equal(TOUR_STOPS[0].id, 'akkc');
-  assert.equal(TOUR_STOPS.at(-1).id, 'akkc');
+  assert.equal(TOUR_STOPS[0].id, 'reffen');
+  assert.equal(TOUR_STOPS.at(-1).id, 'reffen');
   assert.deepEqual(TOUR_STOPS.slice(0, -1).map((s) => s.id).sort(), Object.keys(TELEPORT_LOCATIONS).sort(), 'every teleport is a stop');
   for (const stop of TOUR_STOPS) {
     assert.ok(TELEPORT_LOCATIONS[stop.id], `${stop.id} is a teleport`);
@@ -88,10 +88,10 @@ test('Express takes about 2 minutes and Full about 6', () => {
   const express = tourDuration('express');
   const full = tourDuration('full');
   assert.ok(express >= 100 && express <= 140, `express ${express.toFixed(0)} s`);
-  assert.ok(full >= 300 && full <= 420, `full ${full.toFixed(0)} s`);
+  assert.ok(full >= 240 && full <= 420, `full ${full.toFixed(0)} s`);
 });
 
-test('a guided tour teleports to each stop in order and puts the visitor back at AKKC as they were', () => {
+test('a guided tour teleports to each stop in order and puts the visitor back at Reffen as they were', () => {
   const twin = fakeTwin({ mode: 'cyclist' });
   twin.lightingSystem.activePresetId = 'midday';
   const tour = createTour(twin.deps);
@@ -101,11 +101,11 @@ test('a guided tour teleports to each stop in order and puts the visitor back at
   assert.equal(tour.active, false, 'the tour finished by itself');
   const order = TOUR_STOPS.map((s) => s.id);
   // the stops (the welcome beat puts the walker back on Europa Plads after the Vesterbro showcase), then home on the restore
-  assert.deepEqual(teleports(twin.calls), [order[0], 'akkc', ...order.slice(1), 'akkc']);
+  assert.deepEqual(teleports(twin.calls), [order[0], 'reffen', ...order.slice(1), 'reffen']);
   assert.equal(twin.controllerManager.activeMode, 'cyclist', 'mode restored');
   assert.equal(twin.lightingSystem.activePresetId, 'midday', 'time restored');
   assert.equal(twin.lightingSystem.skyMode, 'clear');
-  assert.ok(twin.calls.some((c) => c[0] === 'camera' && c[1] === 'budolfi' && c[2] === true), 'the first camera of a stop snaps under the black');
+  assert.ok(twin.calls.some((c) => c[0] === 'camera' && c[1] === 'bw' && c[2] === true), 'the first camera of a stop snaps under the black');
   assert.ok(twin.calls.some((c) => c[0] === 'resetInput'), 'the player is held still');
 });
 
@@ -116,7 +116,7 @@ test('the full tour steps through the building levels and restores the visitor\'
   tour.start('full');
   runFor(tour, tourDuration('full') + 30, 0.25);
   const levels = twin.calls.filter((c) => c[0] === 'level').map((c) => c[1]);
-  assert.deepEqual(levels, ['white', 'lod2', 'photo', 'full', 'photo']);
+  assert.deepEqual(levels, ['white', 'full', 'photo']);
   assert.ok(twin.calls.some((c) => c[0] === 'time' && c[1] === 'midnight'));
   assert.ok(twin.calls.some((c) => c[0] === 'sky' && c[1] === 'overcast'));
 });
@@ -152,7 +152,7 @@ test('next, prev and end step through a guided tour', () => {
   assert.equal(tour.state.stopIndex, 0);
   tour.command('end');
   assert.equal(tour.active, false);
-  assert.equal(teleports(twin.calls).at(-1), 'akkc');
+  assert.equal(teleports(twin.calls).at(-1), 'reffen');
 });
 
 test('the drive tour routes stop to stop and arrives within the radius', () => {
@@ -163,11 +163,11 @@ test('the drive tour routes stop to stop and arrives within the radius', () => {
   assert.equal(tour.guided, false);
   runFor(tour, 20);
   assert.equal(tour.state.phase, 'leg');
-  const budolfi = TELEPORT_LOCATIONS.budolfi;
-  assert.deepEqual(twin.mapSystem.waypoint, { x: budolfi.x, z: budolfi.z, name: TOUR_STOPS[1].title });
-  assert.match(twin.ui.card.title, /Next: Budolfi/);
-  twin.entity.position.x = budolfi.x + ARRIVE_RADIUS - 1;
-  twin.entity.position.z = budolfi.z;
+  const operaen = TELEPORT_LOCATIONS[TOUR_STOPS[1].id];
+  assert.deepEqual(twin.mapSystem.waypoint, { x: operaen.x, z: operaen.z, name: TOUR_STOPS[1].title });
+  assert.match(twin.ui.card.title, /Next: B&W/);
+  twin.entity.position.x = operaen.x + ARRIVE_RADIUS - 1;
+  twin.entity.position.z = operaen.z;
   tour.update(0.1);
   assert.equal(tour.state.phase, 'arrive');
   assert.equal(twin.mapSystem.waypoint, null);
@@ -176,12 +176,12 @@ test('the drive tour routes stop to stop and arrives within the radius', () => {
   runFor(tour, 20);
   assert.ok(!twin.calls.slice(before).some((c) => c[0] === 'camera' || c[0] === 'mode' || c[0] === 'teleport'));
   assert.equal(tour.state.stopIndex, 2);
-  assert.equal(twin.mapSystem.waypoint.name, 'Jomfru Ane Gade');
+  assert.equal(twin.mapSystem.waypoint.name, TOUR_STOPS[2].title);
   // a car route ends short of the walking street: reaching its end counts too
-  const jomfru = TELEPORT_LOCATIONS.jomfru;
-  twin.mapSystem.route = { pts: [{ x: 0, z: 0 }, { x: jomfru.x + 50, z: jomfru.z }] };
-  twin.entity.position.x = jomfru.x + 52;
-  twin.entity.position.z = jomfru.z;
+  const akademiet = TELEPORT_LOCATIONS[TOUR_STOPS[2].id];
+  twin.mapSystem.route = { pts: [{ x: 0, z: 0 }, { x: akademiet.x + 50, z: akademiet.z }] };
+  twin.entity.position.x = akademiet.x + 52;
+  twin.entity.position.z = akademiet.z;
   tour.update(0.1);
   assert.equal(tour.state.phase, 'arrive');
 });
@@ -220,7 +220,7 @@ test('the attract loop starts after the idle time and any input ends it', () => 
   assert.equal(tour.noteInput(), true);
   assert.equal(tour.active, false);
   assert.equal(twin.controllerManager.activeMode, 'bus');
-  assert.equal(teleports(twin.calls).at(-1), 'akkc');
+  assert.equal(teleports(twin.calls).at(-1), 'reffen');
 });
 
 test('director shots orbit a point and glide between views, over the ground', () => {
@@ -233,7 +233,7 @@ test('director shots orbit a point and glide between views, over the ground', ()
   assert.deepEqual(shotPose(glide, 9).pos, [10, 20, 0]);
 });
 
-test('the start scene flies over the city, then shows the car, the bike and the Plusbus driving on Vesterbro', () => {
+test('the start scene flies over the city, then shows the car, the bike and the Plusbus driving on Refshalevej', () => {
   const twin = fakeTwin();
   const views = [];
   const tour = createTour({ ...twin.deps, setView: (v) => views.push(v) });
@@ -259,27 +259,27 @@ test('the drive tour skips the start scene', () => {
   assert.ok(!twin.calls.some((c) => c[0] === 'mode' && c[1] === 'bus'));
 });
 
-test('the Utzon Center is in the middle of its director shot', () => {
-  const utzon = TOUR_STOPS.find((s) => s.id === 'utzon');
-  const { shot } = beatsFor(utzon, 'express')[0].do.find((a) => a.shot);
-  const pin = TELEPORT_LOCATIONS.utzon.pin;
+test('Mastekranen is in the middle of its director shot', () => {
+  const mastekranen = TOUR_STOPS.find((s) => s.id === 'mastekranen');
+  const { shot } = beatsFor(mastekranen, 'express')[0].do.find((a) => a.shot);
+  const pin = TELEPORT_LOCATIONS.mastekranen.pin;
   assert.deepEqual(shot.orbit, [pin.x, pin.z]);
 });
 
 test('the bike starts on the cycle track and the skater on the pavement, beside the car lane', async () => {
-  const { VESTERBRO, VESTERBRO_CYCLE_TRACK, VESTERBRO_PAVEMENT } = await import('../js/tour-script.js');
+  const { REFSHALEVEJ, REFSHALEVEJ_CYCLE, REFSHALEVEJ_PAVEMENT } = await import('../js/tour-script.js');
   const start = TOUR_STOPS[0].beats;
   const placeOf = (mode) => start.find((b) => b.do.some((a) => a.mode === mode) && b.do.some((a) => a.place))?.do.find((a) => a.place).place;
-  assert.equal(placeOf('cyclist'), VESTERBRO_CYCLE_TRACK);
-  assert.equal(placeOf('person'), VESTERBRO_PAVEMENT);
-  assert.equal(placeOf('car'), VESTERBRO);
+  assert.equal(placeOf('cyclist'), REFSHALEVEJ_CYCLE);
+  assert.equal(placeOf('person'), REFSHALEVEJ_PAVEMENT);
+  assert.equal(placeOf('car'), REFSHALEVEJ);
   // west of the southbound lane (its right), the pavement outside the cycle track
-  const right = (p) => -(p.x - VESTERBRO.x) * Math.cos(VESTERBRO.heading) + (p.z - VESTERBRO.z) * Math.sin(VESTERBRO.heading);
-  assert.ok(right(VESTERBRO_CYCLE_TRACK) > 1.5 && right(VESTERBRO_PAVEMENT) > right(VESTERBRO_CYCLE_TRACK) + 1);
+  const right = (p) => -(p.x - REFSHALEVEJ.x) * Math.cos(REFSHALEVEJ.heading) + (p.z - REFSHALEVEJ.z) * Math.sin(REFSHALEVEJ.heading);
+  assert.ok(right(REFSHALEVEJ_CYCLE) > 1.5 && right(REFSHALEVEJ_PAVEMENT) > right(REFSHALEVEJ_CYCLE) + 1);
 });
 
 test('the Utzon Center and Musikkens Hus are filmed from the fjord side (north)', () => {
-  for (const id of ['utzon', 'musikkens']) {
+  for (const id of ['mastekranen', 'bw']) {
     const stop = TOUR_STOPS.find((s) => s.id === id);
     for (const beat of stop.beats) {
       const shot = beat.do.find((a) => a.shot)?.shot;

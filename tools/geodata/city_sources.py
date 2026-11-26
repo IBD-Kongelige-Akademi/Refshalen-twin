@@ -27,6 +27,8 @@ BBR_GQL = "https://graphql.datafordeler.dk/BBR/v2"
 GC2 = "https://gc2ekstern.frederiksberg.dk/api/v2/sql/frederiksberg"
 OVERPASS = ["https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
             "https://overpass.private.coffee/api/interpreter"]
+if os.environ.get("OSM_SOURCE") == "api":  # Overpass unreachable from this machine: every caller falls back to the OSM API
+    OVERPASS = []
 OSM_BBOX = "55.58,12.43,55.74,12.74"  # S,W,N,E: both kommuner with margin (clip by tile ownership afterwards)
 RETRY_STATUS = {429, 500, 502, 503, 504}
 

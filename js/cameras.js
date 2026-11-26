@@ -3,32 +3,32 @@ import { TELEPORT_LOCATIONS } from './city-config.js';
 
 // js/cameras.js
 // Multi-camera system supporting Third-Person Chase (with mouse/touch orbit + zoom),
-// Low-Angle Action Cam, POV/Cockpit Cam, 6 Aalborg vantage cameras, and Auto-Director Drone.
+// Low-Angle Action Cam, POV/Cockpit Cam, 6 Refshaleøen vantage cameras, and Auto-Director Drone.
 
 const CAMERA_PRESETS = [
   { id: 'chase',       name: '3rd-Person Chase',         short: 'Chase',       category: 'follow', fov: 56 },
   { id: 'action',      name: 'Low-Angle Action',         short: 'Action',      category: 'follow', fov: 60 },
   { id: 'pov',         name: 'First-Person / Cockpit',   short: 'POV / Dash',  category: 'follow', fov: 68 },
-  { id: 'akkc',        name: 'Kongres & Kultur Center',  short: 'AKKC',        category: 'scenic', fov: 56 },
-  { id: 'musikkens',   name: 'Musikkens Hus',            short: 'Musikkens',   category: 'scenic', fov: 54 },
-  { id: 'utzon',       name: 'Utzon Center',             short: 'Utzon',       category: 'scenic', fov: 50 },
-  { id: 'budolfi',     name: 'Budolfi Domkirke',         short: 'Budolfi',     category: 'scenic', fov: 54 },
-  { id: 'jomfru',      name: 'Jomfru Ane Gade',          short: 'Jomfru Ane',  category: 'scenic', fov: 56 },
-  { id: 'karolinelund', name: 'Karolinelund',            short: 'Karolinelund', category: 'scenic', fov: 56 },
-  { id: 'hvidehus',    name: 'Hotel Det Hvide Hus',      short: 'Hvide Hus',   category: 'scenic', fov: 56 },
+  { id: 'reffen', name: 'Reffen', short: 'Reffen',        category: 'scenic', fov: 56 },
+  { id: 'bw', name: 'B&W Hallerne', short: 'B&W',   category: 'scenic', fov: 54 },
+  { id: 'mastekranen', name: 'Mastekranen', short: 'Mastekran',       category: 'scenic', fov: 50 },
+  { id: 'operaen', name: 'Operaen', short: 'Operaen',     category: 'scenic', fov: 54 },
+  { id: 'akademiet', name: 'Det Kongelige Akademi', short: 'Akademiet',  category: 'scenic', fov: 56 },
+  { id: 'cc', name: 'Copenhagen Contemporary', short: 'CC', category: 'scenic', fov: 56 },
+  { id: 'banchina', name: 'La Banchina', short: 'Banchina',   category: 'scenic', fov: 56 },
   { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
 ];
 
 // Scenic vantage points: stand `back` metres behind and `up` metres above the teleport location (looking along its
 // heading), or at a fixed `pos`, and look at the point `ahead` metres in front of it, `lookY` metres up.
 const SCENIC_VIEWS = {
-  akkc: { back: 30, up: 9, ahead: 45, lookY: 9, sway: 2.5 },
-  musikkens: { back: 30, up: 8, ahead: 60, lookY: 12, sway: 3 },
-  utzon: { back: 30, up: 9, ahead: 70, lookY: 4, sway: 3.5 },
-  budolfi: { back: 14, up: 6, ahead: 85, lookY: 14, sway: 2 },
-  jomfru: { back: 20, up: 5, ahead: 45, lookY: 6, sway: 2 },
-  karolinelund: { back: 20, up: 7, ahead: 50, lookY: 4, sway: 3 },
-  hvidehus: { back: 20, up: 8, ahead: 110, lookY: 30, sway: 2 }
+  reffen: { back: 25, up: 8, ahead: 45, lookY: 6, sway: 2.5 },
+  bw: { back: 25, up: 8, ahead: 60, lookY: 10, sway: 3 },
+  mastekranen: { back: 25, up: 6, ahead: 40, lookY: 25, sway: 3.5 },
+  operaen: { back: 25, up: 6, ahead: 40, lookY: 12, sway: 2 },
+  akademiet: { back: 20, up: 5, ahead: 40, lookY: 8, sway: 2 },
+  cc: { back: 20, up: 6, ahead: 40, lookY: 8, sway: 3 },
+  banchina: { back: 15, up: 4, ahead: 60, lookY: 2, sway: 2 }
 };
 
 // Degrees the chase & action cameras widen their field of view by per m/s, and at most (reached at 40 m/s, a little
@@ -305,13 +305,13 @@ class CameraSystem {
         break;
       }
 
-      case 'akkc':
-      case 'musikkens':
-      case 'utzon':
-      case 'budolfi':
-      case 'jomfru':
-      case 'karolinelund':
-      case 'hvidehus': {
+      case 'reffen':
+      case 'bw':
+      case 'mastekranen':
+      case 'operaen':
+      case 'akademiet':
+      case 'cc':
+      case 'banchina': {
         const view = SCENIC_VIEWS[this.activePresetId];
         const loc = TELEPORT_LOCATIONS[this.activePresetId];
         const sway = Math.sin(elapsed * 0.24) * view.sway;

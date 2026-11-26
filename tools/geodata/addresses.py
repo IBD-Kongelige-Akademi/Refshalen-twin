@@ -180,7 +180,7 @@ def build(kommune: str) -> dict:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--kommune", default="0851")
+    ap.add_argument("--kommune", default="0101")
     ap.add_argument("--out", default=str(OUT))
     a = ap.parse_args()
     doc = build(a.kommune)

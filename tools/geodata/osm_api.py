@@ -157,6 +157,8 @@ QUERIES = {  # build_city.OSM_QUERIES / OSM_QUERIES2 as select() arguments
     "squares": {"way": _square, "relation": _square_rel},
     "groundfloor": {"way": _venue, "relation": _venue, "node": _venue, "center": True},
     "street_nodes": {"node": _street_node},
+    "coastline": {"way": lambda t: t.get("natural") == "coastline"},  # city_tiles.py
+    "water": {"way": lambda t: t.get("natural") == "water", "relation": lambda t: t.get("natural") == "water"},  # city_tiles.py
     "trees_art": {"node": lambda t: t.get("natural") == "tree" or t.get("tourism") == "artwork" or t.get("historic") in ("memorial", "monument")},
 }
 

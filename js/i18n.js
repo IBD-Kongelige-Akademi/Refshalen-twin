@@ -11,16 +11,45 @@ const DEFAULT_LANG = 'da';
 
 // English -> Danish. Keys are the exact English text (trimmed), as written in index.html (entities decoded) or in the code.
 const DA = {
+  // Refshaleøen: teleports and tour
+  'Or drive the Plusbus: the 24.7 m articulated electric bus.': 'Eller kør Plusbussen: den 24,7 m lange leddelte elbus.',
+  "Refshaleøen · street food · start": "Refshaleøen · streetfood · start",
+  "Holmen · the opera house": "Holmen · operahuset",
+  "Holmen · architecture school": "Holmen · arkitektskolen",
+  "Nyholm · the mast crane": "Nyholm · mastekranen",
+  "Refshaleøen · the shipyard halls": "Refshaleøen · værftshallerne",
+  "Refshaleøen · art hall": "Refshaleøen · kunsthal",
+  "Refshaleøen · harbour bath": "Refshaleøen · havnebad",
+  "Welcome to Refshaleøen: the old B&W shipyard island and Holmen as a digital twin, built from open Danish map data.": "Velkommen til Refshaleøen: den gamle B&W-værftsø og Holmen som digital tvilling, bygget af åbne danske kortdata.",
+  "Drive it: cars on the real street network, here up Refshalevej.": "Kør i den: biler på det rigtige vejnet, her op ad Refshalevej.",
+  "Reffen, the street food market on the old shipyard quay.": "Reffen, streetfood-markedet på den gamle værftskaj.",
+  "Every building comes from GeoDanmark footprints and DHM heights, with BBR use, year and materials.": "Hver bygning kommer fra GeoDanmarks omrids og DHM-højder, med anvendelse, opførelsesår og materialer fra BBR.",
+  "The shipyard halls": "Værftshallerne",
+  "B&W Hallerne: the shipyard halls of Burmeister & Wain, now venues and studios.": "B&W Hallerne: Burmeister & Wains værftshaller, i dag spillesteder og studier.",
+  "Building levels: the plain white massing from the footprints and heights…": "Bygningsniveauer: den hvide volumenmodel fra omrids og højder…",
+  "…and the full city with generated windows and doors. Press L to step through them yourself.": "…og hele byen med genererede vinduer og døre. Tryk L for selv at skifte mellem dem.",
+  "Art hall": "Kunsthal",
+  "Copenhagen Contemporary at twilight in Copenhagen weather: overcast skies and wet roads that mirror the lights.": "Copenhagen Contemporary i tusmørke i københavnsk vejr: overskyet himmel og våde veje, der spejler lysene.",
+  "Harbour bath": "Havnebad",
+  "La Banchina: a swim and a sauna on the quay of Søndre Refshalebassin.": "La Banchina: en dukkert og en sauna på kajen ved Søndre Refshalebassin.",
+  "Mastekranen on Nyholm, the naval mast crane from 1751, seen across the harbour.": "Mastekranen på Nyholm, flådens mastekran fra 1751, set over havnen.",
+  "The city is busy: cars, cyclists and pedestrians follow the road network and each other.": "Byen er travl: biler, cyklister og fodgængere følger vejnettet og hinanden.",
+  "Det Kongelige Akademi on Holmen: the architecture school in the old naval buildings.": "Det Kongelige Akademi på Holmen: arkitektskolen i flådens gamle bygninger.",
+  "The opera house": "Operahuset",
+  "Operaen on Holmen, across the harbour from Amalienborg.": "Operaen på Holmen, over for Amalienborg på den anden side af havnen.",
+  "The map (M) shows the whole area. Shift-click a place and the GPS routes you there, by road or on foot.": "Kortet (M) viser hele området. Shift-klik på et sted, og GPS'en viser vej dertil, ad vejen eller til fods.",
+  "Back at Reffen": "Tilbage ved Reffen",
+  "Back at Reffen. Now it is your turn: grab the controller and explore Refshaleøen.": "Tilbage ved Reffen. Nu er det din tur: tag controlleren og udforsk Refshaleøen.",
   // loading screen
   'Initializing WebGPURenderer & TSL Shaders...': 'Starter WebGPURenderer og TSL-shadere...',
   'Initializing Three.js r{rev} WebGPURenderer & TSL Shaders...': 'Starter Three.js r{rev} WebGPURenderer og TSL-shadere...',
-  'Constructing Aalborg...': 'Bygger Aalborg...',
-  'Aalborg Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.':
-    'Aalborg Twin kræver WebGPU, som denne browser ikke har. Prøv en nyere Chrome, Edge eller Safari.',
+  'Constructing Refshaleøen...': 'Bygger Refshaleøen...',
+  'Refshaleøen Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.':
+    'Refshaleøen Twin kræver WebGPU, som denne browser ikke har. Prøv en nyere Chrome, Edge eller Safari.',
   'Compiling Shaders & Render Pipelines...': 'Kompilerer shadere og render-pipelines...',
   'Based on Slop New York by mrdoob (MIT), via copenhagen-twin by Martin Collignon (MIT) · Map data © OpenStreetMap contributors (ODbL), GeoDanmark, DAR, BBR, DAGI, DHM and Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0, via datagrundlag.dk) · LoD2 roofs: Ramboll, Geoflow (MIT)':
     'Baseret på Slop New York af mrdoob (MIT), via copenhagen-twin af Martin Collignon (MIT) · Kortdata © OpenStreetMap-bidragydere (ODbL), GeoDanmark, DAR, BBR, DAGI, DHM og Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0, via datagrundlag.dk) · LoD2-tage: Ramboll, Geoflow (MIT)',
-  '3D interactive Aalborg Twin viewport': 'Interaktiv 3D-visning af Aalborg Twin',
+  '3D interactive Refshaleøen Twin viewport': 'Interaktiv 3D-visning af Refshaleøen Twin',
 
   // title card
   'Credits': 'Kreditering',
@@ -29,7 +58,7 @@ const DA = {
     'Baseret på Slop New York af mrdoob (MIT), via copenhagen-twin af Martin Collignon (MIT). Data: GeoDanmark, DAR, BBR, DAGI, DHM og Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0) og © OpenStreetMap-bidragydere (ODbL).',
 
   // toolbar
-  'Map of Aalborg [M]': 'Kort over Aalborg [M]',
+  'Map of Refshaleøen [M]': 'Kort over Refshaleøen [M]',
   'Map': 'Kort',
   'Atmosphere & time of day': 'Stemning og tidspunkt',
   'Time of day': 'Tidspunkt',
@@ -39,10 +68,10 @@ const DA = {
   'Night 23:00': 'Nat 23:00',
   'Teleport the active player': 'Teleportér den aktive spiller',
   'Teleport': 'Teleportér',
-  'Tour Aalborg from AKKC': 'Rundtur i Aalborg fra AKKC',
-  'Tour Aalborg': 'Rundtur i Aalborg',
+  'Tour Refshaleøen from Reffen': 'Rundtur på Refshaleøen fra Reffen',
+  'Tour Refshaleøen': 'Rundtur på Refshaleøen',
   'Tour': 'Rundtur',
-  'Race from AKKC to Jomfru Ane Gade [R]': 'Kapløb fra AKKC til Jomfru Ane Gade [R]',
+  'Race from Reffen to Akademiet [R]': 'Kapløb fra Reffen til Akademiet [R]',
   'Race': 'Kapløb',
   'Building model level [L cycles]': 'Bygningsmodelniveau [L skifter]',
   'Buildings': 'Bygninger',
@@ -61,7 +90,7 @@ const DA = {
   'Europa Plads · start': 'Europa Plads · start',
   'Old town · the cathedral': 'Gamlebyen · domkirken',
   'Old town · nightlife street': 'Gamlebyen · nattelivsgaden',
-  'Harbour front · Limfjord': 'Havnefronten · Limfjorden',
+  'Harbour front · harbour': 'Havnefronten · havnen',
   'Harbour front · the concert hall': 'Havnefronten · koncerthuset',
   'Park · the old amusement park': 'Park · den gamle forlystelsespark',
   'Vesterbro · the hotel tower': 'Vesterbro · hoteltårnet',
@@ -82,23 +111,23 @@ const DA = {
   'Skip leg': 'Spring etapen over',
   'End the tour [Esc]': 'Afslut rundturen [Esc]',
   'End tour': 'Afslut rundtur',
-  'Press any key or tap to explore Aalborg yourself': 'Tryk på en tast eller på skærmen for selv at udforske Aalborg',
+  'Press any key or tap to explore Refshaleøen yourself': 'Tryk på en tast eller på skærmen for selv at udforske Refshaleøen',
   'Start': 'Start',
   'Finish': 'Mål',
   'Follow the GPS line on the minimap': 'Følg GPS-linjen på minikortet',
 
   // tour stops (js/tour-script.js)
-  'Welcome to Kortdage': 'Velkommen til Kortdage',
+  'Welcome to Refshaleøen': 'Velkommen til Refshaleøen',
   'The cathedral': 'Domkirken',
   'Nightlife street': 'Nattelivsgaden',
-  'Harbour front · Limfjorden': 'Havnefronten · Limfjorden',
+  'Harbour front · havnen': 'Havnefronten · havnen',
   'The concert hall': 'Koncerthuset',
   'Back at AKKC': 'Tilbage ved AKKC',
   'Your turn': 'Din tur',
-  'Welcome to Kortdage. This is Aalborg as a digital twin, built from open Danish map data.':
-    'Velkommen til Kortdage. Dette er Aalborg som digital tvilling, bygget af åbne danske kortdata.',
-  'Aalborg from above: 3,340 buildings at their measured heights, the Limfjord, the streets and the parks.':
-    'Aalborg fra oven: 3.340 bygninger i deres målte højder, Limfjorden, gaderne og parkerne.',
+  'Welcome to Refshaleøen. This is Refshaleøen as a digital twin, built from open Danish map data.':
+    'Velkommen til Refshaleøen. Dette er Refshaleøen som digital tvilling, bygget af åbne danske kortdata.',
+  'Refshaleøen from above: 1,325 buildings at their measured heights, the harbour, the streets and the parks.':
+    'Refshaleøen fra oven: 1.325 bygninger i deres målte højder, havnen, gaderne og parkerne.',
   'Drive it: cars on the real street network, here down Vesterbro past AKKC.':
     'Kør i den: biler på det rigtige vejnet, her ned ad Vesterbro forbi AKKC.',
   'Cycle it, on a city bike or a cargo bike.': 'Cykl i den, på bycykel eller ladcykel.',
@@ -126,18 +155,18 @@ const DA = {
     'Natteravnene samles ved dørene. Alle barer, pubber og natklubber kommer fra OpenStreetMap.',
   'Four times of day: golden hour, midday, twilight and midnight. Try the sun buttons at the top.':
     'Fire tidspunkter: gylden time, middag, tusmørke og midnat. Prøv solknapperne øverst.',
-  'The Utzon Center from the Limfjord: the harbour front, rebuilt from Skråfoto.':
-    'Utzon Center set fra Limfjorden: havnefronten, genopbygget ud fra Skråfoto.',
+  'The Utzon Center from the harbour: the harbour front, rebuilt from Skråfoto.':
+    'Utzon Center set fra havnen: havnefronten, genopbygget ud fra Skråfoto.',
   'Up close: its brick walls and lantern windows.': 'Tæt på: murstensvæggene og lanternevinduerne.',
   'Take the drone up yourself (key 4): it climbs to 120 m and lands on any roof.':
     'Tag selv dronen op (tast 4): den stiger til 120 m og lander på ethvert tag.',
-  'Musikkens Hus from the Limfjord: the concert hall and its plaza down to the water.':
-    'Musikkens Hus set fra Limfjorden: koncerthuset og pladsen ned til vandet.',
+  'Musikkens Hus from the harbour: the concert hall and its plaza down to the water.':
+    'Musikkens Hus set fra havnen: koncerthuset og pladsen ned til vandet.',
   'The city is busy: cars, cyclists and pedestrians follow the road network, the signals and each other.':
     'Byen er travl: biler, cyklister og fodgængere følger vejnettet, signalerne og hinanden.',
   'AI Plusbuses run line 2 in their real colours, stopping at its stops. The traffic gives way to you, mostly.':
     'AI-styrede Plusbusser kører linje 2 i deres rigtige farver og holder ved stoppestederne. Trafikken viger for dig, for det meste.',
-  'Karolinelund at twilight in Aalborg weather: overcast skies and wet roads that mirror the lights.':
+  'Karolinelund at twilight in Refshaleøen weather: overcast skies and wet roads that mirror the lights.':
     'Karolinelund i tusmørke i aalborgensisk vejr: overskyet himmel og våde veje, der spejler lyset.',
   'Trees, lamp posts and park paths are placed from GeoDanmark and the height model, tree by tree.':
     'Træer, lygtepæle og parkstier er placeret ud fra GeoDanmark og højdemodellen, træ for træ.',
@@ -147,12 +176,12 @@ const DA = {
   'Skate, walk or cycle: every mode has its own physics.': 'Rulleskøjter, gang eller cykel: hver transportform har sin egen fysik.',
   'The map (M) shows the whole city. Shift-click a place and the GPS routes you there, by road or on foot.':
     "Kortet (M) viser hele byen. Shift-klik på et sted, og GPS'en guider dig derhen, ad vejen eller til fods.",
-  'Back at the Kongres & Kultur Center. Now it is your turn: grab the controller and explore Aalborg.':
-    'Tilbage ved Kongres & Kultur Center. Nu er det din tur: tag controlleren og udforsk Aalborg.',
+  'Back at the Kongres & Kultur Center. Now it is your turn: grab the controller and explore Refshaleøen.':
+    'Tilbage ved Kongres & Kultur Center. Nu er det din tur: tag controlleren og udforsk Refshaleøen.',
 
   // race
-  'Race to Jomfru Ane Gade': 'Kapløb til Jomfru Ane Gade',
-  'Race: AKKC → Jomfru Ane Gade': 'Kapløb: AKKC → Jomfru Ane Gade',
+  'Race to Akademiet': 'Kapløb til Akademiet',
+  'Race: Reffen → Akademiet': 'Kapløb: Reffen → Akademiet',
   'Any route, any vehicle. Times are handicapped by vehicle, so walkers and cyclists can beat the car.':
     'Valgfri rute, valgfrit køretøj. Tiderne får handicap efter køretøj, så gående og cyklister kan slå bilen.',
   'Start the race': 'Start kapløbet',
@@ -180,7 +209,7 @@ const DA = {
   'route': 'rute',
   'That was faster than this vehicle can go: no score this time. Did something glitch?':
     'Det var hurtigere, end dette køretøj kan køre: ingen score denne gang. Gik der noget galt?',
-  'You reached Jomfru Ane Gade!': 'Du nåede Jomfru Ane Gade!',
+  'You reached Akademiet!': 'Du nåede Akademiet!',
   'Handicapped to car time: {time}.': 'Omregnet til biltid: {time}.',
   'That puts you #{rank} on the list.': 'Det giver dig plads nr. {rank} på listen.',
   'Saved: you are #{rank}!': 'Gemt: du er nr. {rank}!',
@@ -211,8 +240,8 @@ const DA = {
 
   // start screen
   'Sponsored by': 'Sponsoreret af',
-  "Aalborg's centre rebuilt in 3D from open map data, aerial photos and building drawings. Walk, cycle, drive, fly or take the Plusbus through it.":
-    'Aalborgs centrum genopbygget i 3D ud fra åbne kortdata, luftfotos og bygningstegninger. Gå, cykl, kør, flyv eller tag Plusbussen igennem det.',
+  "Refshaleøen and Holmen rebuilt in 3D from open map data and aerial photos. Walk, cycle, drive or fly around the old shipyard island.":
+    'Refshaleøen og Holmen genopbygget i 3D ud fra åbne kortdata og luftfotos. Gå, cykl, kør eller flyv rundt på den gamle værftsø.',
   'Choose how to get around': 'Vælg, hvordan du kommer rundt',
   'Choose a mode': 'Vælg en transportform',
   'Walk': 'Gå',
@@ -225,9 +254,9 @@ const DA = {
   'A drone over the rooftops': 'En drone over tagene',
   'The articulated line 2 bus': 'Den leddelte bus på linje 2',
   'What you can do': 'Det kan du',
-  'Kortdage race': 'Kortdage-kapløb',
-  'AKKC to Jomfru Ane Gade, any route. Times are handicapped by vehicle, so walkers can beat the car.':
-    'AKKC til Jomfru Ane Gade ad valgfri rute. Tiderne får handicap efter køretøj, så gående kan slå bilen.',
+  'Refshaleøen race': 'Refshaleøen-kapløb',
+  'Reffen to Akademiet, any route. Times are handicapped by vehicle, so walkers can beat the car.':
+    'Reffen til Akademiet ad valgfri rute. Tiderne får handicap efter køretøj, så gående kan slå bilen.',
   'Guided tour': 'Guidet rundtur',
   'Sit back for 2 or 6 minutes past seven landmarks, or drive it with the GPS.':
     "Læn dig tilbage i 2 eller 6 minutter forbi syv vartegn, eller kør selv med GPS'en.",
@@ -259,7 +288,7 @@ const DA = {
   'Joystick to move': 'Joystick for at bevæge dig',
   'Drag to look': 'Træk for at se dig om',
   'Pinch to zoom': 'Knib for at zoome',
-  'Explore Aalborg': 'Udforsk Aalborg',
+  'Explore Refshaleøen': 'Udforsk Refshaleøen',
   'Press': 'Tryk',
   'to start ·': 'for at starte ·',
   'race ·': 'kapløb ·',
@@ -269,7 +298,7 @@ const DA = {
 
   // radar, location
   'Live street radar': 'Live gaderadar',
-  'Open the map of Aalborg [M]': 'Åbn kortet over Aalborg [M]',
+  'Open the map of Refshaleøen [M]': 'Åbn kortet over Refshaleøen [M]',
   'near': 'nær',
 
   // walker, bike type, mode bar
@@ -338,11 +367,11 @@ const DA = {
   'Space': 'Mellemrum',
 
   // full map
-  'Map of Aalborg': 'Kort over Aalborg',
-  'Aalborg Street Map': 'Aalborg gadekort',
+  'Map of Refshaleøen': 'Kort over Refshaleøen',
+  'Refshaleøen Street Map': 'Refshaleøen gadekort',
   'You are at Gammel Torv': 'Du er ved Gammel Torv',
   'You are at': 'Du er ved',
-  'Search streets & places — Jomfru Ane Gade, Boulevarden, Utzon…': 'Søg efter gader og steder — Jomfru Ane Gade, Boulevarden, Utzon…',
+  'Search streets & places — Refshalevej, Operaen, Reffen…': 'Søg efter gader og steder — Refshalevej, Operaen, Reffen…',
   'Search street or place': 'Søg efter gade eller sted',
   'Close map [M / Esc]': 'Luk kortet [M / Esc]',
   'True north · the map is drawn on the UTM grid, 0.77° off it': 'Geografisk nord · kortet er tegnet på UTM-gitteret, 0,77° derfra',
@@ -411,10 +440,11 @@ const DA = {
 
 // Text that reads the same in Danish: names, brands and units (kept here so tests can tell "same on purpose" from "missed")
 const KEEP = new Set([
-  'Aalborg Twin', 'Ramboll', 'Kortdage · Aalborg Kongres & Kultur Center', 'three.js · WebGPU · TSL ·', 'fps', 'km/h',
-  'Aalborg Kongres & Kultur Center', 'Kongres & Kultur Center', 'Budolfi Domkirke', 'Jomfru Ane Gade', 'Utzon Center',
+  'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina',
+  'Refshaleøen Twin', 'Ramboll', 'Det Kongelige Akademi · Refshaleøen', 'three.js · WebGPU · TSL ·', 'fps', 'km/h',
+  'Refshaleøen Kongres & Kultur Center', 'Kongres & Kultur Center', 'Budolfi Domkirke', 'Jomfru Ane Gade', 'Utzon Center',
   'Musikkens Hus', 'Karolinelund', 'Hotel Det Hvide Hus', 'Plusbus', 'Drone', 'Bus', 'Skateboard', 'Skateboarder', 'Gamepad',
-  '1 · LoD2', '2 · LoD2 + Skråfoto', 'Boost', 'Sport', 'Horn', 'Stop', 'Shift', 'Aalborg'
+  '1 · LoD2', '2 · LoD2 + Skråfoto', 'Boost', 'Sport', 'Horn', 'Stop', 'Shift', 'Refshaleøen'
 ]);
 
 // Phrases inside the building panel's composed provenance texts (js/appearance.js, js/buildings-real.js describeBuilding),

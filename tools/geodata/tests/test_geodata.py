@@ -7,14 +7,14 @@ import roadgraph
 
 
 def test_origin_maps_to_zero():
-    assert frame.to_local(556000.0, 6323100.0) == (0.0, -0.0)
+    assert frame.to_local(727000.0, 6177500.0) == (0.0, -0.0)
     assert frame.to_local_y(frame.ORIGIN[2]) == 0.0
 
 
 def test_axes_east_positive_x_south_positive_z():
-    x, z = frame.to_local(556000.0 + 100, 6323100.0 - 50)  # 100 m east, 50 m south
+    x, z = frame.to_local(727000.0 + 100, 6177500.0 - 50)  # 100 m east, 50 m south
     assert (x, z) == (100.0, 50.0)
-    assert frame.to_utm(100.0, 50.0) == (556100.0, 6323050.0)
+    assert frame.to_utm(100.0, 50.0) == (727100.0, 6177450.0)
 
 
 def test_roundtrip():
@@ -23,8 +23,8 @@ def test_roundtrip():
 
 
 def test_bbox_corners_match_district():
-    assert frame.to_local(555000, 6324000) == (-1000.0, -900.0)
-    assert frame.to_local(557000, 6322000) == (1000.0, 1100.0)
+    assert frame.to_local(726000, 6178500) == (-1000.0, -1000.0)
+    assert frame.to_local(728000, 6176500) == (1000.0, 1000.0)
 
 
 def test_ccw_in_map_plane_from_cw_input():

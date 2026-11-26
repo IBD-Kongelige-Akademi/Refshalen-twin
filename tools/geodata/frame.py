@@ -6,16 +6,16 @@ fetch.py, lakes.py, ortho.py, roads.py, points.py ...). The JS mirror is js/tile
 Tile grid: a fixed 500 m grid in EPSG:25832. Tile id "<e500>_<n500>" = (floor(E / 500), floor(N / 500)), so four
 tiles fill one 1 km DHM / LoD2 cell (e.g. LoD2 cell 6323_555 = tiles 1110_12646, 1111_12646, 1110_12647, 1111_12647).
 
-Aalborg: origin in the old town by Gammel Torv; the district is the 2 x 2 km box E 555000-557000, N 6322000-6324000
-(16 tiles 1110_12644 .. 1113_12647, LoD2 cells 6322_555, 6322_556, 6323_555, 6323_556).
+Refshaleøen: origin on the island by the B&W halls; the district is the 2 x 2 km box E 726000-728000, N 6176500-6178500
+(16 tiles 1452_12353 .. 1455_12356): Refshaleøen, Holmen, Operaen, the harbour inlet, Trekroner on the edge.
 """
 from __future__ import annotations
 
 import math
 
 # DVR90 height of the origin: the median DHM terrain within 10 m of it (phase 2); keep js/tile-grid.js in step
-ORIGIN = (556000.0, 6323100.0, 3.85)  # E, N (EPSG:25832), DVR90 height
-LOCAL_BBOX = (-1000.0, -900.0, 1000.0, 1100.0)  # xmin, zmin, xmax, zmax
+ORIGIN = (727000.0, 6177500.0, 2.0)  # E, N (EPSG:25832), DVR90 height (Refshaleøen; the DHM median within 10 m is 2.2)
+LOCAL_BBOX = (-1000.0, -1000.0, 1000.0, 1000.0)  # xmin, zmin, xmax, zmax
 
 TILE_SIZE = 500.0  # metres
 FETCH_MARGIN = 60.0  # metres beyond an area so edge geometry is complete

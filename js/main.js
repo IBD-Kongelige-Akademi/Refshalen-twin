@@ -30,7 +30,7 @@ import { t, getLang, setLang, onLangChange, translateDocument } from './i18n.js'
 
 // js/main.js
 // Main entry point in Three.js WebGPURenderer & TSL (three.js dev, see index.html).
-// Boots the Aalborg twin (js/world.js builds the city from the tile index, or data/cph-geodata.json without one).
+// Boots the Refshaleøen twin (js/world.js builds the city from the tile index, or data/cph-geodata.json without one).
 
 async function initApp() {
   const query = new URLSearchParams(location.search);
@@ -83,7 +83,7 @@ async function initApp() {
     renderer.dispose();
     renderer.domElement.remove();
     if (loadingFill) loadingFill.parentElement.style.visibility = 'hidden';
-    if (loadingStatus) loadingStatus.textContent = t('Aalborg Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.');
+    if (loadingStatus) loadingStatus.textContent = t('Refshaleøen Twin needs WebGPU, which this browser does not have. Try a recent Chrome, Edge or Safari.');
     return;
   }
   markInit('renderer');
@@ -94,16 +94,16 @@ async function initApp() {
   markInit('lighting');
 
   if (loadingStatus) {
-    loadingStatus.textContent = t('Constructing Aalborg...');
+    loadingStatus.textContent = t('Constructing Refshaleøen...');
   }
 
   // 3. Build the city from the Copenhagen geodata
   // Tile streaming: `?stream=<near radius in m>` overrides the default rings (near 750 m, mid 1250 m, js/tile-rings.js); the city
-  // streams in around the start point: every visit begins at the Kortdage venue (TELEPORT_LOCATIONS.akkc), so a reload at the
+  // streams in around the start point: every visit begins at the Kortdage venue (TELEPORT_LOCATIONS.reffen), so a reload at the
   // conference stand puts the next visitor back in front of it
   const streamParam = Number(query.get('stream'));
   const streamMid = Number(query.get('streammid')); // optional override for a custom near ring
-  const startPoint = TELEPORT_LOCATIONS.akkc;
+  const startPoint = TELEPORT_LOCATIONS.reffen;
   const start = { x: startPoint.x, z: startPoint.z };
   const world = await buildWorld(scene, {
     treeDate: lightingSystem.currentSunDateTime,
@@ -320,7 +320,7 @@ async function initApp() {
   }
   let tour = null; // created once the map and the building levels exist (below)
   let startScreen = null; // the start screen (js/start-screen.js), created after the race
-  let race = null; // the Kortdage race (js/race.js), created after the tour
+  let race = null; // the Refshaleøen race (js/race.js), created after the tour
 
   // Keyboard guide for each mode: [keys, action]
   const controlHints = {
@@ -721,7 +721,7 @@ async function initApp() {
       setText(tourEls.title, info.title);
       setText(tourEls.sub, info.sub || '');
       setText(tourEls.caption, info.caption);
-      setText(tourEls.hint, info.loop ? t('Press any key or tap to explore Aalborg yourself') : '');
+      setText(tourEls.hint, info.loop ? t('Press any key or tap to explore Refshaleøen yourself') : '');
       if (tourEls.bar) tourEls.bar.style.transform = `scaleX(${info.progress || 0})`;
     },
     hideCard: () => { if (tourCard) tourCard.hidden = true; },
@@ -755,7 +755,7 @@ async function initApp() {
   }
   window.addEventListener('pointermove', () => tour.noteInput({ end: false }), { passive: true });
 
-  // The Kortdage race (js/race.js, js/race-scores.js, docs/race.md): AKKC to Jomfru Ane Gade against the clock, one handicapped
+  // The Refshaleøen race (js/race.js, js/race-scores.js, docs/race.md): Reffen to Akademiet against the clock, one handicapped
   // highscore list per kiosk. `?race=1` starts one after the boot, `?raceReset=1` clears the list (after a confirm).
   const raceEls = {
     hud: document.getElementById('race-hud'),
@@ -850,7 +850,7 @@ async function initApp() {
         setText(raceEls.sub, t('That was faster than this vehicle can go: no score this time. Did something glitch?'));
       } else {
         const pace = result.mode === 'car' ? '' : ` ${t('Handicapped to car time: {time}.', { time: formatTime(result.adjusted) })}`;
-        setText(raceEls.sub, `${t('You reached Jomfru Ane Gade!')}${pace} ${t('That puts you #{rank} on the list.', { rank: result.rank })}`);
+        setText(raceEls.sub, `${t('You reached Akademiet!')}${pace} ${t('That puts you #{rank} on the list.', { rank: result.rank })}`);
       }
       raceEls.form.hidden = result.rejected;
       setText(raceEls.msg, '');
@@ -1013,13 +1013,13 @@ async function initApp() {
         selectCamera('pov', true);
         break;
       case 'Digit8':
-        selectCamera('akkc', true);
+        selectCamera('reffen', true);
         break;
       case 'Digit9':
-        selectCamera('musikkens', true);
+        selectCamera('bw', true);
         break;
       case 'Digit0':
-        selectCamera('utzon', true);
+        selectCamera('mastekranen', true);
         break;
       case 'KeyV':
         cycleCamera(e.shiftKey ? -1 : 1);

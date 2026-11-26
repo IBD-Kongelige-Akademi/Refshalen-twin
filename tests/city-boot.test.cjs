@@ -56,27 +56,27 @@ test('there is no ?city switch and no NYC strings in the shipped sources', () =>
   }
 });
 
-test('the Aalborg frame matches docs/cph-geodata-schema.md', async () => {
+test('the Refshaleøen frame matches docs/cph-geodata-schema.md', async () => {
   const { CPH_FRAME, toLocal, toEtrs, ISLAND_BOUNDS, TELEPORT_LOCATIONS } = await import('../js/city-config.js');
   const [e0, n0, h0] = CPH_FRAME.origin;
-  assert.deepEqual([e0, n0], [556000.0, 6323100.0]);
+  assert.deepEqual([e0, n0], [727000.0, 6177500.0]);
   assert.equal(CPH_FRAME.epsg, 25832);
-  assert.deepEqual([...CPH_FRAME.bbox], [-1000, -900, 1000, 1100]);
+  assert.deepEqual([...CPH_FRAME.bbox], [-1000, -1000, 1000, 1000]);
   assert.match(CPH_FRAME.axes, /x=east, z=south/);
   const p = toLocal(e0 + 100, n0 + 40, h0 + 3);
   assert.ok([p.x - 100, p.y - 3, p.z + 40].every((d) => Math.abs(d) < 1e-9), 'north is -z');
   const back = toEtrs(p.x, p.z, p.y);
   assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
-  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -900, 1000, 1100]);
-  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['akkc', 'budolfi', 'jomfru', 'utzon', 'musikkens', 'karolinelund', 'hvidehus']);
+  assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-1000, -1000, 1000, 1000]);
+  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['reffen', 'operaen', 'akademiet', 'mastekranen', 'bw', 'cc', 'banchina']);
 });
 
-test('the city config is the Aalborg one', async () => {
+test('the city config is the Refshaleøen one', async () => {
   const config = await import('../js/city-config.js');
   assert.equal(config.ISLAND_BOUNDS.maxX, 1000);
   assert.equal(config.isTypingInField({ target: { tagName: 'INPUT' } }), true);
   assert.equal(config.isTypingInField({ target: { tagName: 'DIV' } }), false);
-  assert.equal(config.TELEPORT_LOCATIONS.akkc.name, 'Aalborg Kongres & Kultur Center', 'start at the Kortdage venue');
+  assert.equal(config.TELEPORT_LOCATIONS.reffen.name, 'Reffen', 'start at Reffen');
 });
 
 test('geodata is optional: absent data boots the empty plane, present data is exposed', async () => {

@@ -827,7 +827,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     if (slice || signal) await batchBuildingCellsAsync(root, leaves, pickables, slice, signal);
     else batchBuildingCells(root, leaves, pickables);
 
-    const neon = { group: null, panels: [], update() {}, stats: { panels: 0 } }; // upstream's Irma sign; no neon signs in Aalborg yet
+    const neon = { group: null, panels: [], update() {}, stats: { panels: 0 } }; // upstream's Irma sign; no neon signs in Refshaleøen yet
     texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget, closeFade: level !== 'photo' }) : null; // joins the shared budget itself
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();

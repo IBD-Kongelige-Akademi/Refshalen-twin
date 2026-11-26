@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = ["requests", "shapely>=2", "pyproj", "numpy", "rasterio", "scipy", "pillow", "laspy[lazrs]", "pyshp",
-#                 "geopandas", "pyogrio", "duckdb", "mapbox-earcut"]
+#                 "geopandas", "pyogrio", "pyarrow", "fsspec", "aiohttp", "duckdb", "mapbox-earcut"]
 # ///
 """Citywide compiler (milestone C1/C5 of docs/citywide-plan.md): Aalborg Kommune (the tiles of data/city/tiles.json) -> 500 m tiles.
 
@@ -73,8 +73,8 @@ TERRAIN_CELL = 2.0
 GEO_VERSION = "cph-geodata/1"
 CITY_BBOX_MARGIN = 100.0
 
-KOMMUNE = "0851"  # Aalborg
-SCOPE = "Aalborg Kommune, the tiles of data/city/tiles.json (build_city.py)"
+KOMMUNE = "0101"  # København
+SCOPE = "Københavns Kommune (Refshaleøen district), the tiles of data/city/tiles.json (build_city.py)"
 ATTRIBUTION = [
     "Indeholder data fra Klimadatastyrelsen / GeoDanmark (Bygning, Vejkant, Vejmidte, Sø, Kyst, Havn, Bassin, Træ), BBR, DAGI og DHM "
     "(vilkår for frie geografiske data, CC BY 4.0), via datagrundlag.dk.",

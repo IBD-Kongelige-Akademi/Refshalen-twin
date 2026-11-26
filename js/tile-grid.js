@@ -4,9 +4,9 @@
 // Local frame: x = E - origin.E, z = -(N - origin.N). A tile's local bounds are [xmin, zmin, xmax, zmax].
 
 export const TILE_SIZE = 500;
-export const ORIGIN_E = 556000; // Aalborg, by Gammel Torv
-export const ORIGIN_N = 6323100;
-export const ORIGIN_H = 3.85; // DVR90 height of the origin: the median DHM terrain within 10 m of it
+export const ORIGIN_E = 727000; // Refshaleøen, by the B&W halls
+export const ORIGIN_N = 6177500;
+export const ORIGIN_H = 2.0; // DVR90 height of the origin: the median DHM terrain within 10 m of it
 /** 0 m DVR90 (the sea) in the local frame. */
 export const SEA_LEVEL_LOCAL = -ORIGIN_H;
 

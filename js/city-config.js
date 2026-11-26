@@ -1,5 +1,5 @@
 // js/city-config.js
-// Aalborg spatial configuration: the local frame, the playable bounds and the teleport presets the engine core
+// Refshaleøen spatial configuration: the local frame, the playable bounds and the teleport presets the engine core
 // (controllers, cameras, materials, gamepad) relies on. The frame follows docs/cph-geodata-schema.md and mirrors
 // tools/geodata/frame.py (keep the two in step).
 //
@@ -11,9 +11,9 @@ import { ORIGIN_E, ORIGIN_N, ORIGIN_H } from './tile-grid.js';
 export const CPH_FRAME = Object.freeze({
   epsg: 25832,
   vertical: 'DVR90',
-  origin: Object.freeze([ORIGIN_E, ORIGIN_N, ORIGIN_H]), // by Gammel Torv (js/tile-grid.js)
+  origin: Object.freeze([ORIGIN_E, ORIGIN_N, ORIGIN_H]), // Refshaleøen (js/tile-grid.js)
   axes: 'x=east, z=south, y=up',
-  bbox: Object.freeze([-1000, -900, 1000, 1100]) // [minX, minZ, maxX, maxZ]: E 555000-557000, N 6322000-6324000
+  bbox: Object.freeze([-1000, -1000, 1000, 1000]) // [minX, minZ, maxX, maxZ]: E 726000-728000, N 6176500-6178500
 });
 
 const [BX0, BZ0, BX1, BZ1] = CPH_FRAME.bbox;
@@ -60,19 +60,17 @@ export function setCityBounds(bbox, { frame = null } = {}) {
 /** The current playable / loaded extent as [minX, minZ, maxX, maxZ]. */
 export const getCityBounds = () => [ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ];
 
-// Teleport presets (local frame; forward is (sin h, cos h), so heading PI faces north towards the Limfjord). Each lies on a link of
-// the road graph (data/city/roadgraph.json) next to the landmark's OSM position; streets face along the street, the bridge north
-// across the fjord, the buildings' presets face the building. The scenic cameras (cameras.js) frame the same places.
-// pin: the building's footprint centre, where the map puts its marker (default: the arrival point x, z).
-// akkc is where the player starts: the Kortdage conference venue, seen from Europa Plads with the entrance ahead
+// Teleport presets (local frame; forward is (sin h, cos h)). Each stands on a link of the road graph (data/city/roadgraph.json)
+// 30-60 m from the landmark's OSM position and faces it; the scenic cameras (cameras.js) frame the same places.
+// pin: the landmark's OSM position, where the map puts its marker. reffen is where the player starts.
 const TELEPORT_LOCATIONS = {
-  akkc: { name: 'Aalborg Kongres & Kultur Center', sub: 'Europa Plads · start', x: -663.7, z: 467.9, heading: 0.70, pin: { x: -585.8, z: 505.1 } },
-  budolfi: { name: 'Budolfi Domkirke', sub: 'Old town · the cathedral', x: -308.1, z: -1.7, heading: 1.23, pin: { x: -219.5, z: 7.0 } },
-  jomfru: { name: 'Jomfru Ane Gade', sub: 'Old town · nightlife street', x: -256.4, z: -236.5, heading: 2.94 },
-  utzon: { name: 'Utzon Center', sub: 'Harbour front · Limfjord', x: 157.9, z: -165.7, heading: 2.17, pin: { x: 202.4, z: -172.2 } },
-  musikkens: { name: 'Musikkens Hus', sub: 'Harbour front · the concert hall', x: 594.1, z: -82.0, heading: 0.0, pin: { x: 600.0, z: 27.4 } },
-  karolinelund: { name: 'Karolinelund', sub: 'Park · the old amusement park', x: 584.3, z: 421.9, heading: 3.14 },
-  hvidehus: { name: 'Hotel Det Hvide Hus', sub: 'Vesterbro · the hotel tower', x: -737.0, z: 759.0, heading: 2.57, pin: { x: -672.9, z: 652.8 } }
+  reffen: { name: 'Reffen', sub: 'Refshaleøen · street food · start', x: -174.6, z: -417.8, heading: -0.29, pin: { x: -187.2, z: -376.1 } },
+  operaen: { name: 'Operaen', sub: 'Holmen · the opera house', x: -653.3, z: 983.8, heading: 2.76, pin: { x: -641.3, z: 953.7 } },
+  akademiet: { name: 'Det Kongelige Akademi', sub: 'Holmen · architecture school', x: -364.4, z: 939.9, heading: -1.97, pin: { x: -388.3, z: 929.8 } },
+  mastekranen: { name: 'Mastekranen', sub: 'Nyholm · the mast crane', x: -313.2, z: 234.2, heading: -1.49, pin: { x: -351.6, z: 237.3 } },
+  bw: { name: 'B&W Hallerne', sub: 'Refshaleøen · the shipyard halls', x: 206.3, z: -349.5, heading: -0.25, pin: { x: 191.8, z: -293.1 } },
+  cc: { name: 'Copenhagen Contemporary', sub: 'Refshaleøen · art hall', x: 74.3, z: -346.4, heading: 2.47, pin: { x: 98.2, z: -376.8 } },
+  banchina: { name: 'La Banchina', sub: 'Refshaleøen · harbour bath', x: -48.3, z: 49.5, heading: -0.28, pin: { x: -57.0, z: 80.0 } }
 };
 
 function isTypingInField(event) {

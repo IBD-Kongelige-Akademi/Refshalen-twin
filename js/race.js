@@ -2,26 +2,29 @@ import { TELEPORT_LOCATIONS } from './city-config.js';
 import { REF_SPEED, SANITY, parFor, adjustedTime, raceMode, createScores } from './race-scores.js';
 
 // js/race.js
-// The Kortdage race (docs/race.md): from AKKC to Jomfru Ane Gade in any mode, any route, against the clock.
+// The Refshaleøen race (docs/race.md): from Reffen to Akademiet in any mode, any route, against the clock.
 //   idle -> countdown (3 s, the controls held) -> running (the clock, the GPS route to the finish) -> finished (the result card,
 //   name + company for the list) -> idle. The finish is the street itself: within FINISH_RADIUS of any road-graph link named
-//   Jomfru Ane Gade (a car reaches either end of the walking street).
+//   Danneskiold-Samsøes Allé, the Academy's street on Holmen.
 // Plain logic over injected functions (js/main.js passes its UI closures), so tests/race.test.mjs runs it without a browser.
 
 export const COUNTDOWN = 3; // s
 export const FINISH_RADIUS = 8; // m from the street's centre line
-export const FINISH_FALLBACK_RADIUS = 25; // m from TELEPORT_LOCATIONS.jomfru when the road graph has no Jomfru Ane Gade
-export const FINISH_NAME = 'Jomfru Ane Gade';
+export const FINISH_REACH = 60; // m: the allé's links this close to the Akademiet teleport
+export const FINISH_FALLBACK_RADIUS = 25; // m from TELEPORT_LOCATIONS.akademiet when the road graph has no Danneskiold-Samsøes Allé
+export const FINISH_NAME = 'Danneskiold-Samsøes Allé'; // the Academy's street on Holmen
 const JUMP = 60; // m in one update: a teleport, which ends the race
 const HEADING_LOOKAHEAD = 25; // m along the route: the start faces that way
 
 /** The finish line's segments [ax, az, bx, bz] from the road graph's links named `name`. */
-export function finishSegments(graph, name = FINISH_NAME) {
+export function finishSegments(graph, name = FINISH_NAME, near = TELEPORT_LOCATIONS.akademiet, reach = FINISH_REACH) {
   if (!graph?.names || !graph.links || !graph.nodes) return [];
   const idx = graph.names.indexOf(name);
   if (idx < 0) return [];
   const N = graph.nodes;
-  return graph.links.filter((l) => l[6] === idx && l[0] !== l[1]).map((l) => [N[2 * l[0]], N[2 * l[0] + 1], N[2 * l[1]], N[2 * l[1] + 1]]);
+  const segs = graph.links.filter((l) => l[6] === idx && l[0] !== l[1]).map((l) => [N[2 * l[0]], N[2 * l[0] + 1], N[2 * l[1]], N[2 * l[1] + 1]]);
+  // the long allé runs the length of Holmen: only its links by the Academy are the finish
+  return near ? segs.filter((g) => segmentDistance(near.x, near.z, g) <= reach) : segs;
 }
 
 function segmentDistance(px, pz, [ax, az, bx, bz]) {
@@ -56,8 +59,8 @@ export function createRace(deps) {
   const {
     controllerManager, mapSystem = null, teleportTo,
     router = mapSystem?.router || null,
-    start = TELEPORT_LOCATIONS.akkc,
-    target = TELEPORT_LOCATIONS.jomfru,
+    start = TELEPORT_LOCATIONS.reffen,
+    target = TELEPORT_LOCATIONS.akademiet,
     finish = [],
     scores = createScores(deps.storage),
     ui = {}

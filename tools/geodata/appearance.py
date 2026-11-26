@@ -43,7 +43,7 @@ from PIL import Image
 import polytri
 from frame import ORIGIN
 
-LAT, LON = 57.048, 9.919  # district centre (Aalborg), for the sun position
+LAT, LON = 55.693, 12.614  # district centre (Refshaleøen), for the sun position
 
 SHADOW_AMBIENT = 0.55  # sky share of irradiance on a surface (a in E = a + (1-a) cos); soft so shaded walls stay photo-like
 E_REF_COS = 0.8  # reference sun incidence the reported tone is normalised to

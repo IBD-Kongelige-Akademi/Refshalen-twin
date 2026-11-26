@@ -32,8 +32,8 @@ test('October daytime presets point into the south half of the scene and blue ho
   assert.ok(golden.z > 0, 'golden-hour sunlight comes from the south-west');
   assert.ok(midday.z > 0, 'midday sunlight comes from the south');
   const actualGridAzimuth = Math.atan2(midday.x, -midday.z) * 180 / Math.PI;
-  const expectedGridAzimuth = solarPosition(middayInstant).azimuth - 0.77;
-  assert.ok(Math.abs(actualGridAzimuth - expectedGridAzimuth) < 1e-9, 'the vector uses the 0.77° grid correction');
+  const expectedGridAzimuth = solarPosition(middayInstant).azimuth - 2.99;
+  assert.ok(Math.abs(actualGridAzimuth - expectedGridAzimuth) < 1e-9, 'the vector uses the 2.99° grid correction');
   assert.ok(blueHourPosition.elevation < 0, 'blue hour has no direct sun');
   assert.ok(blueHour.y < 0, 'the blue-hour sun vector is below the horizon');
   for (const direction of [golden, midday, blueHour]) {

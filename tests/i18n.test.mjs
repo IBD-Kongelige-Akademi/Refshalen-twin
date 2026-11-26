@@ -54,7 +54,7 @@ test('the tour, cameras, modes, hints and vehicle labels have Danish entries', (
 
 test('Danish is the default language', () => {
   assert.equal(getLang(), 'da');
-  assert.equal(t('Explore Aalborg'), 'Udforsk Aalborg');
+  assert.equal(t('Explore Refshaleøen'), 'Udforsk Refshaleøen');
 });
 
 test('t() switches with the language, fills placeholders and passes unknown text through', () => {
@@ -62,12 +62,12 @@ test('t() switches with the language, fills placeholders and passes unknown text
   const off = onLangChange((lang) => seen.push(lang));
   setLang('en');
   assert.equal(getLang(), 'en');
-  assert.equal(t('Explore Aalborg'), 'Explore Aalborg');
+  assert.equal(t('Explore Refshaleøen'), 'Explore Refshaleøen');
   assert.equal(t('Saved: you are #{rank}!', { rank: 3 }), 'Saved: you are #3!');
   assert.equal(setLang('da'), true);
   assert.equal(setLang('da'), false, 'no change');
   assert.equal(setLang('sv'), false, 'unknown language');
-  assert.equal(t('Explore Aalborg'), 'Udforsk Aalborg');
+  assert.equal(t('Explore Refshaleøen'), 'Udforsk Refshaleøen');
   assert.equal(t('Saved: you are #{rank}!', { rank: 3 }), 'Gemt: du er nr. 3!');
   assert.equal(t('Algade'), 'Algade');
   assert.equal(translatePhrases('observed 2025, shadow, white-balanced'), 'observeret 2025, skygge, hvidbalanceret');

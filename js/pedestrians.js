@@ -40,7 +40,7 @@ import { RAGDOLL_POINTS } from './ragdoll.js';
 // Each crowd level uses one instanced draw, with 15-bone poses in a storage buffer and seeded appearance.
 // PersonRig plants footsteps in world space and uses two-bone IK to place the legs; it also handles
 // turns, curb steps, running, jumping, getting up after a fall, cycling and weight shifts while standing; and (Copenhagen /
-// Aalborg) roller skates, a skateboard and the cargo bike's rider. Gait, jumps and getting up from slop-newyork.
+// Refshaleøen) roller skates, a skateboard and the cargo bike's rider. Gait, jumps and getting up from slop-newyork.
 
 // ============================================================================
 // 1. SKELETON

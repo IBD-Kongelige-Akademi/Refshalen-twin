@@ -1,5 +1,5 @@
 // js/race-scores.js
-// The Kortdage race's highscores (docs/race.md): one list per kiosk in localStorage, every mode on it, made comparable by a
+// The Refshaleøen race's highscores (docs/race.md): one list per kiosk in localStorage, every mode on it, made comparable by a
 // handicap. Each mode's par = its route length to Jomfru Ane Gade / its reference speed; a run's score ("adjusted time") is its
 // time scaled to the car's par, i.e. what the run would have taken in the car at the same pace relative to par.
 // Pure: storage is injected, so tests/race-scores.test.mjs runs without a browser.

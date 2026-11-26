@@ -338,7 +338,7 @@ function createPedestrianRoutes({ walkable, extraOffset = null, obstruction = nu
   }
 
   // Could someone on a walking line step `offset` metres to its side (an escape dive, a dodge round someone)? Clear of walls
-  // and furniture, off the carriageway, the railway and the water (slop-newyork 8492b56 / e673049, on Aalborg's limits)
+  // and furniture, off the carriageway, the railway and the water (slop-newyork 8492b56 / e673049, on Refshaleøen's limits)
   function canDodge(p, offset) {
     const target = { x: p.ax + p.ux * p.t + p.uz * offset, z: p.az + p.uz * p.t - p.ux * offset };
     if (roadAt && roadAt(target.x, target.z)) return false;

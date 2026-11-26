@@ -70,7 +70,7 @@ test('the citywide presets are finite, hidden until a tile covers them, and lie 
 const ROADGRAPH = join(__dirname, '..', 'data/city/roadgraph.json');
 test('street teleports land on the street they name', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json (built in phase 2-3)' }, () => {
   const graph = JSON.parse(readFileSync(ROADGRAPH, 'utf8'));
-  const streets = { jomfru: 'Jomfru Ane Gade' };
+  const streets = { mastekranen: 'A.H. Vedels Plads' };
   for (const [key, street] of Object.entries(streets)) {
     const p = TELEPORT_LOCATIONS[key];
     assert.ok(distanceToStreet({ roadGraph: graph }, street, p.x, p.z) < 12, `${key} is within 12 m of ${street}`);
@@ -82,7 +82,7 @@ test('no New York destinations or labels remain in the teleport and camera menus
   const menus = html.slice(html.indexOf('id="teleport-popover"'), html.indexOf('id="camera-popover"') + 3000);
   assert.ok(!/Empire|Times Square|Chrysler|Bryant|Central Park|Manhattan|Taxi/i.test(menus));
   assert.ok(!/NYC|mph/.test(html));
-  assert.match(html, /<title>Aalborg Twin<\/title>/);
+  assert.match(html, /<title>Refshaleøen Twin<\/title>/);
   assert.match(html, /km\/h/);
 });
 
@@ -118,7 +118,7 @@ test('preset teleports share arrival resets', () => {
       addEventListener: (_event, handler) => handlers.set(key, handler)
     })),
     closePopovers: () => {},
-    race: null // the Kortdage race: no race running
+    race: null // the Refshaleøen race: no race running
   };
   vm.runInNewContext(main.slice(start, end), environment);
   for (const [name, point] of Object.entries({ ...TELEPORT_LOCATIONS, ...CITY_TELEPORT_LOCATIONS })) {

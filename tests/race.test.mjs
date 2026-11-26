@@ -5,10 +5,10 @@ import { TELEPORT_LOCATIONS } from '../js/city-config.js';
 import { createRace, finishSegments, COUNTDOWN, FINISH_RADIUS } from '../js/race.js';
 import { createScores, parFor } from '../js/race-scores.js';
 
-const start = TELEPORT_LOCATIONS.akkc;
-const target = TELEPORT_LOCATIONS.jomfru;
-// the street as the road graph has it (data/city/roadgraph.json, Jomfru Ane Gade's footway links)
-const STREET = [[-268.8, -158.2, -269.4, -165.6], [-269.4, -165.6, -263.7, -201.3], [-263.7, -201.3, -256.2, -237.4], [-256.2, -237.4, -250.2, -261.9], [-250.2, -261.9, -235.6, -310.6], [-235.6, -310.6, -233.8, -316.5]];
+const start = TELEPORT_LOCATIONS.reffen;
+const target = TELEPORT_LOCATIONS.akademiet;
+// the street as the road graph has it (data/city/roadgraph.json, Danneskiold-Samsøes Allé by the Academy)
+const STREET = [[-333.08, 866.17, -363.19, 937.04], [-363.19, 937.04, -432.13, 1100.0]];
 
 function fakeTwin({ mode = 'car', avatar = 'man', router = null } = {}) {
   const calls = [];
@@ -57,16 +57,16 @@ function driveTo(race, entity, x, z, seconds) {
 
 // the road graph is gitignored: only where phase 2-3 have built it
 const ROADGRAPH = new URL('../data/city/roadgraph.json', import.meta.url);
-test('the finish line is Jomfru Ane Gade in the road graph', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json' }, () => {
+test('the finish line is Danneskiold-Samsøes Allé in the road graph', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json' }, () => {
   const graph = JSON.parse(readFileSync(ROADGRAPH, 'utf8'));
   const segs = finishSegments(graph);
-  assert.ok(segs.length >= 3, 'the street has links');
-  for (const [ax, az] of segs) assert.ok(Math.hypot(ax - target.x, az - target.z) < 120, 'near the Jomfru Ane Gade teleport');
+  assert.ok(segs.length >= 1, 'the street has links');
+  for (const [ax, az] of segs) assert.ok(Math.hypot(ax - target.x, az - target.z) < 200, 'near the Akademiet teleport');
   assert.deepEqual(finishSegments({ names: [], links: [], nodes: [] }), []);
   assert.deepEqual(finishSegments(null), []);
 });
 
-test('the race counts down at AKKC with the controls held, then runs the clock to the finish', () => {
+test('the race counts down at Reffen with the controls held, then runs the clock to the finish', () => {
   const { deps, calls, entity, ui, mapSystem } = fakeTwin();
   const race = createRace(deps);
   assert.ok(race.begin());
@@ -90,12 +90,12 @@ test('the race counts down at AKKC with the controls held, then runs the clock t
   assert.equal(ui.result.rank, 1);
 });
 
-test('either end of the walking street finishes; next to it does not', () => {
+test('either end of the allé by the Academy finishes; next to it does not', () => {
   const { deps } = fakeTwin();
   const race = createRace(deps);
-  assert.ok(race.atFinish(-268.8, -158.2 + FINISH_RADIUS - 1), 'the north end');
-  assert.ok(race.atFinish(-233.8 + 3, -316.5 - 3), 'the south end');
-  assert.ok(!race.atFinish(-268.8 - FINISH_RADIUS - 2, -200), 'the parallel street');
+  assert.ok(race.atFinish(-333.08, 866.17 - FINISH_RADIUS + 1), 'the south end');
+  assert.ok(race.atFinish(-432.13 + 3, 1100.0 - 3), 'the north end');
+  assert.ok(!race.atFinish(-363.19 - FINISH_RADIUS - 12, 937.04), 'beside the street');
   const fallback = createRace({ ...deps, finish: [] });
   assert.ok(fallback.atFinish(target.x + 10, target.z));
   assert.ok(!fallback.atFinish(target.x + 40, target.z));
@@ -121,9 +121,9 @@ test('the result is saved with a name and company, and a run too fast for its ve
   driveTo(race, entity, target.x, target.z, par * 1.2);
   assert.equal(race.state.result.rejected, false);
   assert.equal(race.submit('', 'Nobody'), null, 'a name is required');
-  const saved = race.submit('Anna', 'Aalborg Kommune');
+  const saved = race.submit('Anna', 'Det Kongelige Akademi');
   assert.equal(saved.rank, 1);
-  assert.equal(ui.board.entry.company, 'Aalborg Kommune');
+  assert.equal(ui.board.entry.company, 'Det Kongelige Akademi');
   assert.equal(race.state.phase, 'idle');
   assert.equal(race.scores.top(1)[0].mode, 'walk');
 });

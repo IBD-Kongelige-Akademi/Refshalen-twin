@@ -30,8 +30,8 @@ import { mergeRigidMeshes } from './rigid-meshes.js';
 // 3. City Bike and Long-John Cargo Bike (Procedural Frames with Skinned Riders)
 // 4. Drone (X-frame quadcopter, see actor-models.js createDroneModel)
 
-// Spawn by the Kortdage venue (Aalborg Kongres & Kultur Center); main.js places every mode at TELEPORT_LOCATIONS.akkc on boot
-const SPAWN_Z = TELEPORT_LOCATIONS.akkc.z;
+// Spawn by the Kortdage venue (Refshaleøen Kongres & Kultur Center); main.js places every mode at TELEPORT_LOCATIONS.reffen on boot
+const SPAWN_Z = TELEPORT_LOCATIONS.reffen.z;
 const JUMP_LEAD = 0.085; // s: the walker's crouch before a jump leaves the ground
 const groundCollider = { type: 'ground' };
 

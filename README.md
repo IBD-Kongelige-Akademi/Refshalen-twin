@@ -1,3 +1,11 @@
+# Refshaleøen Twin
+
+A walkable, drivable and bikeable real-time 3D twin of **Refshaleøen and Holmen** in Copenhagen (the 2 × 2 km box E 726000–728000, N 6176500–6178500: Reffen, B&W Hallerne, Copenhagen Contemporary, La Banchina, Mastekranen on Nyholm, Det Kongelige Akademi and Operaen), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.
+
+Forked from [askonring/aalborg-twin](https://github.com/askonring/aalborg-twin) (Andreas' Aalborg twin) at `a8ef36f`; what changed for Copenhagen is in [docs/refshaleoen.md](docs/refshaleoen.md). The Aalborg README follows below; its commands work the same here.
+
+---
+
 # Aalborg Twin
 
 A walkable, drivable and bikeable real-time 3D twin of central Aalborg on the Limfjord (Budolfi, Jomfru Ane Gade, Aalborghus, the harbour front, Utzon Center and Limfjordsbroen), built with [three.js](https://threejs.org/) WebGPURenderer and TSL.

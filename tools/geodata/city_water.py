@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["numpy", "shapely>=2", "pyproj", "requests", "geopandas", "pyogrio"]
+# dependencies = ["numpy", "shapely>=2", "pyproj", "requests", "geopandas", "pyogrio", "pyarrow", "fsspec", "aiohttp"]
 # ///
 """Citywide water and green ground (milestone C4 of docs/citywide-plan.md): a post-process of the tile compiler, like far_lod.py and
 tile_streets.py. It never edits what build_city.py / city_layers2.py write; it reads the tile `terrain` / `roads` / `buildings` /
@@ -114,7 +114,7 @@ NATURE_LEISURE = ("nature_reserve",)
 HARBOUR_MIN_M2 = 40000.0  # a sea-level body this big is harbour
 NATURAL_NEAR_M = 30.0  # a shore vertex this close to natural land is natural coast
 MOAT_NAME = ("stadsgrav", "kastelsgrav", "voldgrav")
-SEA_NAME = "Limfjorden"  # the sea body's name (else it takes the name of the largest basin it absorbs)
+SEA_NAME = "Københavns Havn"  # the sea body's name (else it takes the name of the largest basin it absorbs)
 FETCH_MARGIN_M = 500.0  # the raw layers reach this far beyond the tiles (coast and harbour basins that run out of them)
 
 

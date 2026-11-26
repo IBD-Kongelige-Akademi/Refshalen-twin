@@ -1775,7 +1775,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     const off = v.dl - (v.evade || 0);
     const want = Math.atan((wheelbase * bend) / 2) + v.nose + Math.atan(((panic ? 3 : 1.2) * off) / (1 + v.speed));
     const lateral = panic ? v.driver.grip : 1.3 * v.driver.aLat; // the sideways acceleration it steers up to
-    // Aalborg's junction curves are often tighter than a car turns at full lock (a radius under 1 m where the lanes end
+    // Refshaleøen's junction curves are often tighter than a car turns at full lock (a radius under 1 m where the lanes end
     // near the node): there it turns the wheels as far as the curve needs, or it would swing out across the junction
     const need = Math.min(LOCK_MAX, 1.15 * Math.abs(Math.atan((wheelbase * bend) / 2)));
     const most = Math.min(Math.max(v.driver.lock, need), Math.atan((lateral * wheelbase) / Math.max(v.speed * v.speed, 1e-3)));

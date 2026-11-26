@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Aalborg Twin</title>
+  <title>Refshaleøen Twin</title>
   <link rel="icon" href="data:," />
-  <meta name="description" content="Aalborg Twin: a walkable, drivable and bikeable real-time 3D twin of the old town and harbour front on the Limfjord, built with three.js WebGPURenderer and TSL. Real building footprints and heights, streets, signals, traffic and cyclists." />
+  <meta name="description" content="Refshaleøen Twin: a walkable, drivable and bikeable real-time 3D twin of the old town and harbour front on the harbour, built with three.js WebGPURenderer and TSL. Real building footprints and heights, streets, signals, traffic and cyclists." />
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   <!-- Intentional immutable three.js source pin: keep core, TSL, and addons on the same verified commit. -->
   <script type="importmap">
@@ -191,7 +191,7 @@
   <div id="loading-overlay" role="status" aria-live="polite">
     <div class="loader">
       <span class="brand-mark loader-bullet" role="img" aria-label="Ramboll"></span>
-      <div class="loader-title">Aalborg Twin</div>
+      <div class="loader-title">Refshaleøen Twin</div>
       <div class="loader-track is-indeterminate" aria-hidden="true"><span id="loading-progress" class="loader-fill"></span></div>
       <!-- in Danish, the default language: this shows before js/i18n.js has loaded (it maps it back for English) -->
       <div id="loading-status">Starter WebGPURenderer og TSL-shadere...</div>
@@ -200,7 +200,7 @@
   </div>
 
   <!-- 3D WebGPU Viewport Container -->
-  <main id="canvas-container" aria-label="3D interactive Aalborg Twin viewport"></main>
+  <main id="canvas-container" aria-label="3D interactive Refshaleøen Twin viewport"></main>
 
   <!-- Top-Left: Brand & Renderer Telemetry -->
   <header class="hud hud-top-left">
@@ -208,7 +208,7 @@
       <span class="brand-mark" role="img" aria-label="Ramboll"></span>
       <div class="brand-titles">
         <div class="brand-heading">
-          <h1>Aalborg Twin</h1>
+          <h1>Refshaleøen Twin</h1>
           <a class="repo-link" href="./credits.html" target="_blank" rel="noopener" title="Based on Slop New York by mrdoob (MIT), via copenhagen-twin by Martin Collignon (MIT). Data: GeoDanmark, DAR, BBR, DAGI, DHM and Skråfoto (Klimadatastyrelsen / SDFI, CC BY 4.0) and © OpenStreetMap contributors (ODbL)." aria-label="Credits and data attributions (opens in a new tab)">Credits <span aria-hidden="true">↗</span></a>
         </div>
         <div class="brand-subtitle">three.js · WebGPU · TSL · <span id="hud-fps" class="fps-ok">60</span> fps</div>
@@ -219,7 +219,7 @@
   <!-- Top-Right Toolbar: Map, Time of Day, Teleport & Clean View -->
   <div class="hud hud-top-right">
     <div id="hud-toolbar" class="panel toolbar">
-      <button id="btn-open-map" class="tool-btn" type="button" title="Map of Aalborg [M]">
+      <button id="btn-open-map" class="tool-btn" type="button" title="Map of Refshaleøen [M]">
         <svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><span class="tool-label">Map</span><kbd data-pad="MENU">M</kbd>
       </button>
       <span class="toolbar-divider" aria-hidden="true"></span>
@@ -229,10 +229,10 @@
       <button id="btn-teleport" class="tool-btn" type="button" popovertarget="teleport-popover" title="Teleport the active player">
         <svg class="icon" aria-hidden="true"><use href="#i-pin"/></svg><span class="tool-label">Teleport</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
-      <button id="btn-tour" class="tool-btn" type="button" popovertarget="tour-popover" title="Tour Aalborg from AKKC">
+      <button id="btn-tour" class="tool-btn" type="button" popovertarget="tour-popover" title="Tour Refshaleøen from Reffen">
         <svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg><span class="tool-label">Tour</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
-      <button id="btn-race" class="tool-btn" type="button" popovertarget="race-popover" title="Race from AKKC to Jomfru Ane Gade [R]">
+      <button id="btn-race" class="tool-btn" type="button" popovertarget="race-popover" title="Race from Reffen to Akademiet [R]">
         <svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg><span class="tool-label">Race</span><svg class="icon icon-sm" aria-hidden="true"><use href="#i-chevron-down"/></svg>
       </button>
       <button id="btn-buildings" class="tool-btn" type="button" popovertarget="buildings-popover" title="Building model level [L cycles]">
@@ -261,27 +261,27 @@
   <!-- Teleport Destinations (native popover: light-dismiss & Esc) -->
   <div id="teleport-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" aria-label="Teleport the active player">
     <div class="pop-title">Teleport to</div>
-    <button id="tp-akkc" class="pop-item tp-btn" data-teleport="akkc" type="button"><span class="pop-name">Aalborg Kongres &amp; Kultur Center</span><span class="pop-sub">Europa Plads · start</span></button>
-    <button id="tp-budolfi" class="pop-item tp-btn" data-teleport="budolfi" type="button"><span class="pop-name">Budolfi Domkirke</span><span class="pop-sub">Old town · the cathedral</span></button>
-    <button id="tp-jomfru" class="pop-item tp-btn" data-teleport="jomfru" type="button"><span class="pop-name">Jomfru Ane Gade</span><span class="pop-sub">Old town · nightlife street</span></button>
-    <button id="tp-utzon" class="pop-item tp-btn" data-teleport="utzon" type="button"><span class="pop-name">Utzon Center</span><span class="pop-sub">Harbour front · Limfjord</span></button>
-    <button id="tp-musikkens" class="pop-item tp-btn" data-teleport="musikkens" type="button"><span class="pop-name">Musikkens Hus</span><span class="pop-sub">Harbour front · the concert hall</span></button>
-    <button id="tp-karolinelund" class="pop-item tp-btn" data-teleport="karolinelund" type="button"><span class="pop-name">Karolinelund</span><span class="pop-sub">Park · the old amusement park</span></button>
-    <button id="tp-hvidehus" class="pop-item tp-btn" data-teleport="hvidehus" type="button"><span class="pop-name">Hotel Det Hvide Hus</span><span class="pop-sub">Vesterbro · the hotel tower</span></button>
+    <button id="tp-reffen" class="pop-item tp-btn" data-teleport="reffen" type="button"><span class="pop-name">Reffen</span><span class="pop-sub">Refshaleøen · street food · start</span></button>
+    <button id="tp-operaen" class="pop-item tp-btn" data-teleport="operaen" type="button"><span class="pop-name">Operaen</span><span class="pop-sub">Holmen · the opera house</span></button>
+    <button id="tp-akademiet" class="pop-item tp-btn" data-teleport="akademiet" type="button"><span class="pop-name">Det Kongelige Akademi</span><span class="pop-sub">Holmen · architecture school</span></button>
+    <button id="tp-mastekranen" class="pop-item tp-btn" data-teleport="mastekranen" type="button"><span class="pop-name">Mastekranen</span><span class="pop-sub">Nyholm · the mast crane</span></button>
+    <button id="tp-bw" class="pop-item tp-btn" data-teleport="bw" type="button"><span class="pop-name">B&amp;W Hallerne</span><span class="pop-sub">Refshaleøen · the shipyard halls</span></button>
+    <button id="tp-cc" class="pop-item tp-btn" data-teleport="cc" type="button"><span class="pop-name">Copenhagen Contemporary</span><span class="pop-sub">Refshaleøen · art hall</span></button>
+    <button id="tp-banchina" class="pop-item tp-btn" data-teleport="banchina" type="button"><span class="pop-name">La Banchina</span><span class="pop-sub">Refshaleøen · harbour bath</span></button>
     <div id="tp-city-title" class="pop-title" hidden>Citywide</div>
   </div>
 
   <!-- The Kortdage tour (js/tour.js): from AKKC round the landmarks and back -->
-  <div id="tour-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-tour" aria-label="Tour Aalborg">
-    <div class="pop-title">Tour Aalborg from AKKC</div>
+  <div id="tour-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-tour" aria-label="Tour Refshaleøen">
+    <div class="pop-title">Tour Refshaleøen from Reffen</div>
     <button id="tour-express" class="pop-item tp-btn" data-tour="express" type="button"><span class="pop-name">Express tour · 2 min</span><span class="pop-sub">An aerial opening, the drive modes, then seven landmarks, hands-off</span></button>
     <button id="tour-full" class="pop-item tp-btn" data-tour="full" type="button"><span class="pop-name">Full tour · 6 min</span><span class="pop-sub">Every feature: building levels, night, drone, Plusbus, weather</span></button>
     <button id="tour-drive" class="pop-item tp-btn" data-tour="drive" type="button"><span class="pop-name">Drive the tour</span><span class="pop-sub">You drive, the GPS routes you stop to stop (drone starts in the car)</span></button>
   </div>
 
-  <!-- The Kortdage race (js/race.js, docs/race.md): AKKC to Jomfru Ane Gade, one highscore list for every mode -->
-  <div id="race-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-race" aria-label="Race to Jomfru Ane Gade">
-    <div class="pop-title">Race: AKKC → Jomfru Ane Gade</div>
+  <!-- The Refshaleøen race (js/race.js, docs/race.md): Reffen to Akademiet, one highscore list for every mode -->
+  <div id="race-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-race" aria-label="Race to Akademiet">
+    <div class="pop-title">Race: Reffen → Akademiet</div>
     <p class="race-rules">Any route, any vehicle. Times are handicapped by vehicle, so walkers and cyclists can beat the car.</p>
     <button id="race-start" class="pop-item tp-btn" type="button"><span class="pop-name">Start the race <kbd>R</kbd></span><span class="pop-sub" id="race-start-mode">in the car</span></button>
     <div class="pop-title">Highscores</div>
@@ -350,13 +350,13 @@
       <header class="start-head">
         <span class="brand-mark" role="img" aria-label="Ramboll"></span>
         <div>
-          <div class="start-kicker">Kortdage · Aalborg Kongres &amp; Kultur Center</div>
-          <h2 id="start-title" class="start-title">Aalborg Twin</h2>
+          <div class="start-kicker">Det Kongelige Akademi · Refshaleøen</div>
+          <h2 id="start-title" class="start-title">Refshaleøen Twin</h2>
         </div>
         <div class="start-sponsor">Sponsored by <b>Ramboll</b></div>
         <button class="start-lang" type="button" data-lang-toggle="long" data-i18n-skip lang="da" title="Skift til dansk" aria-label="Skift til dansk">Dansk</button>
       </header>
-      <p class="start-pitch">Aalborg's centre rebuilt in 3D from open map data, aerial photos and building drawings. Walk, cycle, drive, fly or take the Plusbus through it.</p>
+      <p class="start-pitch">Refshaleøen and Holmen rebuilt in 3D from open map data and aerial photos. Walk, cycle, drive or fly around the old shipyard island.</p>
 
       <div class="start-label">Choose how to get around <span class="start-label-keys"><kbd>1</kbd>–<kbd>5</kbd></span></div>
       <div class="start-modes" role="group" aria-label="Choose a mode">
@@ -369,7 +369,7 @@
 
       <div class="start-label">What you can do</div>
       <ul class="start-features">
-        <li><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg><div><b>Kortdage race</b><span>AKKC to Jomfru Ane Gade, any route. Times are handicapped by vehicle, so walkers can beat the car.</span></div><kbd>R</kbd></li>
+        <li><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg><div><b>Refshaleøen race</b><span>Reffen to Akademiet, any route. Times are handicapped by vehicle, so walkers can beat the car.</span></div><kbd>R</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg><div><b>Guided tour</b><span>Sit back for 2 or 6 minutes past seven landmarks, or drive it with the GPS.</span></div></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-map"/></svg><div><b>Map &amp; teleport</b><span>Search a street, click to jump there, right-click to plan a GPS route.</span></div><kbd data-pad="MENU">M</kbd></li>
         <li><svg class="icon" aria-hidden="true"><use href="#i-building"/></svg><div><b>Real buildings</b><span>Click any building for its data. Step from bare LoD2 shells to photo-textured hero buildings.</span></div><kbd>L</kbd></li>
@@ -384,8 +384,8 @@
       </div>
 
       <div class="start-actions">
-        <button class="start-btn start-primary" data-start-action="explore" type="button">Explore Aalborg</button>
-        <button class="start-btn" data-start-action="race" type="button"><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg>Race to Jomfru Ane Gade</button>
+        <button class="start-btn start-primary" data-start-action="explore" type="button">Explore Refshaleøen</button>
+        <button class="start-btn" data-start-action="race" type="button"><svg class="icon" aria-hidden="true"><use href="#i-stopwatch"/></svg>Race to Akademiet</button>
         <button class="start-btn" data-start-action="tour" type="button"><svg class="icon" aria-hidden="true"><use href="#i-tour"/></svg>Express tour · 2 min</button>
       </div>
       <div class="start-hint"><span class="start-hint-keys">Press <kbd>Enter</kbd> to start · <kbd>R</kbd> race · <kbd>T</kbd> tour</span><span class="start-hint-pad">Gamepad: <b>A</b> start · <b>Y</b> race · <b>X</b> tour</span></div>
@@ -395,7 +395,7 @@
   <!-- Bottom-Left: Street-Name Sign & Live Radar Minimap -->
   <div class="hud hud-bottom-left">
     <div id="hud-location" class="location" aria-live="off"></div>
-    <aside id="minimap-card" class="panel radar" aria-label="Live street radar" title="Open the map of Aalborg [M]">
+    <aside id="minimap-card" class="panel radar" aria-label="Live street radar" title="Open the map of Refshaleøen [M]">
       <canvas id="minimap-canvas"></canvas>
       <span class="radar-north" aria-hidden="true">N</span>
       <kbd class="radar-key" data-pad="MENU">M</kbd>
@@ -483,25 +483,25 @@
     </div>
   </section>
 
-  <!-- All Cameras: 3 Follow Cameras + 6 Aalborg Vantage Cameras + Auto-Director Drone -->
+  <!-- All Cameras: 3 Follow Cameras + 6 Refshaleøen Vantage Cameras + Auto-Director Drone -->
   <div id="camera-popover" class="popover" popover data-side="above" data-anchor="hud-cluster" data-align="hud-cluster" aria-label="Multiple Camera Angles">
     <div class="pop-title">Follow</div>
     <button id="cam-chase" class="pop-item cam-btn active" data-camera="chase" type="button"><span class="pop-name">3rd-Person Chase</span></button>
     <button id="cam-action" class="pop-item cam-btn" data-camera="action" type="button"><span class="pop-name">Low-Angle Action</span><kbd>6</kbd></button>
     <button id="cam-pov" class="pop-item cam-btn" data-camera="pov" type="button"><span class="pop-name">First-Person / Cockpit</span><kbd>7</kbd></button>
     <div class="pop-title">Scenic</div>
-    <button id="cam-akkc" class="pop-item cam-btn" data-camera="akkc" type="button"><span class="pop-name">Kongres &amp; Kultur Center</span><kbd>8</kbd></button>
-    <button id="cam-musikkens" class="pop-item cam-btn" data-camera="musikkens" type="button"><span class="pop-name">Musikkens Hus</span><kbd>9</kbd></button>
-    <button id="cam-utzon" class="pop-item cam-btn" data-camera="utzon" type="button"><span class="pop-name">Utzon Center</span><kbd>0</kbd></button>
-    <button id="cam-budolfi" class="pop-item cam-btn" data-camera="budolfi" type="button"><span class="pop-name">Budolfi Domkirke</span></button>
-    <button id="cam-jomfru" class="pop-item cam-btn" data-camera="jomfru" type="button"><span class="pop-name">Jomfru Ane Gade</span></button>
-    <button id="cam-karolinelund" class="pop-item cam-btn" data-camera="karolinelund" type="button"><span class="pop-name">Karolinelund</span></button>
-    <button id="cam-hvidehus" class="pop-item cam-btn" data-camera="hvidehus" type="button"><span class="pop-name">Hotel Det Hvide Hus</span></button>
+    <button id="cam-reffen" class="pop-item cam-btn" data-camera="reffen" type="button"><span class="pop-name">Reffen</span><kbd>8</kbd></button>
+    <button id="cam-bw" class="pop-item cam-btn" data-camera="bw" type="button"><span class="pop-name">B&amp;W Hallerne</span><kbd>9</kbd></button>
+    <button id="cam-mastekranen" class="pop-item cam-btn" data-camera="mastekranen" type="button"><span class="pop-name">Mastekranen</span><kbd>0</kbd></button>
+    <button id="cam-operaen" class="pop-item cam-btn" data-camera="operaen" type="button"><span class="pop-name">Operaen</span></button>
+    <button id="cam-akademiet" class="pop-item cam-btn" data-camera="akademiet" type="button"><span class="pop-name">Det Kongelige Akademi</span></button>
+    <button id="cam-cc" class="pop-item cam-btn" data-camera="cc" type="button"><span class="pop-name">Copenhagen Contemporary</span></button>
+    <button id="cam-banchina" class="pop-item cam-btn" data-camera="banchina" type="button"><span class="pop-name">La Banchina</span></button>
     <button id="cam-drone" class="pop-item cam-btn" data-camera="drone" type="button"><span class="pop-name">Auto-Director Aerial</span></button>
   </div>
 
   <!-- Full-Screen Interactive Map of the Twin ([M]) -->
-  <section id="fullmap-modal" class="fullmap-modal hidden" role="dialog" aria-modal="true" aria-label="Map of Aalborg">
+  <section id="fullmap-modal" class="fullmap-modal hidden" role="dialog" aria-modal="true" aria-label="Map of Refshaleøen">
     <div id="fullmap-canvas-wrap" class="fullmap-canvas-wrap">
       <canvas id="fullmap-canvas"></canvas>
     </div>
@@ -510,13 +510,13 @@
       <div class="panel fullmap-title">
         <span class="brand-mark" role="img" aria-label="Ramboll"></span>
         <div>
-          <h2>Aalborg Street Map</h2>
+          <h2>Refshaleøen Street Map</h2>
           <p id="fullmap-player-info" class="fullmap-subtitle">You are at Gammel Torv</p>
         </div>
       </div>
       <label class="panel fullmap-search-wrap">
         <svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>
-        <input id="fullmap-search" class="fullmap-search" type="text" placeholder="Search streets &amp; places — Jomfru Ane Gade, Boulevarden, Utzon…" aria-label="Search street or place" autocomplete="off" spellcheck="false" />
+        <input id="fullmap-search" class="fullmap-search" type="text" placeholder="Search streets &amp; places — Refshalevej, Operaen, Reffen…" aria-label="Search street or place" autocomplete="off" spellcheck="false" />
       </label>
       <button id="close-fullmap-btn" class="panel tool-btn fullmap-close" type="button" title="Close map [M / Esc]">
         <svg class="icon" aria-hidden="true"><use href="#i-close"/></svg><span class="tool-label">Close</span><kbd data-pad="B">Esc</kbd>

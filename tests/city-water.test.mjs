@@ -17,18 +17,18 @@ const layerPath = (id) => path.join(ROOT, 'data/tiles', id, 'water.json');
 const layer = (id) => JSON.parse(fs.readFileSync(layerPath(id), 'utf8'));
 const skip = !have && 'run uv run tools/geodata/city_water.py after the tile compiler';
 
-test('the header: levels per body, the Limfjord at the sea level, no override', { skip }, () => {
+test('the header: levels per body, the harbour at the sea level, no override', { skip }, () => {
   assert.equal(header.version, 'cph-water/1');
   assert.equal(header.sea, SEA_LEVEL_LOCAL);
   assert.ok(header.stats.bodies >= 3 && header.stats.quay_km > 2, JSON.stringify(header.stats));
   for (const b of header.bodies) assert.ok(Number.isFinite(b.level) && b.area_m2 > 0, b.id);
   const sea = header.bodies.filter((b) => b.sea);
-  assert.ok(sea.some((b) => b.level === SEA_LEVEL_LOCAL && b.area_m2 > 1e6), 'the Limfjord is one sea-level body over 1 km²');
+  assert.ok(sea.some((b) => b.level === SEA_LEVEL_LOCAL && b.area_m2 > 1e6), 'the harbour is one sea-level body over 1 km²');
   assert.equal(header.override, null);
 });
 
-test('Utzon Center: the harbour has a quay, the ground is cut under the water, nothing of the ground lies in it', { skip }, () => {
-  const id = tileOfLocal(200, -300); // the fjord off Utzon Center
+test('Refshaleøen: the harbour has a quay, the ground is cut under the water, nothing of the ground lies in it', { skip }, () => {
+  const id = tileOfLocal(250, -750); // Lynetten at the north end (tiles with bridges keep small ground slivers under the decks)
   const p = layer(id);
   const a = buildTileWaterArrays(p);
   assert.ok(a.surface.index.length > 0 && a.walls.index.length > 0);

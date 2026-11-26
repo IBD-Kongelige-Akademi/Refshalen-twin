@@ -1,6 +1,6 @@
 # /// script
 # requires-python = ">=3.10"
-# dependencies = ["requests", "duckdb", "pyogrio", "geopandas"]
+# dependencies = ["requests", "duckdb", "pyogrio", "pyarrow", "fsspec", "aiohttp", "geopandas"]
 # ///
 """Building entrances from DAR -> data/cph-entrances.json (cph-entrances/1).
 
@@ -369,7 +369,7 @@ def main() -> None:
     ap.add_argument("--geodata", default=None)
     ap.add_argument("--source", choices=("datagrundlag", "dar-rest"), default="datagrundlag",
                     help="datagrundlag.dk (no account) or upstream's Datafordeler DAR REST + BBR GraphQL (credentials)")
-    ap.add_argument("--kommune", default="0851", help="kommunekode of the BBR opgange (datagrundlag)")
+    ap.add_argument("--kommune", default="0101", help="kommunekode of the BBR opgange (datagrundlag)")
     frame.add_area_args(ap)
     args = ap.parse_args()
     frame.apply_area_args(args)

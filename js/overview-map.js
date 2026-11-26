@@ -3,7 +3,7 @@ import { GRID_CONVERGENCE_DEGREES } from './sun-position.js';
 
 // js/overview-map.js
 // Live radar minimap (bottom left) + full-screen interactive map ([M]) of the twin, ported from mrdoob's js/nyc-map.js (upstream).
-// Both are drawn on a 2D canvas, grid north up (the twin's frame is the UTM 32N grid, 0.77° off true north at Aalborg), 1 unit =
+// Both are drawn on a 2D canvas, grid north up (the twin's frame is the UTM 32N grid, 0.77° off true north at Refshaleøen), 1 unit =
 // 1 m, from city-level data so the map is complete before any tile streams in: building footprints, water, parks and green ground
 // from data/city/map.json (tools/geodata/city_map.py) and the streets with their names from the citywide road graph
 // (data/city/roadgraph.json, which the engine already loads). The GPS route is a shortest path on that road graph (one-way streets
@@ -450,7 +450,7 @@ class OverviewMap {
   /**
    * @param roadGraph  the citywide road graph ({ nodes, links, names, classes }) or null
    * @param places     { key: { name, sub, x, z, pin? } } (the teleports): white pins at `pin` (the building's centre) or else x, z, searchable
-   * @param locate     (x, z) -> 'Aalborg · <street>' (world.locationLabel)
+   * @param locate     (x, z) -> 'Refshaleøen · <street>' (world.locationLabel)
    * @param translate  English UI text -> the current language (js/i18n.js t)
    */
   constructor({ controllerManager, cameraSystem, trafficSystem = null, roadGraph = null, places = {}, locate = () => '', translate = (text) => text, onTeleport, onToggle }) {
@@ -710,7 +710,7 @@ class OverviewMap {
   placeName(x, z) {
     const label = this.locate(x, z) || '';
     const i = label.indexOf(' · ');
-    return i >= 0 ? label.slice(i + 3) : label || 'Aalborg';
+    return i >= 0 ? label.slice(i + 3) : label || 'Refshaleøen';
   }
 
   /** The gamepad's crosshair at the centre of the full map (a mouse press hides it again) */

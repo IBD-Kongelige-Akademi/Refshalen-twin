@@ -10,14 +10,14 @@ DATA = Path(__file__).resolve().parents[3] / "data"
 
 
 def test_ownership_by_centroid_and_tile_edges():
-    # local x=0,z=0 is E 556000, N 6323100 -> tile 1112_12646; x=500 is E 556500 -> the next tile east
-    assert T.owner_of_point({"x": 0, "z": 0}) == "1112_12646"
-    assert T.owner_of_point({"x": 499.99, "z": -0.01}) == "1112_12646"
-    assert T.owner_of_point({"x": 500.0, "z": -0.01}) == "1113_12646"
+    # local x=0,z=0 is E 556000, N 6323100 -> tile 1454_12355; x=500 is E 556500 -> the next tile east
+    assert T.owner_of_point({"x": 0, "z": 0}) == "1454_12355"
+    assert T.owner_of_point({"x": 499.99, "z": -0.01}) == "1454_12355"
+    assert T.owner_of_point({"x": 500.0, "z": -0.01}) == "1455_12355"
     # a building sticking out of its tile belongs to the tile of its bbox centre
     ring = [490, -10, 530, -10, 530, -30, 490, -30]  # centre x = 510
-    assert T.owner_of_ring({"ring": ring}) == "1113_12646"
-    assert T.owner_of_line({"pts": [10, -10, 30, -30]}) == "1112_12646"
+    assert T.owner_of_ring({"ring": ring}) == "1455_12355"
+    assert T.owner_of_line({"pts": [10, -10, 30, -30]}) == "1454_12355"
 
 
 def _mini(tmp_path):
@@ -34,7 +34,7 @@ def test_split_keeps_every_item_once_and_orders(tmp_path):
     geo = _mini(tmp_path)
     tiles, meta, rg, extra, bins = T.split_all(tmp_path)
     owners = {tid: [b["id"] for b in L["buildings"]["buildings"]] for tid, L in tiles.layers.items() if "buildings" in L}
-    assert owners == {"1113_12646": ["gdk:1", "gdk:3"], "1112_12646": ["gdk:2"]}
+    assert owners == {"1455_12355": ["gdk:1", "gdk:3"], "1454_12355": ["gdk:2"]}
     out, city = tmp_path / "tiles", tmp_path / "city"
     T.write_all(tiles, meta, rg, extra, bins, out, city, tmp_path)
     again = T.assemble(out, city)

@@ -78,6 +78,51 @@ def cache_path(source: str, table: str, suffix: str = "") -> Path:
     return RAW_CITY / f"dg_{source}_{table}{suffix}.json"
 
 
+def _read_geoparquet(url: str, bbox, where: str | None, columns) -> dict:
+    """GeoParquet 1.1 (EPSG:25832, WKB + bbox covering column) -> FeatureCollection, reading only the row groups whose
+    bbox statistics touch `bbox`. `where` supports the one form the compiler uses: "<col> IN ('a', 'b')"."""
+    import re
+    import fsspec
+    import pyarrow.dataset as ds
+    import pyarrow.parquet as pq
+    from shapely import wkb
+    from shapely.geometry import box as _box, mapping
+
+    fs = fsspec.filesystem("https", client_kwargs={"trust_env": True})
+    with fs.open(url, block_size=1 << 20) as fh:
+        meta = json.loads(pq.ParquetFile(fh).metadata.metadata[b"geo"])
+    gcol = meta["primary_column"]
+    cov = (meta["columns"][gcol].get("covering") or {}).get("bbox")
+    bcol = cov["xmin"][0] if cov else f"{gcol}_bbox"
+    dset = ds.dataset(url, filesystem=fs, format="parquet")
+    flt = None
+    if bbox is not None:
+        e0, n0, e1, n1 = (float(v) for v in bbox)
+        f = ds.field
+        flt = (f(bcol, "xmax") >= e0) & (f(bcol, "xmin") <= e1) & (f(bcol, "ymax") >= n0) & (f(bcol, "ymin") <= n1)
+    if where:
+        m = re.fullmatch(r"\s*(\w+)\s+IN\s*\((.*)\)\s*", where, re.I)
+        if not m:
+            raise ValueError(f"unsupported where: {where}")
+        vals = [v.strip().strip("'\"") for v in m.group(2).split(",")]
+        w = ds.field(m.group(1)).isin(vals)
+        flt = w if flt is None else flt & w
+    names = dset.schema.names
+    keep = [c for c in (columns or names) if c in names and c not in (gcol, bcol)]
+    tbl = dset.to_table(columns=keep + [gcol], filter=flt, batch_size=1 << 16)
+    area = _box(*bbox) if bbox is not None else None
+    feats = []
+    props = {c: tbl.column(c).to_pylist() for c in keep}
+    for i, g in enumerate(tbl.column(gcol).to_pylist()):
+        if g is None:
+            continue
+        geom = wkb.loads(g)
+        if area is not None and not geom.intersects(area):
+            continue
+        feats.append({"type": "Feature", "properties": {c: props[c][i] for c in keep}, "geometry": mapping(geom)})
+    return {"type": "FeatureCollection", "features": json.loads(json.dumps(feats, default=str))}
+
+
 def fetch_features(source: str, table: str, bbox=None, where: str | None = None, columns=None, force: bool = False,
                    suffix: str = "") -> dict:
     """A FeatureCollection (EPSG:25832) of the features in `bbox` (minE, minN, maxE, maxN) and/or matching the OGR SQL `where`,
@@ -85,20 +130,24 @@ def fetch_features(source: str, table: str, bbox=None, where: str | None = None,
     p = cache_path(source, table, suffix)
     if p.exists() and not force:
         return json.loads(p.read_text(encoding="utf-8"))
-    import pyogrio
-
-    url, date = asset_url(source, table, "flatgeobuf")
-    kw = {}
-    if bbox is not None:
-        kw["bbox"] = tuple(float(v) for v in bbox)
-    if where:
-        kw["where"] = where
-    if columns:
-        kw["columns"] = list(columns)
-    df = pyogrio.read_dataframe("/vsicurl/" + url, **kw)
-    if df.crs is not None and df.crs.to_epsg() != 25832:
-        df = df.to_crs(25832)
-    fc = json.loads(df.to_json(drop_id=True, na="null"))
+    try:
+        url, date = asset_url(source, table, "flatgeobuf")
+    except KeyError:  # datagrundlag.dk dropped the FlatGeobuf assets (Nov 2026): read the GeoParquet by HTTP range
+        url, date = asset_url(source, table, "data")
+        fc = _read_geoparquet(url, bbox, where, columns)
+    else:
+        import pyogrio
+        kw = {}
+        if bbox is not None:
+            kw["bbox"] = tuple(float(v) for v in bbox)
+        if where:
+            kw["where"] = where
+        if columns:
+            kw["columns"] = list(columns)
+        df = pyogrio.read_dataframe("/vsicurl/" + url, **kw)
+        if df.crs is not None and df.crs.to_epsg() != 25832:
+            df = df.to_crs(25832)
+        fc = json.loads(df.to_json(drop_id=True, na="null"))
     fc["source"] = f"datagrundlag.dk {source}.{table}, snapshot {date}"
     _write(p, json.dumps(fc, ensure_ascii=False, separators=(",", ":")))
     record_snapshot(source, table, date, features=len(fc["features"]))
@@ -112,23 +161,25 @@ def fetch_bbr_bygning(kommunekode: str, force: bool = False) -> dict:
     p = cache_path("bbr", "bygning", f"_{kommunekode}")
     if p.exists() and not force:
         return json.loads(p.read_text(encoding="utf-8"))
-    import duckdb
-
     url, date = asset_url("bbr", "bygning", "data")
-    con = duckdb.connect()
-    con.execute("INSTALL httpfs; LOAD httpfs; SET s3_region='eu-west-1';")
-    cols = [c[0] for c in con.execute(f"DESCRIBE SELECT * FROM read_parquet('{url}')").fetchall()]
+    import fsspec
+    import pyarrow.dataset as ds
+
+    # pyarrow over HTTP range reads (DuckDB's httpfs extension cannot be installed behind every proxy)
+    dset = ds.dataset(url, filesystem=fsspec.filesystem("https", client_kwargs={"trust_env": True}), format="parquet")
+    cols = dset.schema.names
 
     def col(prefix: str) -> str:
         return next(c for c in cols if c.startswith(prefix))
 
     pick = {"use": col("byg021"), "year": col("byg026"), "wall_code": col("byg032"), "roof_code": col("byg033"),
             "storeys": col("byg054"), "status": "status"}
-    sel = ", ".join(f'"{v}"' for v in pick.values())
-    rows = con.execute(f'SELECT id_lokalid, {sel} FROM read_parquet(\'{url}\') WHERE kommunekode = ?', [kommunekode.zfill(4)]).fetchall()
+    tbl = dset.to_table(columns=["id_lokalid", *pick.values()], filter=ds.field("kommunekode") == kommunekode.zfill(4))
+    data = [tbl.column(c).to_pylist() for c in ["id_lokalid", *pick.values()]]
+    rows = list(zip(*data))
 
     def num(v):
-        v = (v or "").strip()
+        v = str(v if v is not None else "").strip()
         return int(v) if v.lstrip("-").isdigit() else None
 
     out = {}

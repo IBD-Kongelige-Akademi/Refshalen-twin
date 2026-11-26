@@ -66,7 +66,7 @@ test('routing: driving keeps to one-way streets and carriageways, walking may us
 test('names fold Danish letters and accents for the search', () => {
   const { fold } = load();
   assert.equal(fold('Østerågade'), 'oesteraagade');
-  assert.equal(fold('Jomfru Ane Gade'), 'jomfru ane gade');
+  assert.equal(fold('Danneskiold-Samsøes Allé'), 'danneskiold-samsoees alle');
 });
 
 for (const [width, height, dpr] of [[500, 300, 1], [320, 180, 1.5], [1920, 1080, 2]]) {
@@ -265,15 +265,15 @@ test('the GPS route follows the road graph and is only recomputed once the playe
   assert.notEqual(h.map.currentRoute(60, 0, 3000), first, 'farther on: a new route');
 });
 
-test('searching Jomfru Ane Gade frames the street on the built road graph', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json' }, () => {
+test('searching Refshalevej frames the street on the built road graph', { skip: !existsSync(ROADGRAPH) && 'no data/city/roadgraph.json' }, () => {
   const h = mapHarness(JSON.parse(readFileSync(ROADGRAPH, 'utf8')));
-  h.map.search('jomfru ane gade');
-  const label = h.map.roadLabels.find((l) => l.text === 'Jomfru Ane Gade');
+  h.map.search('refshalevej');
+  const label = h.map.roadLabels.find((l) => l.text === 'Refshalevej');
   assert.ok(label, 'the street is in the road graph');
   assert.ok(h.map.searchPath, 'the street is highlighted');
   const { viewCenterX: x, viewCenterZ: z } = h.map;
   assert.ok(x >= label.minX && x <= label.maxX && z >= label.minZ && z <= label.maxZ, 'the view is centred on the street');
-  assert.ok(h.map.searchHit && h.map.searchHit.name === 'Jomfru Ane Gade', 'Enter would route there');
+  assert.ok(h.map.searchHit && h.map.searchHit.name === 'Refshalevej', 'Enter would route there');
 });
 
 test('gamepad on the full map: the stick pans at a steady screen speed, the triggers zoom, A and X act at the crosshair', () => {

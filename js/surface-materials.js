@@ -220,7 +220,7 @@ const concrete = Fn(([u, v, seed, wp]) => {
 });
 
 // ---- asphalt -----------------------------------------------------------------------------------------------------
-// After slop-newyork's road (dcb453f, acaccfd, 1e92837, ed9b796, 627f7b3, 057bed2, 91dc313), on Aalborg's roads: the wear
+// After slop-newyork's road (dcb453f, acaccfd, 1e92837, ed9b796, 627f7b3, 057bed2, 91dc313), on Refshaleøen's roads: the wear
 // and repairs follow each road (kuv: u metres along it, v across it, as the meshes carry them), the grain, relief and the
 // round things (potholes, oil drips, stone chips, manhole covers) the world. Physically based albedos (weathered asphalt
 // about 9%, fresh blacktop and tar sealant 4-5%), the aggregate grain filtered like a texture so it reaches down the street,
@@ -364,7 +364,7 @@ function createAsphaltMaterial({ tone = 0.7, tracks = 0, patchRate = 0.3, cracki
   const u = kuv.x, v = kuv.y;
   const wp = positionWorld.xz;
 
-  // (tone 0.7 by default: slop-newyork's 9% weathered asphalt reads light under Aalborg's brighter exposure)
+  // (tone 0.7 by default: slop-newyork's 9% weathered asphalt reads light under Refshaleøen's brighter exposure)
   const cAsphaltDark = srgb(62, 64, 67).mul(tone);
   const cAsphaltLight = srgb(106, 108, 112).mul(tone);
   const cOldPatch = srgb(119, 120, 122).mul(tone);
@@ -540,7 +540,7 @@ function createAsphaltMaterial({ tone = 0.7, tracks = 0, patchRate = 0.3, cracki
       const slope = 0.384 * ASPHALT_RELIEF[i].a * ASPHALT_RELIEF[i].f;
       unresolved = unresolved.add(reliefUnresolved(i, foot).mul(2.0 * slope * slope));
     }
-    // (0.86, rougher than slop-newyork's 0.58: under Aalborg's exposure a glossier road mirrors the bright sky at grazing
+    // (0.86, rougher than slop-newyork's 0.58: under Refshaleøen's exposure a glossier road mirrors the bright sky at grazing
     // angles and glares white towards the low winter sun; this keeps a soft sheen and the polished wheel tracks)
     const micro = float(0.86).add(worn.mul(0.04)).add(tableNoise(wp.mul(0.7).add(5.0)).w.sub(0.5).mul(0.08));
     const asphalt = sqrt(sqrt(pow(micro, 4.0).add(unresolved)));

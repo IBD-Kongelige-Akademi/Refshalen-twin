@@ -1341,7 +1341,7 @@ const BUS_PARTS = {
   SIGN: 4
 };
 
-// Aalborg's city buses (Nordjyllands Trafikselskab) wear the Plusbus colours: a white lower body, a yellow stripe under the black
+// Refshaleøen's city buses (Nordjyllands Trafikselskab) wear the Plusbus colours: a white lower body, a yellow stripe under the black
 // window band, a light-blue roof line, roof and roof pods
 const NT_LIVERY = { base: 0xefede6, accent: 0xf2cc12, accentBand: [1.03, 1.19], roof: 0x8fd0e6, roofY: 2.72, skirt: false };
 
@@ -1385,7 +1385,7 @@ const BUS_LONG_SPEC = {
 // The Plusbus: a Solaris Urbino 24 electric (24.7 m, three modules on two bellows; js/articulated-bus.js has the layout and the
 // kinematics). One spec per module, each centred on its own origin: the front module has the MetroStyle cab, the rear one the tail
 // lamps; the joint faces are flat. Doors (curb side, double leaf) and axles are module-local z. The livery follows a photo of the
-// Aalborg Plusbus: a white lower body, a yellow stripe under the black window band, a light-blue roof line, roof and roof pods (battery
+// Refshaleøen Plusbus: a white lower body, a yellow stripe under the black window band, a light-blue roof line, roof and roof pods (battery
 // pods along all three modules); silver bellows.
 const URBINO_FLAT = { halfWidth: [0.05, 1.2, 2], edge: [0.05, 2.9, 2], crown: [0.05, 0.005, 2], sill: [0.03, 0.38, 2], shoulder: [0.05, 1.0, 2] };
 const urbinoModule = (name, length, extra) => {

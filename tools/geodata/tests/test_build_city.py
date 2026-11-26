@@ -18,17 +18,17 @@ def test_cells_and_tiles_agree():
 
 
 def test_layers_drop_items_of_tiles_that_are_not_ours():
-    L = BC.Layers({"1112_12646"})
-    L.add("1112_12646", "roads", "roads", {"id": "a"}, 0)
+    L = BC.Layers({"1454_12355"})
+    L.add("1454_12355", "roads", "roads", {"id": "a"}, 0)
     L.add("9_9", "roads", "roads", {"id": "b"}, 1)
-    assert [r["id"] for r in L.t.layers["1112_12646"]["roads"]["roads"]] == ["a"]
+    assert [r["id"] for r in L.t.layers["1454_12355"]["roads"]["roads"]] == ["a"]
     assert L.dropped["roads.roads"] == 1
 
 
 def test_centroid_ownership_has_one_owner_across_cells():
     # a footprint sticking out of its cell belongs to the tile of its bbox centre only
     ring = [490, -10, 530, -10, 530, -30, 490, -30]  # centre x = 510 -> E 556510 -> tile 1113
-    assert T.owner_of_ring({"ring": ring}) == "1113_12646"
+    assert T.owner_of_ring({"ring": ring}) == "1455_12355"
 
 
 def test_graph_components_counts_islands():

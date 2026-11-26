@@ -43,7 +43,7 @@ const HOTSPOTS = [
   [-345, 476, -247, 614, 120, 2.0], // J.F. Kennedys Plads: the station and the bus terminal
   [-270, 468, -148, 50, 40, 1.3], // Boulevarden
   [158, -166, 594, -82, 80, 1.4], // the harbour front, Utzon Center to Musikkens Hus
-  [-586, 505, -586, 505, 100, 1.4], // Europa Plads and Aalborg Kongres & Kultur Center
+  [-586, 505, -586, 505, 100, 1.4], // Europa Plads and Refshaleøen Kongres & Kultur Center
   [584, 421, 584, 421, 120, 1.2] // Karolinelund
 ];
 const OLD_TOWN = { x: -150, z: -40 };
