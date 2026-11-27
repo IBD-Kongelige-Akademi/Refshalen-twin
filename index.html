@@ -192,7 +192,7 @@
   <!-- Loading Screen -->
   <div id="loading-overlay" role="status" aria-live="polite">
     <div class="loader">
-      <span class="brand-mark loader-bullet" role="img" aria-label="Ramboll"></span>
+      <span class="brand-mark loader-bullet" role="img" aria-label="Refshaleøen Twin"></span>
       <div class="loader-title">Refshaleøen Twin</div>
       <div class="loader-track is-indeterminate" aria-hidden="true"><span id="loading-progress" class="loader-fill"></span></div>
       <!-- in Danish, the default language: this shows before js/i18n.js has loaded (it maps it back for English) -->
@@ -207,7 +207,7 @@
   <!-- Top-Left: Brand & Renderer Telemetry -->
   <header class="hud hud-top-left">
     <div class="panel brand">
-      <span class="brand-mark" role="img" aria-label="Ramboll"></span>
+      <span class="brand-mark" role="img" aria-label="Refshaleøen Twin"></span>
       <div class="brand-titles">
         <div class="brand-heading">
           <h1>Refshaleøen Twin</h1>
@@ -263,7 +263,7 @@
   <!-- Teleport Destinations (native popover: light-dismiss & Esc) -->
   <div id="teleport-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" aria-label="Teleport the active player">
     <div class="pop-title">Teleport to</div>
-    <button id="tp-reffen" class="pop-item tp-btn" data-teleport="reffen" type="button"><span class="pop-name">Reffen</span><span class="pop-sub">Refshaleøen · street food · start</span></button>
+    <button id="tp-reffen" class="pop-item tp-btn" data-teleport="reffen" type="button"><span class="pop-name">Reffen</span><span class="pop-sub">Refshaleøen · street food</span></button>
     <button id="tp-operaen" class="pop-item tp-btn" data-teleport="operaen" type="button"><span class="pop-name">Operaen</span><span class="pop-sub">Holmen · the opera house</span></button>
     <button id="tp-akademiet" class="pop-item tp-btn" data-teleport="akademiet" type="button"><span class="pop-name">Det Kongelige Akademi</span><span class="pop-sub">Holmen · architecture school</span></button>
     <button id="tp-mastekranen" class="pop-item tp-btn" data-teleport="mastekranen" type="button"><span class="pop-name">Mastekranen</span><span class="pop-sub">Nyholm · the mast crane</span></button>
@@ -273,7 +273,8 @@
     <button id="tp-operaparken" class="pop-item tp-btn" data-teleport="operaparken" type="button"><span class="pop-name">Operaparken</span><span class="pop-sub">Holmen · the park by the opera</span></button>
     <button id="tp-kai" class="pop-item tp-btn" data-teleport="kai" type="button"><span class="pop-name">KAI</span><span class="pop-sub">Papirøen · the new swimming hall</span></button>
     <button id="tp-banchina" class="pop-item tp-btn" data-teleport="banchina" type="button"><span class="pop-name">La Banchina</span><span class="pop-sub">Refshaleøen · harbour bath</span></button>
-    <button id="tp-bygning147" class="pop-item tp-btn" data-teleport="bygning147" type="button"><span class="pop-name">Bygning 147</span><span class="pop-sub">Refshaleøen · Refshalevej 147</span></button>
+    <button id="tp-bygning147" class="pop-item tp-btn" data-teleport="bygning147" type="button"><span class="pop-name">Bygning 147</span><span class="pop-sub">Refshaleøen · Refshalevej 147 · start</span></button>
+    <button id="tp-havnebus" class="pop-item tp-btn" data-camera="havnebus" type="button"><span class="pop-name">Aboard the harbour bus</span><span class="pop-sub">Inderhavnen · rides line 991/992, looking ashore</span></button>
     <div id="tp-city-title" class="pop-title" hidden>Citywide</div>
   </div>
 
@@ -281,7 +282,7 @@
   <div id="tour-popover" class="popover" popover data-side="below" data-anchor="hud-toolbar" data-align="btn-tour" aria-label="Tour Refshaleøen">
     <div class="pop-title">Tour Refshaleøen from Reffen</div>
     <button id="tour-express" class="pop-item tp-btn" data-tour="express" type="button"><span class="pop-name">Express tour · 2 min</span><span class="pop-sub">An aerial opening, the drive modes, then seven landmarks, hands-off</span></button>
-    <button id="tour-full" class="pop-item tp-btn" data-tour="full" type="button"><span class="pop-name">Full tour · 6 min</span><span class="pop-sub">Every feature: building levels, night, drone, Plusbus, weather</span></button>
+    <button id="tour-full" class="pop-item tp-btn" data-tour="full" type="button"><span class="pop-name">Full tour · 6 min</span><span class="pop-sub">Every feature: building levels, night, drone, A-bus, weather</span></button>
     <button id="tour-drive" class="pop-item tp-btn" data-tour="drive" type="button"><span class="pop-name">Drive the tour</span><span class="pop-sub">You drive, the GPS routes you stop to stop (drone starts in the car)</span></button>
   </div>
 
@@ -354,12 +355,11 @@
   <section id="start-screen" class="start-screen" role="dialog" aria-modal="true" aria-labelledby="start-title" hidden>
     <div class="start-card panel">
       <header class="start-head">
-        <span class="brand-mark" role="img" aria-label="Ramboll"></span>
+        <span class="brand-mark" role="img" aria-label="Refshaleøen Twin"></span>
         <div>
           <div class="start-kicker">Det Kongelige Akademi · Refshaleøen</div>
           <h2 id="start-title" class="start-title">Refshaleøen Twin</h2>
         </div>
-        <div class="start-sponsor">Sponsored by <b>Ramboll</b></div>
         <button class="start-lang" type="button" data-lang-toggle="long" data-i18n-skip lang="da" title="Skift til dansk" aria-label="Skift til dansk">Dansk</button>
       </header>
       <p class="start-pitch">Refshaleøen and Holmen rebuilt in 3D from open map data and aerial photos. Walk, cycle, drive or fly around the old shipyard island.</p>
@@ -370,7 +370,7 @@
         <button class="start-mode" data-start-mode="car" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-car"/></svg><span class="start-mode-name">Drive</span><span class="start-mode-sub">A car in live traffic</span><kbd>2</kbd></button>
         <button class="start-mode" data-start-mode="cyclist" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bike"/></svg><span class="start-mode-name">Cycle</span><span class="start-mode-sub">City bike or cargo bike</span><kbd>3</kbd></button>
         <button class="start-mode" data-start-mode="drone" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-drone"/></svg><span class="start-mode-name">Fly</span><span class="start-mode-sub">A drone over the rooftops</span><kbd>4</kbd></button>
-        <button class="start-mode" data-start-mode="bus" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg><span class="start-mode-name">Plusbus</span><span class="start-mode-sub">The articulated line 2 bus</span><kbd>5</kbd></button>
+        <button class="start-mode" data-start-mode="bus" type="button" aria-pressed="false"><svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg><span class="start-mode-name">A-bus</span><span class="start-mode-sub">The articulated line 2A bus</span><kbd>5</kbd></button>
       </div>
 
       <div class="start-label">What you can do</div>
@@ -435,7 +435,7 @@
       <button id="mode-drone" class="mode-btn" data-mode="drone" type="button" title="Drone [4]">
         <svg class="icon" aria-hidden="true"><use href="#i-drone"/></svg><span class="mode-label">Fly</span><kbd>4</kbd>
       </button>
-      <button id="mode-bus" class="mode-btn" data-mode="bus" type="button" title="Plusbus [5]">
+      <button id="mode-bus" class="mode-btn" data-mode="bus" type="button" title="A-bus [5]">
         <svg class="icon" aria-hidden="true"><use href="#i-bus"/></svg><span class="mode-label">Bus</span><kbd>5</kbd>
       </button>
     </nav>
@@ -507,6 +507,7 @@
     <button id="cam-kai" class="pop-item cam-btn" data-camera="kai" type="button"><span class="pop-name">KAI</span></button>
     <button id="cam-banchina" class="pop-item cam-btn" data-camera="banchina" type="button"><span class="pop-name">La Banchina</span></button>
     <button id="cam-bygning147" class="pop-item cam-btn" data-camera="bygning147" type="button"><span class="pop-name">Bygning 147</span></button>
+    <button id="cam-havnebus" class="pop-item cam-btn" data-camera="havnebus" type="button"><span class="pop-name">Aboard the harbour bus</span></button>
     <button id="cam-drone" class="pop-item cam-btn" data-camera="drone" type="button"><span class="pop-name">Auto-Director Aerial</span></button>
   </div>
 
@@ -518,7 +519,7 @@
 
     <div class="fullmap-header">
       <div class="panel fullmap-title">
-        <span class="brand-mark" role="img" aria-label="Ramboll"></span>
+        <span class="brand-mark" role="img" aria-label="Refshaleøen Twin"></span>
         <div>
           <h2>Refshaleøen Street Map</h2>
           <p id="fullmap-player-info" class="fullmap-subtitle">You are at Gammel Torv</p>

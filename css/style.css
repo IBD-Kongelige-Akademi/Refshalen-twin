@@ -348,7 +348,7 @@ body.hud-minimized .toolbar > :not(#btn-toggle-hud) {
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: #ffffff url('ramboll-logo.png') center / 78% no-repeat;
+  background: #ffffff url('twin-mark.svg') center / 80% no-repeat;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1786,18 +1786,10 @@ body.racing #btn-tour { opacity: 0.4; pointer-events: none; }
 }
 
 .start-head { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
-.start-sponsor {
-  margin-left: auto;
-  padding: 6px 12px;
-  border: 1px solid rgba(0, 157, 240, 0.45);
-  border-radius: 999px;
-  font-size: 12.5px;
-  color: var(--text-2);
-}
-.start-sponsor b { color: var(--accent); font-weight: 700; }
 .start-head .brand-mark { width: 46px; height: 46px; font-size: 13px; }
 /* the language toggle (js/i18n.js): it names the language it switches to */
 .start-lang {
+  margin-left: auto;
   min-height: 32px;
   padding: 0 12px;
   border: 1px solid var(--glass-border);

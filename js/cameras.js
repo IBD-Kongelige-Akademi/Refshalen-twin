@@ -20,6 +20,7 @@ const CAMERA_PRESETS = [
   { id: 'kai', name: 'KAI', short: 'KAI', category: 'scenic', fov: 56 },
   { id: 'banchina', name: 'La Banchina', short: 'Banchina',   category: 'scenic', fov: 56 },
   { id: 'bygning147', name: 'Bygning 147', short: 'Bygning 147', category: 'scenic', fov: 56 },
+  { id: 'havnebus', name: 'Aboard the harbour bus', short: 'Havnebus', category: 'scenic', fov: 60 },
   { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
 ];
 
@@ -57,6 +58,8 @@ class CameraSystem {
     );
 
     this.activePresetId = 'chase';
+    this.harbourBuses = null; // js/harbour-bus.js, set by main.js: the boats the 'havnebus' camera rides on
+    this.harbourBoat = 0;
     this.orbitYawOffset = 0.0;
     this.orbitPitchOffset = 0.09;
     this.zoomMultiplier = 1.0;
@@ -341,6 +344,26 @@ class CameraSystem {
         break;
       }
 
+      case 'havnebus': {
+        // On deck of a harbour bus (js/harbour-bus.js), by the rail, looking out over the water to the Holmen side (east) of the
+        // harbour, a little ahead of the beam; the camera rides with the boat (snapped below, like the POV camera)
+        const boats = this.harbourBuses?.boats || [];
+        const boat = boats[this.harbourBoat % Math.max(boats.length, 1)];
+        if (!boat) { desiredPos.copy(this.currentPos); desiredLook.copy(this.currentLookAt); break; }
+        const m = boat.mesh.position;
+        const h = boat.mesh.rotation.y;
+        const fx = Math.sin(h), fz = Math.cos(h); // forward
+        let sx = Math.cos(h), sz = -Math.sin(h);  // one beam
+        if (sx < 0) { sx = -sx; sz = -sz; }       // the eastern beam: Holmen, the opera, Refshaleøen
+        const lookAhead = 0.35;
+        const dx = sx + fx * lookAhead, dz = sz + fz * lookAhead;
+        const n = Math.hypot(dx, dz) || 1;
+        const sway = Math.sin(elapsed * 0.6) * 0.08;
+        desiredPos.set(m.x + sx * 2.3 - fx * 4.0, m.y + 3.4 + sway, m.z + sz * 2.3 - fz * 4.0);
+        desiredLook.set(desiredPos.x + (dx / n) * 80, m.y + 6.0, desiredPos.z + (dz / n) * 80);
+        break;
+      }
+
       case 'drone': {
         // Slow orbit above the old town and the harbour front (Budolfi, Utzon Center)
         const angle = elapsed * 0.07 + 0.65;
@@ -356,7 +379,7 @@ class CameraSystem {
       }
     }
 
-    if (!this.initialized || this.activePresetId === 'pov') {
+    if (!this.initialized || this.activePresetId === 'pov' || this.activePresetId === 'havnebus') {
       this.currentPos.copy(desiredPos);
       this.currentLookAt.copy(desiredLook);
       this.initialized = true;

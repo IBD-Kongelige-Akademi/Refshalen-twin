@@ -1539,7 +1539,7 @@ class ThirdPersonControllerManager {
     art.place(start.x, start.z, start.heading);
     const entity = {
       type: 'bus',
-      label: 'Plusbus',
+      label: 'A-bus',
       bodySpec: { width: URBINO_24.width, length: URBINO_24.modules[0].to - URBINO_24.modules[0].from, height: URBINO_24.height },
       mesh: modules[0].group,
       art,

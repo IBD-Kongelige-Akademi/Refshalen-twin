@@ -21,16 +21,18 @@ const DA = {
   'Operaparken: the new park behind the opera house, with its glasshouse café.': 'Operaparken: den nye park bag operahuset med drivhuscaféen.',
   'The new swimming hall': 'Den nye svømmehal',
   'KAI on Papirøen, the new swimming hall by Kengo Kuma: brick peaks floating on a glass ground floor, built from the drawings.': 'KAI på Papirøen, Kengo Kumas nye svømmehal: teglbjerge, der svæver over en stueetage i glas, bygget ud fra tegningerne.',
-  'Or drive the Plusbus: the 24.7 m articulated electric bus.': 'Eller kør Plusbussen: den 24,7 m lange leddelte elbus.',
-  "Refshaleøen · street food · start": "Refshaleøen · streetfood · start",
+  'Or drive the A-bus: the articulated electric bus of line 2A.': 'Eller kør A-bussen: den leddelte elbus på linje 2A.',
+  "Refshaleøen · street food": "Refshaleøen · streetfood",
   "Holmen · the opera house": "Holmen · operahuset",
   "Holmen · architecture school": "Holmen · arkitektskolen",
   "Nyholm · the mast crane": "Nyholm · mastekranen",
   "Refshaleøen · the shipyard halls": "Refshaleøen · værftshallerne",
   "Refshaleøen · art hall": "Refshaleøen · kunsthal",
   "Refshaleøen · harbour bath": "Refshaleøen · havnebad",
-  "Refshaleøen · Refshalevej 147": "Refshaleøen · Refshalevej 147",
+  "Refshaleøen · Refshalevej 147 · start": "Refshaleøen · Refshalevej 147 · start",
   "B&W office building": "B&Ws kontorbygning",
+  "Aboard the harbour bus": "Ombord på havnebussen",
+  "Inderhavnen · rides line 991/992, looking ashore": "Inderhavnen · sejler med linje 991/992 og kigger ind mod land",
   "Bygning 147 on Refshalevej, the 1955 B&W office building, here as Anders Hermund's Rhino model.": "Bygning 147 på Refshalevej, B&Ws kontorbygning fra 1955, her som Anders Hermunds Rhino-model.",
   "Welcome to Refshaleøen: the old B&W shipyard island and Holmen as a digital twin, built from open Danish map data.": "Velkommen til Refshaleøen: den gamle B&W-værftsø og Holmen som digital tvilling, bygget af åbne danske kortdata.",
   "Drive it: cars on the real street network, here up Refshalevej.": "Kør i den: biler på det rigtige vejnet, her op ad Refshalevej.",
@@ -112,7 +114,7 @@ const DA = {
   'Express tour · 2 min': 'Ekspresrundtur · 2 min',
   'An aerial opening, the drive modes, then seven landmarks, hands-off': 'En åbning fra luften, transportformerne og så syv vartegn, helt automatisk',
   'Full tour · 6 min': 'Fuld rundtur · 6 min',
-  'Every feature: building levels, night, drone, Plusbus, weather': 'Alle funktioner: bygningsniveauer, nat, drone, Plusbus, vejr',
+  'Every feature: building levels, night, drone, A-bus, weather': 'Alle funktioner: bygningsniveauer, nat, drone, A-bus, vejr',
   'Drive the tour': 'Kør selv rundturen',
   'You drive, the GPS routes you stop to stop (drone starts in the car)': "Du kører, og GPS'en guider dig fra stop til stop (dronen starter i bilen)",
   'Back [←]': 'Tilbage [←]',
@@ -143,8 +145,8 @@ const DA = {
   'Drive it: cars on the real street network, here down Vesterbro past AKKC.':
     'Kør i den: biler på det rigtige vejnet, her ned ad Vesterbro forbi AKKC.',
   'Cycle it, on a city bike or a cargo bike.': 'Cykl i den, på bycykel eller ladcykel.',
-  'Or drive the Plusbus: the 24.7 m articulated electric bus of line 2.':
-    'Eller kør Plusbussen: den 24,7 m lange leddelte elbus på linje 2.',
+  'Or drive the A-bus: the articulated electric bus of line 2A.':
+    'Eller kør A-bussen: den leddelte elbus på linje 2A.',
   'Skate, walk or fly the drone too. Keys 1 to 5 switch, or LB / RB on a gamepad.':
     'Du kan også løbe på rulleskøjter, gå eller flyve med dronen. Tasterne 1 til 5 skifter, eller LB / RB på en gamepad.',
   'Welcome to the Kongres & Kultur Center: AKKC itself is a detail model, rebuilt from the Skråfoto oblique aerial photos.':
@@ -176,8 +178,8 @@ const DA = {
     'Musikkens Hus set fra havnen: koncerthuset og pladsen ned til vandet.',
   'The city is busy: cars, cyclists and pedestrians follow the road network, the signals and each other.':
     'Byen er travl: biler, cyklister og fodgængere følger vejnettet, signalerne og hinanden.',
-  'AI Plusbuses run line 2 in their real colours, stopping at its stops. The traffic gives way to you, mostly.':
-    'AI-styrede Plusbusser kører linje 2 i deres rigtige farver og holder ved stoppestederne. Trafikken viger for dig, for det meste.',
+  'Yellow Movia A-buses run line 2A, stopping at its stops, and the harbour buses sail the harbour. The traffic gives way to you, mostly.':
+    'Gule Movia A-busser kører linje 2A og holder ved stoppestederne, og havnebusserne sejler i havnen. Trafikken viger for dig, for det meste.',
   'Karolinelund at twilight in Refshaleøen weather: overcast skies and wet roads that mirror the lights.':
     'Karolinelund i tusmørke i aalborgensisk vejr: overskyet himmel og våde veje, der spejler lyset.',
   'Trees, lamp posts and park paths are placed from GeoDanmark and the height model, tree by tree.':
@@ -264,7 +266,7 @@ const DA = {
   'City bike or cargo bike': 'Bycykel eller ladcykel',
   'Fly': 'Flyv',
   'A drone over the rooftops': 'En drone over tagene',
-  'The articulated line 2 bus': 'Den leddelte bus på linje 2',
+  'The articulated line 2A bus': 'Den leddelte bus på linje 2A',
   'What you can do': 'Det kan du',
   'Refshaleøen race': 'Refshaleøen-kapløb',
   'Reffen to Akademiet, any route. Times are handicapped by vehicle, so walkers can beat the car.':
@@ -324,7 +326,7 @@ const DA = {
   'Car [2]': 'Bil [2]',
   'Cycle [3]': 'Cykel [3]',
   'Drone [4]': 'Drone [4]',
-  'Plusbus [5]': 'Plusbus [5]',
+  'A-bus [5]': 'A-bus [5]',
   // the active vehicle (js/controllers.js labels)
   'Pedestrian': 'Fodgænger',
   'Roller skater': 'Rulleskøjteløber',
@@ -455,7 +457,7 @@ const KEEP = new Set([
   'Marmorkirken', 'Operaparken', 'KAI', 'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina', 'Bygning 147',
   'Refshaleøen Twin', 'Ramboll', 'Det Kongelige Akademi · Refshaleøen', 'three.js · WebGPU · TSL ·', 'fps', 'km/h',
   'Refshaleøen Kongres & Kultur Center', 'Kongres & Kultur Center', 'Budolfi Domkirke', 'Jomfru Ane Gade', 'Utzon Center',
-  'Musikkens Hus', 'Karolinelund', 'Hotel Det Hvide Hus', 'Plusbus', 'Drone', 'Bus', 'Skateboard', 'Skateboarder', 'Gamepad',
+  'Musikkens Hus', 'Karolinelund', 'Hotel Det Hvide Hus', 'A-bus', 'Drone', 'Bus', 'Skateboard', 'Skateboarder', 'Gamepad',
   '1 · LoD2', '2 · LoD2 + Skråfoto', 'Boost', 'Sport', 'Horn', 'Stop', 'Shift', 'Refshaleøen'
 ]);
 

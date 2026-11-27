@@ -101,11 +101,11 @@ async function initApp() {
 
   // 3. Build the city from the Copenhagen geodata
   // Tile streaming: `?stream=<near radius in m>` overrides the default rings (near 750 m, mid 1250 m, js/tile-rings.js); the city
-  // streams in around the start point: every visit begins at the Kortdage venue (TELEPORT_LOCATIONS.reffen), so a reload at the
-  // conference stand puts the next visitor back in front of it
+  // streams in around the start point: every visit begins on Refshalevej in front of Bygning 147 (TELEPORT_LOCATIONS.bygning147), so
+  // a reload puts the next visitor back there
   const streamParam = Number(query.get('stream'));
   const streamMid = Number(query.get('streammid')); // optional override for a custom near ring
-  const startPoint = TELEPORT_LOCATIONS.reffen;
+  const startPoint = TELEPORT_LOCATIONS.bygning147;
   const start = { x: startPoint.x, z: startPoint.z };
   const world = await buildWorld(scene, {
     treeDate: lightingSystem.currentSunDateTime,
@@ -660,6 +660,7 @@ async function initApp() {
   world.fetchCityJson?.('nightlife.json').then((doc) => nightlife.setVenues(doc.venues)).catch((e) => console.info('[nightlife] no data/city/nightlife.json:', e?.message || e));
   // the harbour buses 991 / 992 on their sailing line (tools/geodata/bus_lines.py build_ferries, js/harbour-bus.js)
   const harbourBuses = createHarbourBuses(scene, { waterLevel: HARBOUR_WATER_Y });
+  cameraSystem.harbourBuses = harbourBuses; // the 'havnebus' camera rides on the first boat
   world.fetchCityJson?.('ferry-lines.json').then((doc) => harbourBuses.setLines(doc)).catch((e) => console.info('[harbour bus] no data/city/ferry-lines.json:', e?.message || e));
   // Building model level (js/buildings-stream.js setLevel): plain LoD2 -> + Skraafoto photos -> + generated windows / doors -> + hero buildings
   const levelButtons = [...document.querySelectorAll('[data-building-level]')];

@@ -64,7 +64,7 @@ export const getCityBounds = () => [ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLA
 // 30-60 m from the landmark's OSM position and faces it; the scenic cameras (cameras.js) frame the same places.
 // pin: the landmark's OSM position, where the map puts its marker. reffen is where the player starts.
 const TELEPORT_LOCATIONS = {
-  reffen: { name: 'Reffen', sub: 'Refshaleøen · street food · start', x: -174.6, z: -417.8, heading: -0.29, pin: { x: -187.2, z: -376.1 } },
+  reffen: { name: 'Reffen', sub: 'Refshaleøen · street food', x: -174.6, z: -417.8, heading: -0.29, pin: { x: -187.2, z: -376.1 } },
   operaen: { name: 'Operaen', sub: 'Holmen · the opera house', x: -653.3, z: 983.8, heading: 2.76, pin: { x: -641.3, z: 953.7 } },
   akademiet: { name: 'Det Kongelige Akademi', sub: 'Holmen · architecture school', x: -364.4, z: 939.9, heading: -1.97, pin: { x: -388.3, z: 929.8 } },
   mastekranen: { name: 'Mastekranen', sub: 'Nyholm · the mast crane', x: -313.2, z: 234.2, heading: -1.49, pin: { x: -351.6, z: 237.3 } },
@@ -74,7 +74,7 @@ const TELEPORT_LOCATIONS = {
   operaparken: { name: 'Operaparken', sub: 'Holmen · the park by the opera', x: -618.1, z: 1107.7, heading: -0.78, pin: { x: -640.0, z: 1130.0 } },
   kai: { name: 'KAI', sub: 'Papirøen · the new swimming hall', x: -833.1, z: 1221.8, heading: 2.17, pin: { x: -800.0, z: 1199.0 } },
   banchina: { name: 'La Banchina', sub: 'Refshaleøen · harbour bath', x: -48.3, z: 49.5, heading: -0.28, pin: { x: -57.0, z: 80.0 } },
-  bygning147: { name: 'Bygning 147', sub: 'Refshaleøen · Refshalevej 147', x: -16.4, z: 122.2, heading: 2.86, pin: { x: -13.4, z: 47.1 } }
+  bygning147: { name: 'Bygning 147', sub: 'Refshaleøen · Refshalevej 147 · start', x: -16.4, z: 122.2, heading: 2.86, pin: { x: -13.4, z: 47.1 } }
 };
 
 function isTypingInField(event) {

@@ -19,7 +19,7 @@ export const REF_SPEED = {
 };
 
 export const MODE_LABEL = {
-  car: 'Car', bus: 'Plusbus', cyclist: 'Bike', cargobike: 'Cargo bike', walk: 'On foot', skates: 'Roller skates', board: 'Skateboard', drone: 'Drone'
+  car: 'Car', bus: 'A-bus', cyclist: 'Bike', cargobike: 'Cargo bike', walk: 'On foot', skates: 'Roller skates', board: 'Skateboard', drone: 'Drone'
 };
 // index.html icon per mode (a <use href="#i-…">)
 export const MODE_ICON = { car: 'car', bus: 'bus', cyclist: 'bike', cargobike: 'bike', walk: 'walk', skates: 'walk', board: 'walk', drone: 'drone' };
