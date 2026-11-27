@@ -127,5 +127,5 @@ test('long buses have three wheel arches and a visible 18.75 m bellows body', ()
   }
   assert.equal(models.BUS_LONG_SPEC.axles.length, 3);
   assert.equal(models.BUS_LONG_SPEC.length, 18.75);
-  assert.equal(models.BUS_LONG_SPEC.aLine, false);
+  assert.equal(models.BUS_LONG_SPEC.aLine, true); // line 1A, an A-bus: red corner panels on the Movia yellow
 });

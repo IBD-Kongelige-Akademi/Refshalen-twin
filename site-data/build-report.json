@@ -1,8 +1,8 @@
 {
- "out": "/home/claude/packs",
- "files": 53,
- "bytes": 60580598,
- "manifestBytes": 4435,
+ "out": "site-data",
+ "files": 54,
+ "bytes": 60633620,
+ "manifestBytes": 4582,
  "folders": {
   "a": {
    "files": 30,
@@ -11,12 +11,12 @@
   },
   "c": {
    "files": 2,
-   "bytes": 943290,
-   "largest": 702886
+   "bytes": 945038,
+   "largest": 704634
   },
   "d": {
    "files": 9,
-   "bytes": 2420287,
+   "bytes": 2426623,
    "largest": 487504
   },
   "t": {
@@ -25,8 +25,8 @@
    "largest": 2627128
   },
   "x": {
-   "files": 2,
-   "bytes": 482741,
+   "files": 3,
+   "bytes": 527532,
    "largest": 457684
   }
  },
@@ -63,5 +63,5 @@
    "block": 2
   }
  ],
- "seconds": 5
+ "seconds": 2
 }

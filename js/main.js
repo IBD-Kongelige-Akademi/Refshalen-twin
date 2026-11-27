@@ -20,6 +20,8 @@ import { setupSceneCulling, updateSceneCulling } from './scene-culling.js';
 import { CityAudioSystem } from './audio-system.js';
 import { nightlife, nightlifeLevel } from './nightlife.js';
 import { createNightlifeScene } from './nightlife-scene.js';
+import { createHarbourBuses } from './harbour-bus.js';
+import { SEA_LEVEL_LOCAL as HARBOUR_WATER_Y } from './tile-grid.js';
 import { createPhotoDrawBudget, createPhotoRenderCallback } from './facade-lod.js';
 import { OverviewMap } from './overview-map.js';
 import { createTour } from './tour.js';
@@ -656,6 +658,9 @@ async function initApp() {
   // the bars, pubs and nightclubs (tools/geodata/nightlife.py): neon, coloured spill and beats after dark (js/nightlife*.js)
   const nightlifeScene = createNightlifeScene(scene, nightlife, { groundHeight: world.groundHeight, furniture: world.furniture });
   world.fetchCityJson?.('nightlife.json').then((doc) => nightlife.setVenues(doc.venues)).catch((e) => console.info('[nightlife] no data/city/nightlife.json:', e?.message || e));
+  // the harbour buses 991 / 992 on their sailing line (tools/geodata/bus_lines.py build_ferries, js/harbour-bus.js)
+  const harbourBuses = createHarbourBuses(scene, { waterLevel: HARBOUR_WATER_Y });
+  world.fetchCityJson?.('ferry-lines.json').then((doc) => harbourBuses.setLines(doc)).catch((e) => console.info('[harbour bus] no data/city/ferry-lines.json:', e?.message || e));
   // Building model level (js/buildings-stream.js setLevel): plain LoD2 -> + Skraafoto photos -> + generated windows / doors -> + hero buildings
   const levelButtons = [...document.querySelectorAll('[data-building-level]')];
   const levelStatus = document.getElementById('bl-status');
@@ -1173,7 +1178,7 @@ async function initApp() {
   if (new URLSearchParams(location.search).has('hooks')) {
     Object.defineProperty(globalThis.__twin, 'shaderBudget', { get: () => photoDrawBudget.snapshot(), enumerable: true });
     const updateCamera = cameraSystem.update.bind(cameraSystem);
-    Object.assign(globalThis.__twin, { THREE, trafficSystem, mapSystem, freeCam: null, frozen: false, stream: world.stream || null, nightlife, nightlifeScene, audioSystem });
+    Object.assign(globalThis.__twin, { THREE, trafficSystem, mapSystem, freeCam: null, frozen: false, stream: world.stream || null, nightlife, nightlifeScene, harbourBuses, audioSystem });
     cameraSystem.update = (dt, time) => {
       updateCamera(dt, time);
       const f = globalThis.__twin.freeCam;
@@ -1240,6 +1245,7 @@ async function initApp() {
     audioSystem.update(dt, elapsed, cameraSystem.camera, lightingSystem.activePresetId === 'midnight');
     nightlife.setLevel(nightlifeLevel(lightingSystem.activePresetId, lightingSystem.uNightFactor.value));
     nightlifeScene.update(dt, cameraSystem.currentPos.x, cameraSystem.currentPos.z, audioSystem.beatClock ?? elapsed);
+    harbourBuses.update(dt, elapsed);
     if (warmedUp) updateSceneCulling(cameraSystem.camera.position); // the warm-up frame draws every chunk
 
     // Render frame via TSL RenderPipeline (SSR + Bloom)

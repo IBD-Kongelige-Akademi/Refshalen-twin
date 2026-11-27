@@ -1341,12 +1341,13 @@ const BUS_PARTS = {
   SIGN: 4
 };
 
-// Refshaleøen's city buses (Nordjyllands Trafikselskab) wear the Plusbus colours: a white lower body, a yellow stripe under the black
-// window band, a light-blue roof line, roof and roof pods
+// Copenhagen's buses are Movia yellow (livery null: createLoftedBusMaterial paints them yellow, an A-bus with red corner panels). The
+// Aalborg Plusbus livery is kept for reference: a white lower body, a yellow stripe under the black window band, a light-blue roof line
 const NT_LIVERY = { base: 0xefede6, accent: 0xf2cc12, accentBand: [1.03, 1.19], roof: 0x8fd0e6, roofY: 2.72, skirt: false };
+const MOVIA_LIVERY = null;
 
 const BUS_SPEC = {
-  name: 'bus', aLine: false, livery: NT_LIVERY, route: '12', length: 11.56, width: 2.6, massRatio: 0.15,
+  name: 'bus', aLine: false, livery: MOVIA_LIVERY, route: '26', length: 11.56, width: 2.6, massRatio: 0.15,
   headlight: [0.79, 0.8], // midpoint of each pair of white lamps; excludes the outer amber indicator
   zFront: 5.78,
   zRear: -5.78,
@@ -1376,7 +1377,7 @@ const BUS_SPEC = {
 
 // Rigid fallback: lane occupancy and SAT currently model one chassis, including its swept corners.
 const BUS_LONG_SPEC = {
-  ...BUS_SPEC, name: 'bus-long', route: '16', length: 18.75, zFront: 9.375, zRear: -9.375,
+  ...BUS_SPEC, name: 'bus-long', aLine: true, route: '1A', length: 18.75, zFront: 9.375, zRear: -9.375,
   wheelZ: 7.1, axles: [7.1, 0.2, -6.9], joint: -2.0, stationStep: 0.72,
   halfWidth: [[9.375, 1.3], [-9.375, 1.3]],
   frontDoor: [7.96, 8.96], rearDoor: [-0.9, 0.15], thirdDoor: [-6.3, -5.25]
@@ -1395,7 +1396,7 @@ const urbinoModule = (name, length, extra) => {
     halfWidth: [[h, 1.275], [-h, 1.275]],
     edge: [[h, 3.0], [-h, 3.0]],
     nose: URBINO_FLAT, tail: URBINO_FLAT, cab: false, tailFace: false, rake: 0,
-    livery: NT_LIVERY,
+    livery: MOVIA_LIVERY, aLine: true,
     route: '2H',
     ...extra
   };
@@ -1637,10 +1638,10 @@ function createBusWheelMaterial() {
 
 const _busDestinationTextures = new Map();
 const BUS_DESTINATIONS = {
-  12: ['12', 'GISTRUP'],
-  16: ['16', 'CITY SYD'],
-  '2H': ['2', 'HOSPITALSBYEN'],
-  '2V': ['2', 'VÆDDELØBSBANEN']
+  26: ['26', 'BELLAHØJ'],
+  '1A': ['1A', 'HELLERUP ST.'],
+  '2H': ['2A', 'REFSHALEØEN'],   // the articulated A-bus on line 2A, towards Refshaleøen
+  '2V': ['2A', 'TINGBJERG']      // and back
 };
 
 function createBusDestinationTexture(route) {
@@ -1651,7 +1652,7 @@ function createBusDestinationTexture(route) {
   const ctx = c.getContext('2d');
   ctx.fillStyle = '#0c0f14';
   ctx.fillRect(0, 0, 256, 64);
-  // [line, destination]: NT city lines through the district (OSM route relations); 2 is the Plusbus, one key per direction
+  // [line, destination]: Movia lines through the district (OSM route relations); 2H / 2V are line 2A's two directions
   const [line, destination] = BUS_DESTINATIONS[route] || [route, ''];
   ctx.fillStyle = '#ffad35';
   ctx.font = 'bold 30px "Arial Narrow", Arial, sans-serif';

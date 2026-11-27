@@ -27,7 +27,7 @@ import { URBINO_24, createArticulation } from './articulated-bus.js';
 
 // js/traffic.js
 // Copenhagen traffic and pedestrians on the road graph road-network.js derives from the centreline graph:
-// - Four AI Plusbuses (Solaris Urbino 24, double-articulated) run line 2's real route both ways and stop at its stops (section 2b).
+// - Four AI A-buses on line 2A (the engine's double-articulated model, in Movia's A-bus colours) run its real route both ways and stop at its stops (section 2b).
 // - 120 cars (European crossovers, hatchbacks, estates, vans and taxis) and 12 buses keep to their lanes and follow the vehicle
 //   ahead (Intelligent Driver Model), change lanes to overtake or to reach a turn lane, turn into other streets,
 //   stop for the signals at the junctions the register places (signal-plan.js), give way to oncoming traffic when
@@ -359,7 +359,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
         const p = d.path;
         const cum = new Float64Array(p.length / 2);
         for (let i = 1; i < cum.length; i++) cum[i] = cum[i - 1] + Math.hypot(p[2 * i] - p[2 * i - 2], p[2 * i + 1] - p[2 * i - 1]);
-        busLines.push({ ref: line.ref, path: p, cum, stops: (d.stops || []).map((s) => s.s), back: !/Hospitalsbyen/.test(d.to || '') });
+        busLines.push({ ref: line.ref, path: p, cum, stops: (d.stops || []).map((s) => s.s), back: !/Refshaleøen/.test(d.to || '') }); // the front sign reads REFSHALEØEN towards it, TINGBJERG back
       }
     }
     refreshNearRoute();
@@ -2605,6 +2605,7 @@ function createTrafficSystem(scene, signalIntersections, options = {}) {
     cars,
     buses: [...buses, ...plusbuses],
     plusbuses,
+    get lineStats() { return { lines: busLines.length, nearRoute: nearRoute.length / 2, near: nearEdges.length }; },
     peds: pedestrianSystem.peds,
     fallen: pedestrianSystem.fallen,
     // the world knocked-down people land in: the ground's height, and the buildings & street furniture to bounce off

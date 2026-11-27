@@ -1,0 +1,2210 @@
+{
+"version": "refshaleoen-park-trees/1",
+"about": "Operaparken (COBE, 2023): the young trees of the planting beds, traced from a published vertical aerial photograph (positions and colour-guessed genus only; nothing of the photograph is stored). Heights and crown radii are typical, not measured.",
+"source": {
+"id": "operaparken-traced",
+"text": "Operaparken: tree positions traced from a vertical aerial photograph published by COBE (cobe.dk/projects/the-opera-park)",
+"licence": "positions only",
+"url": "https://www.cobe.dk/projects/the-opera-park"
+},
+"trees": [
+{
+"x": -692.0,
+"z": 1035.96,
+"height": 9.1,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -646.65,
+"z": 1099.57,
+"height": 11.4,
+"crown_radius": 3.2,
+"genus": "birch"
+},
+{
+"x": -668.13,
+"z": 1110.0,
+"height": 8.0,
+"crown_radius": 2.5,
+"genus": "maple"
+},
+{
+"x": -675.83,
+"z": 1088.81,
+"height": 10.7,
+"crown_radius": 2.7,
+"genus": "hawthorn"
+},
+{
+"x": -709.29,
+"z": 1105.37,
+"height": 6.9,
+"crown_radius": 1.8,
+"genus": "birch"
+},
+{
+"x": -672.14,
+"z": 1129.87,
+"height": 10.4,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -743.28,
+"z": 1050.08,
+"height": 8.8,
+"crown_radius": 2.2,
+"genus": "maple"
+},
+{
+"x": -673.3,
+"z": 1031.5,
+"height": 8.9,
+"crown_radius": 2.8,
+"genus": "maple"
+},
+{
+"x": -737.91,
+"z": 1028.35,
+"height": 9.9,
+"crown_radius": 3.0,
+"genus": "maple"
+},
+{
+"x": -643.32,
+"z": 1072.13,
+"height": 7.1,
+"crown_radius": 2.0,
+"genus": "oak"
+},
+{
+"x": -641.76,
+"z": 1046.53,
+"height": 11.2,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -669.49,
+"z": 1096.87,
+"height": 8.2,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -654.57,
+"z": 1109.67,
+"height": 7.8,
+"crown_radius": 2.2,
+"genus": "oak"
+},
+{
+"x": -658.96,
+"z": 1040.2,
+"height": 7.9,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -659.43,
+"z": 1034.15,
+"height": 10.6,
+"crown_radius": 3.3,
+"genus": "birch"
+},
+{
+"x": -662.17,
+"z": 1097.79,
+"height": 7.3,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -682.27,
+"z": 1097.39,
+"height": 7.4,
+"crown_radius": 2.1,
+"genus": "maple"
+},
+{
+"x": -689.01,
+"z": 1085.87,
+"height": 11.4,
+"crown_radius": 2.9,
+"genus": "maple"
+},
+{
+"x": -675.13,
+"z": 1133.62,
+"height": 9.2,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -643.64,
+"z": 1032.9,
+"height": 11.0,
+"crown_radius": 3.5,
+"genus": "maple"
+},
+{
+"x": -622.18,
+"z": 1030.73,
+"height": 9.5,
+"crown_radius": 3.1,
+"genus": "maple"
+},
+{
+"x": -637.01,
+"z": 1072.05,
+"height": 10.3,
+"crown_radius": 2.9,
+"genus": "oak"
+},
+{
+"x": -664.56,
+"z": 1080.96,
+"height": 10.4,
+"crown_radius": 3.0,
+"genus": "maple"
+},
+{
+"x": -645.12,
+"z": 1134.88,
+"height": 6.5,
+"crown_radius": 1.7,
+"genus": "birch"
+},
+{
+"x": -639.0,
+"z": 1041.97,
+"height": 9.0,
+"crown_radius": 2.2,
+"genus": "birch"
+},
+{
+"x": -673.45,
+"z": 1123.76,
+"height": 10.6,
+"crown_radius": 3.5,
+"genus": "maple"
+},
+{
+"x": -674.07,
+"z": 1097.25,
+"height": 8.6,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -643.2,
+"z": 1103.29,
+"height": 8.3,
+"crown_radius": 2.1,
+"genus": "maple"
+},
+{
+"x": -665.84,
+"z": 1130.5,
+"height": 9.3,
+"crown_radius": 2.3,
+"genus": "lime"
+},
+{
+"x": -671.59,
+"z": 1091.29,
+"height": 8.6,
+"crown_radius": 2.6,
+"genus": "hawthorn"
+},
+{
+"x": -655.93,
+"z": 1103.68,
+"height": 10.2,
+"crown_radius": 2.9,
+"genus": "birch"
+},
+{
+"x": -732.65,
+"z": 1086.48,
+"height": 9.6,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -678.06,
+"z": 1038.79,
+"height": 6.3,
+"crown_radius": 1.6,
+"genus": "maple"
+},
+{
+"x": -671.39,
+"z": 1086.38,
+"height": 11.1,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -636.66,
+"z": 1144.69,
+"height": 11.3,
+"crown_radius": 3.2,
+"genus": "ash"
+},
+{
+"x": -753.19,
+"z": 1097.74,
+"height": 10.7,
+"crown_radius": 3.1,
+"genus": "ash"
+},
+{
+"x": -628.2,
+"z": 1048.91,
+"height": 9.7,
+"crown_radius": 3.1,
+"genus": "birch"
+},
+{
+"x": -655.59,
+"z": 1131.93,
+"height": 8.1,
+"crown_radius": 2.3,
+"genus": "birch"
+},
+{
+"x": -707.21,
+"z": 1050.16,
+"height": 7.5,
+"crown_radius": 2.0,
+"genus": "oak"
+},
+{
+"x": -659.87,
+"z": 1021.55,
+"height": 6.2,
+"crown_radius": 1.7,
+"genus": "birch"
+},
+{
+"x": -708.2,
+"z": 1057.31,
+"height": 7.4,
+"crown_radius": 2.3,
+"genus": "birch"
+},
+{
+"x": -654.96,
+"z": 1097.95,
+"height": 7.9,
+"crown_radius": 2.5,
+"genus": "birch"
+},
+{
+"x": -709.91,
+"z": 1130.79,
+"height": 6.7,
+"crown_radius": 2.2,
+"genus": "birch"
+},
+{
+"x": -643.98,
+"z": 1151.62,
+"height": 6.3,
+"crown_radius": 1.8,
+"genus": "oak"
+},
+{
+"x": -681.87,
+"z": 1022.64,
+"height": 10.9,
+"crown_radius": 2.6,
+"genus": "cherry"
+},
+{
+"x": -641.21,
+"z": 1065.02,
+"height": 8.4,
+"crown_radius": 2.1,
+"genus": "hawthorn"
+},
+{
+"x": -640.12,
+"z": 1036.79,
+"height": 9.0,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -684.15,
+"z": 1032.53,
+"height": 11.1,
+"crown_radius": 3.1,
+"genus": "maple"
+},
+{
+"x": -665.81,
+"z": 1147.5,
+"height": 10.5,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -668.6,
+"z": 1118.65,
+"height": 7.6,
+"crown_radius": 2.1,
+"genus": "maple"
+},
+{
+"x": -643.06,
+"z": 1113.19,
+"height": 7.2,
+"crown_radius": 1.8,
+"genus": "oak"
+},
+{
+"x": -721.9,
+"z": 1108.24,
+"height": 7.9,
+"crown_radius": 2.2,
+"genus": "ash"
+},
+{
+"x": -725.22,
+"z": 1056.05,
+"height": 11.5,
+"crown_radius": 3.3,
+"genus": "hawthorn"
+},
+{
+"x": -623.74,
+"z": 1052.91,
+"height": 9.1,
+"crown_radius": 2.3,
+"genus": "maple"
+},
+{
+"x": -747.01,
+"z": 1091.48,
+"height": 6.1,
+"crown_radius": 1.7,
+"genus": "hawthorn"
+},
+{
+"x": -660.17,
+"z": 1091.63,
+"height": 10.9,
+"crown_radius": 2.8,
+"genus": "hawthorn"
+},
+{
+"x": -620.12,
+"z": 1070.55,
+"height": 10.1,
+"crown_radius": 3.0,
+"genus": "birch"
+},
+{
+"x": -614.12,
+"z": 1053.79,
+"height": 9.3,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -624.52,
+"z": 1070.85,
+"height": 9.0,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -651.23,
+"z": 1126.62,
+"height": 10.6,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -679.42,
+"z": 1130.54,
+"height": 10.5,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -741.61,
+"z": 1116.13,
+"height": 6.5,
+"crown_radius": 1.7,
+"genus": "maple"
+},
+{
+"x": -668.75,
+"z": 1018.56,
+"height": 6.3,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -719.13,
+"z": 1032.91,
+"height": 9.1,
+"crown_radius": 2.3,
+"genus": "cherry"
+},
+{
+"x": -616.96,
+"z": 1057.17,
+"height": 8.7,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -731.91,
+"z": 1035.85,
+"height": 7.9,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -656.79,
+"z": 1126.58,
+"height": 7.9,
+"crown_radius": 2.2,
+"genus": "maple"
+},
+{
+"x": -741.93,
+"z": 1035.23,
+"height": 9.2,
+"crown_radius": 2.8,
+"genus": "ash"
+},
+{
+"x": -704.59,
+"z": 1110.19,
+"height": 7.8,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -642.32,
+"z": 1051.29,
+"height": 6.2,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -736.71,
+"z": 1060.67,
+"height": 8.6,
+"crown_radius": 2.4,
+"genus": "ash"
+},
+{
+"x": -732.73,
+"z": 1098.29,
+"height": 6.6,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -694.46,
+"z": 1124.55,
+"height": 8.5,
+"crown_radius": 2.1,
+"genus": "maple"
+},
+{
+"x": -705.96,
+"z": 1043.41,
+"height": 7.2,
+"crown_radius": 1.8,
+"genus": "maple"
+},
+{
+"x": -719.28,
+"z": 981.34,
+"height": 8.3,
+"crown_radius": 2.3,
+"genus": "ash"
+},
+{
+"x": -695.59,
+"z": 1107.09,
+"height": 10.2,
+"crown_radius": 3.3,
+"genus": "ash"
+},
+{
+"x": -736.8,
+"z": 1040.37,
+"height": 6.2,
+"crown_radius": 1.7,
+"genus": "ash"
+},
+{
+"x": -677.78,
+"z": 1033.34,
+"height": 6.7,
+"crown_radius": 1.7,
+"genus": "maple"
+},
+{
+"x": -721.91,
+"z": 1058.72,
+"height": 9.7,
+"crown_radius": 3.0,
+"genus": "birch"
+},
+{
+"x": -718.82,
+"z": 1020.91,
+"height": 8.5,
+"crown_radius": 2.2,
+"genus": "maple"
+},
+{
+"x": -713.89,
+"z": 1110.58,
+"height": 9.0,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -724.12,
+"z": 1049.66,
+"height": 6.6,
+"crown_radius": 1.7,
+"genus": "maple"
+},
+{
+"x": -669.9,
+"z": 1146.36,
+"height": 6.5,
+"crown_radius": 1.7,
+"genus": "hawthorn"
+},
+{
+"x": -638.75,
+"z": 1024.95,
+"height": 10.9,
+"crown_radius": 3.2,
+"genus": "maple"
+},
+{
+"x": -648.05,
+"z": 1028.77,
+"height": 6.6,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -722.06,
+"z": 1037.54,
+"height": 11.4,
+"crown_radius": 3.0,
+"genus": "ash"
+},
+{
+"x": -689.84,
+"z": 1111.78,
+"height": 6.8,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -677.76,
+"z": 1143.65,
+"height": 10.7,
+"crown_radius": 2.8,
+"genus": "ash"
+},
+{
+"x": -704.16,
+"z": 1091.39,
+"height": 9.1,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -633.04,
+"z": 1048.88,
+"height": 8.4,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -722.59,
+"z": 1089.4,
+"height": 11.1,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -668.68,
+"z": 1028.29,
+"height": 6.0,
+"crown_radius": 1.6,
+"genus": "maple"
+},
+{
+"x": -592.79,
+"z": 1034.16,
+"height": 9.1,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -690.87,
+"z": 1101.93,
+"height": 9.1,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -729.66,
+"z": 1108.71,
+"height": 11.5,
+"crown_radius": 3.1,
+"genus": "birch"
+},
+{
+"x": -659.25,
+"z": 1119.84,
+"height": 8.8,
+"crown_radius": 2.5,
+"genus": "birch"
+},
+{
+"x": -625.83,
+"z": 1039.48,
+"height": 10.6,
+"crown_radius": 3.5,
+"genus": "maple"
+},
+{
+"x": -705.86,
+"z": 1120.07,
+"height": 6.3,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -630.67,
+"z": 1077.7,
+"height": 9.6,
+"crown_radius": 3.1,
+"genus": "ash"
+},
+{
+"x": -641.74,
+"z": 1020.85,
+"height": 7.6,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -702.78,
+"z": 1115.08,
+"height": 6.3,
+"crown_radius": 1.6,
+"genus": "ash"
+},
+{
+"x": -691.54,
+"z": 1094.66,
+"height": 6.1,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -696.06,
+"z": 1082.93,
+"height": 10.4,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -654.99,
+"z": 1038.57,
+"height": 7.5,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -638.72,
+"z": 1076.48,
+"height": 11.1,
+"crown_radius": 3.2,
+"genus": "maple"
+},
+{
+"x": -647.66,
+"z": 1113.27,
+"height": 11.4,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -616.34,
+"z": 1045.44,
+"height": 10.1,
+"crown_radius": 3.1,
+"genus": "oak"
+},
+{
+"x": -657.46,
+"z": 1139.14,
+"height": 10.1,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -740.58,
+"z": 1088.74,
+"height": 9.7,
+"crown_radius": 3.2,
+"genus": "birch"
+},
+{
+"x": -687.87,
+"z": 1119.02,
+"height": 9.6,
+"crown_radius": 3.0,
+"genus": "ash"
+},
+{
+"x": -600.68,
+"z": 1051.69,
+"height": 7.5,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -640.45,
+"z": 1059.77,
+"height": 7.7,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -629.92,
+"z": 1094.71,
+"height": 10.7,
+"crown_radius": 3.0,
+"genus": "lime"
+},
+{
+"x": -648.0,
+"z": 1022.52,
+"height": 7.7,
+"crown_radius": 2.0,
+"genus": "maple"
+},
+{
+"x": -674.21,
+"z": 1013.86,
+"height": 9.7,
+"crown_radius": 2.4,
+"genus": "maple"
+},
+{
+"x": -645.97,
+"z": 1064.46,
+"height": 9.7,
+"crown_radius": 2.9,
+"genus": "hawthorn"
+},
+{
+"x": -644.53,
+"z": 1025.82,
+"height": 8.4,
+"crown_radius": 2.4,
+"genus": "ash"
+},
+{
+"x": -730.21,
+"z": 1082.36,
+"height": 9.0,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -761.32,
+"z": 1110.04,
+"height": 8.4,
+"crown_radius": 2.5,
+"genus": "hawthorn"
+},
+{
+"x": -669.36,
+"z": 1133.46,
+"height": 6.7,
+"crown_radius": 2.1,
+"genus": "maple"
+},
+{
+"x": -751.03,
+"z": 1108.63,
+"height": 9.4,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -692.84,
+"z": 1088.55,
+"height": 6.1,
+"crown_radius": 1.6,
+"genus": "maple"
+},
+{
+"x": -718.38,
+"z": 1025.66,
+"height": 9.9,
+"crown_radius": 2.7,
+"genus": "birch"
+},
+{
+"x": -648.15,
+"z": 1108.64,
+"height": 8.2,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -714.44,
+"z": 1059.27,
+"height": 10.5,
+"crown_radius": 3.5,
+"genus": "hawthorn"
+},
+{
+"x": -743.96,
+"z": 1111.87,
+"height": 10.9,
+"crown_radius": 3.1,
+"genus": "ash"
+},
+{
+"x": -756.83,
+"z": 1109.2,
+"height": 9.9,
+"crown_radius": 2.5,
+"genus": "birch"
+},
+{
+"x": -661.94,
+"z": 1113.3,
+"height": 7.1,
+"crown_radius": 2.0,
+"genus": "ash"
+},
+{
+"x": -654.75,
+"z": 1116.59,
+"height": 10.4,
+"crown_radius": 3.0,
+"genus": "birch"
+},
+{
+"x": -654.83,
+"z": 1032.37,
+"height": 10.4,
+"crown_radius": 3.3,
+"genus": "maple"
+},
+{
+"x": -717.09,
+"z": 1013.36,
+"height": 10.5,
+"crown_radius": 3.3,
+"genus": "maple"
+},
+{
+"x": -706.58,
+"z": 1034.3,
+"height": 7.4,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -697.23,
+"z": 1100.42,
+"height": 6.4,
+"crown_radius": 1.6,
+"genus": "maple"
+},
+{
+"x": -710.62,
+"z": 1026.9,
+"height": 9.5,
+"crown_radius": 3.0,
+"genus": "oak"
+},
+{
+"x": -734.99,
+"z": 1053.83,
+"height": 9.6,
+"crown_radius": 2.4,
+"genus": "ash"
+},
+{
+"x": -714.28,
+"z": 1115.27,
+"height": 10.7,
+"crown_radius": 3.5,
+"genus": "maple"
+},
+{
+"x": -708.82,
+"z": 991.84,
+"height": 8.6,
+"crown_radius": 2.2,
+"genus": "maple"
+},
+{
+"x": -660.15,
+"z": 1101.49,
+"height": 10.7,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -669.63,
+"z": 1023.05,
+"height": 8.3,
+"crown_radius": 2.0,
+"genus": "ash"
+},
+{
+"x": -680.93,
+"z": 1018.33,
+"height": 7.0,
+"crown_radius": 2.1,
+"genus": "cherry"
+},
+{
+"x": -596.78,
+"z": 1042.34,
+"height": 9.4,
+"crown_radius": 2.9,
+"genus": "lime"
+},
+{
+"x": -683.62,
+"z": 1132.07,
+"height": 7.4,
+"crown_radius": 2.3,
+"genus": "maple"
+},
+{
+"x": -703.17,
+"z": 1038.44,
+"height": 6.8,
+"crown_radius": 2.1,
+"genus": "oak"
+},
+{
+"x": -661.36,
+"z": 1108.83,
+"height": 9.6,
+"crown_radius": 2.9,
+"genus": "maple"
+},
+{
+"x": -610.67,
+"z": 1050.66,
+"height": 8.3,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -660.23,
+"z": 1142.69,
+"height": 6.5,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -725.65,
+"z": 1110.38,
+"height": 10.9,
+"crown_radius": 3.2,
+"genus": "maple"
+},
+{
+"x": -670.65,
+"z": 1137.92,
+"height": 11.4,
+"crown_radius": 3.7,
+"genus": "lime"
+},
+{
+"x": -666.34,
+"z": 1105.04,
+"height": 9.4,
+"crown_radius": 2.7,
+"genus": "birch"
+},
+{
+"x": -677.32,
+"z": 1093.75,
+"height": 10.7,
+"crown_radius": 3.5,
+"genus": "birch"
+},
+{
+"x": -714.64,
+"z": 1128.11,
+"height": 8.1,
+"crown_radius": 2.0,
+"genus": "oak"
+},
+{
+"x": -712.78,
+"z": 1097.35,
+"height": 8.2,
+"crown_radius": 2.6,
+"genus": "oak"
+},
+{
+"x": -654.55,
+"z": 1019.07,
+"height": 6.2,
+"crown_radius": 1.7,
+"genus": "maple"
+},
+{
+"x": -653.26,
+"z": 1121.21,
+"height": 6.3,
+"crown_radius": 2.0,
+"genus": "hawthorn"
+},
+{
+"x": -663.21,
+"z": 1025.44,
+"height": 7.2,
+"crown_radius": 1.8,
+"genus": "birch"
+},
+{
+"x": -664.34,
+"z": 1019.26,
+"height": 10.9,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -650.29,
+"z": 1034.83,
+"height": 6.7,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -603.44,
+"z": 1060.67,
+"height": 10.1,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -637.19,
+"z": 1051.29,
+"height": 6.9,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -655.87,
+"z": 1023.94,
+"height": 6.7,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -710.98,
+"z": 1039.03,
+"height": 7.8,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -681.19,
+"z": 999.81,
+"height": 8.4,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -713.18,
+"z": 1023.12,
+"height": 7.6,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -609.03,
+"z": 1034.08,
+"height": 8.8,
+"crown_radius": 2.9,
+"genus": "lime"
+},
+{
+"x": -751.26,
+"z": 1093.12,
+"height": 8.2,
+"crown_radius": 2.5,
+"genus": "oak"
+},
+{
+"x": -636.81,
+"z": 1139.92,
+"height": 10.7,
+"crown_radius": 3.5,
+"genus": "ash"
+},
+{
+"x": -650.85,
+"z": 1133.2,
+"height": 10.4,
+"crown_radius": 3.3,
+"genus": "ash"
+},
+{
+"x": -703.69,
+"z": 1053.34,
+"height": 8.0,
+"crown_radius": 2.2,
+"genus": "birch"
+},
+{
+"x": -651.5,
+"z": 1103.67,
+"height": 9.2,
+"crown_radius": 3.0,
+"genus": "birch"
+},
+{
+"x": -735.47,
+"z": 1023.52,
+"height": 9.1,
+"crown_radius": 2.5,
+"genus": "birch"
+},
+{
+"x": -663.26,
+"z": 1040.26,
+"height": 10.3,
+"crown_radius": 3.0,
+"genus": "maple"
+},
+{
+"x": -710.89,
+"z": 1068.89,
+"height": 10.3,
+"crown_radius": 3.0,
+"genus": "lime"
+},
+{
+"x": -680.72,
+"z": 1029.11,
+"height": 9.8,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -699.25,
+"z": 1109.7,
+"height": 6.9,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -627.71,
+"z": 1034.41,
+"height": 9.3,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -661.19,
+"z": 1050.68,
+"height": 10.0,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -684.09,
+"z": 1140.72,
+"height": 7.1,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -738.99,
+"z": 1044.6,
+"height": 9.8,
+"crown_radius": 3.1,
+"genus": "birch"
+},
+{
+"x": -642.27,
+"z": 1107.53,
+"height": 9.8,
+"crown_radius": 2.8,
+"genus": "lime"
+},
+{
+"x": -732.65,
+"z": 1049.24,
+"height": 7.7,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -640.81,
+"z": 1122.84,
+"height": 11.1,
+"crown_radius": 3.2,
+"genus": "oak"
+},
+{
+"x": -683.83,
+"z": 1102.16,
+"height": 11.4,
+"crown_radius": 3.2,
+"genus": "ash"
+},
+{
+"x": -684.6,
+"z": 1026.78,
+"height": 8.2,
+"crown_radius": 2.5,
+"genus": "birch"
+},
+{
+"x": -679.13,
+"z": 1105.26,
+"height": 8.4,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -651.35,
+"z": 1095.46,
+"height": 7.3,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -721.59,
+"z": 1053.86,
+"height": 7.6,
+"crown_radius": 2.4,
+"genus": "maple"
+},
+{
+"x": -662.24,
+"z": 1030.98,
+"height": 11.3,
+"crown_radius": 3.2,
+"genus": "ash"
+},
+{
+"x": -634.36,
+"z": 1059.89,
+"height": 10.3,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -670.14,
+"z": 1042.38,
+"height": 6.6,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -734.07,
+"z": 1031.81,
+"height": 11.5,
+"crown_radius": 3.3,
+"genus": "ash"
+},
+{
+"x": -721.15,
+"z": 1082.87,
+"height": 7.0,
+"crown_radius": 2.2,
+"genus": "hawthorn"
+},
+{
+"x": -649.23,
+"z": 1016.58,
+"height": 7.8,
+"crown_radius": 2.2,
+"genus": "ash"
+},
+{
+"x": -734.71,
+"z": 1044.95,
+"height": 8.5,
+"crown_radius": 2.6,
+"genus": "maple"
+},
+{
+"x": -748.39,
+"z": 1115.3,
+"height": 7.8,
+"crown_radius": 2.0,
+"genus": "maple"
+},
+{
+"x": -752.03,
+"z": 1087.1,
+"height": 6.7,
+"crown_radius": 1.7,
+"genus": "lime"
+},
+{
+"x": -714.18,
+"z": 1029.27,
+"height": 11.3,
+"crown_radius": 3.5,
+"genus": "birch"
+},
+{
+"x": -644.51,
+"z": 1055.51,
+"height": 10.1,
+"crown_radius": 2.5,
+"genus": "hawthorn"
+},
+{
+"x": -710.32,
+"z": 1113.65,
+"height": 10.5,
+"crown_radius": 3.0,
+"genus": "maple"
+},
+{
+"x": -718.17,
+"z": 1044.3,
+"height": 7.4,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -641.06,
+"z": 1029.12,
+"height": 8.6,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -725.3,
+"z": 1009.07,
+"height": 7.0,
+"crown_radius": 1.7,
+"genus": "birch"
+},
+{
+"x": -746.52,
+"z": 1108.09,
+"height": 6.8,
+"crown_radius": 2.1,
+"genus": "lime"
+},
+{
+"x": -652.03,
+"z": 1145.26,
+"height": 8.9,
+"crown_radius": 2.8,
+"genus": "maple"
+},
+{
+"x": -718.88,
+"z": 1112.64,
+"height": 9.1,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -663.28,
+"z": 1134.28,
+"height": 8.5,
+"crown_radius": 2.3,
+"genus": "birch"
+},
+{
+"x": -743.71,
+"z": 1083.58,
+"height": 8.1,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -661.38,
+"z": 1012.51,
+"height": 11.0,
+"crown_radius": 3.5,
+"genus": "birch"
+},
+{
+"x": -739.17,
+"z": 1048.8,
+"height": 7.9,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -695.22,
+"z": 1039.9,
+"height": 6.8,
+"crown_radius": 1.7,
+"genus": "ash"
+},
+{
+"x": -699.86,
+"z": 1044.53,
+"height": 8.0,
+"crown_radius": 2.3,
+"genus": "maple"
+},
+{
+"x": -714.5,
+"z": 1017.72,
+"height": 9.2,
+"crown_radius": 2.6,
+"genus": "ash"
+},
+{
+"x": -697.01,
+"z": 1120.06,
+"height": 9.8,
+"crown_radius": 2.4,
+"genus": "ash"
+},
+{
+"x": -709.9,
+"z": 1100.69,
+"height": 6.2,
+"crown_radius": 2.0,
+"genus": "hawthorn"
+},
+{
+"x": -636.18,
+"z": 1031.45,
+"height": 10.0,
+"crown_radius": 3.2,
+"genus": "cherry"
+},
+{
+"x": -640.98,
+"z": 1080.53,
+"height": 6.7,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -627.43,
+"z": 1062.78,
+"height": 8.4,
+"crown_radius": 2.2,
+"genus": "birch"
+},
+{
+"x": -696.47,
+"z": 1092.46,
+"height": 10.7,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -646.31,
+"z": 1069.03,
+"height": 7.2,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -698.59,
+"z": 1034.64,
+"height": 7.3,
+"crown_radius": 1.8,
+"genus": "lime"
+},
+{
+"x": -737.63,
+"z": 1118.22,
+"height": 8.1,
+"crown_radius": 2.5,
+"genus": "maple"
+},
+{
+"x": -650.36,
+"z": 1116.99,
+"height": 11.4,
+"crown_radius": 3.2,
+"genus": "maple"
+},
+{
+"x": -649.26,
+"z": 1152.98,
+"height": 9.9,
+"crown_radius": 3.2,
+"genus": "oak"
+},
+{
+"x": -622.95,
+"z": 1046.25,
+"height": 10.3,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -726.8,
+"z": 1061.53,
+"height": 10.6,
+"crown_radius": 3.0,
+"genus": "birch"
+},
+{
+"x": -667.69,
+"z": 1032.42,
+"height": 7.0,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -655.58,
+"z": 1092.27,
+"height": 6.3,
+"crown_radius": 2.1,
+"genus": "ash"
+},
+{
+"x": -683.4,
+"z": 1125.74,
+"height": 6.9,
+"crown_radius": 1.8,
+"genus": "ash"
+},
+{
+"x": -684.46,
+"z": 1040.11,
+"height": 9.1,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -627.13,
+"z": 1088.02,
+"height": 8.2,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -661.15,
+"z": 1127.47,
+"height": 6.4,
+"crown_radius": 1.6,
+"genus": "birch"
+},
+{
+"x": -707.14,
+"z": 1087.58,
+"height": 6.5,
+"crown_radius": 1.8,
+"genus": "birch"
+},
+{
+"x": -595.03,
+"z": 1038.5,
+"height": 9.8,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -722.47,
+"z": 1041.93,
+"height": 6.1,
+"crown_radius": 1.5,
+"genus": "birch"
+},
+{
+"x": -718.4,
+"z": 1040.06,
+"height": 7.2,
+"crown_radius": 2.3,
+"genus": "ash"
+},
+{
+"x": -678.63,
+"z": 1099.62,
+"height": 7.1,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -632.6,
+"z": 1033.8,
+"height": 11.3,
+"crown_radius": 2.9,
+"genus": "maple"
+},
+{
+"x": -730.33,
+"z": 1029.66,
+"height": 8.9,
+"crown_radius": 2.9,
+"genus": "maple"
+},
+{
+"x": -727.3,
+"z": 1016.94,
+"height": 11.4,
+"crown_radius": 3.6,
+"genus": "birch"
+},
+{
+"x": -627.99,
+"z": 1067.54,
+"height": 8.2,
+"crown_radius": 2.2,
+"genus": "lime"
+},
+{
+"x": -758.87,
+"z": 1088.8,
+"height": 8.3,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -667.13,
+"z": 1084.73,
+"height": 9.4,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -645.23,
+"z": 1119.42,
+"height": 8.5,
+"crown_radius": 2.3,
+"genus": "birch"
+},
+{
+"x": -702.95,
+"z": 1028.68,
+"height": 7.9,
+"crown_radius": 2.2,
+"genus": "oak"
+},
+{
+"x": -704.33,
+"z": 1023.11,
+"height": 11.0,
+"crown_radius": 3.3,
+"genus": "lime"
+},
+{
+"x": -635.74,
+"z": 1063.88,
+"height": 9.0,
+"crown_radius": 2.3,
+"genus": "maple"
+},
+{
+"x": -711.44,
+"z": 1092.77,
+"height": 10.8,
+"crown_radius": 3.5,
+"genus": "oak"
+},
+{
+"x": -656.03,
+"z": 1081.38,
+"height": 9.0,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -630.05,
+"z": 1040.0,
+"height": 6.7,
+"crown_radius": 2.2,
+"genus": "ash"
+},
+{
+"x": -654.19,
+"z": 1136.08,
+"height": 8.9,
+"crown_radius": 2.2,
+"genus": "ash"
+},
+{
+"x": -751.8,
+"z": 1080.06,
+"height": 10.2,
+"crown_radius": 3.1,
+"genus": "ash"
+},
+{
+"x": -744.0,
+"z": 1068.9,
+"height": 8.5,
+"crown_radius": 2.2,
+"genus": "oak"
+},
+{
+"x": -758.23,
+"z": 1080.08,
+"height": 8.3,
+"crown_radius": 2.7,
+"genus": "oak"
+},
+{
+"x": -676.36,
+"z": 1042.92,
+"height": 6.3,
+"crown_radius": 2.0,
+"genus": "ash"
+},
+{
+"x": -615.46,
+"z": 1032.4,
+"height": 10.4,
+"crown_radius": 2.7,
+"genus": "birch"
+},
+{
+"x": -632.03,
+"z": 1044.74,
+"height": 7.3,
+"crown_radius": 2.1,
+"genus": "lime"
+},
+{
+"x": -637.31,
+"z": 1046.1,
+"height": 6.5,
+"crown_radius": 2.1,
+"genus": "birch"
+},
+{
+"x": -695.48,
+"z": 1096.58,
+"height": 10.3,
+"crown_radius": 2.9,
+"genus": "birch"
+},
+{
+"x": -717.53,
+"z": 1051.99,
+"height": 9.3,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -622.97,
+"z": 1063.36,
+"height": 7.0,
+"crown_radius": 2.0,
+"genus": "ash"
+},
+{
+"x": -665.99,
+"z": 1015.01,
+"height": 9.1,
+"crown_radius": 2.4,
+"genus": "ash"
+},
+{
+"x": -763.25,
+"z": 1086.98,
+"height": 7.7,
+"crown_radius": 2.0,
+"genus": "lime"
+},
+{
+"x": -674.65,
+"z": 1101.71,
+"height": 10.3,
+"crown_radius": 3.3,
+"genus": "ash"
+},
+{
+"x": -641.14,
+"z": 1148.24,
+"height": 9.0,
+"crown_radius": 2.3,
+"genus": "oak"
+},
+{
+"x": -708.26,
+"z": 1016.47,
+"height": 7.3,
+"crown_radius": 2.3,
+"genus": "hawthorn"
+},
+{
+"x": -701.2,
+"z": 1097.62,
+"height": 6.6,
+"crown_radius": 1.8,
+"genus": "lime"
+},
+{
+"x": -685.47,
+"z": 1000.16,
+"height": 10.4,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -625.72,
+"z": 1113.01,
+"height": 11.4,
+"crown_radius": 3.6,
+"genus": "birch"
+},
+{
+"x": -645.18,
+"z": 1130.57,
+"height": 10.1,
+"crown_radius": 2.9,
+"genus": "maple"
+},
+{
+"x": -675.78,
+"z": 1084.26,
+"height": 6.0,
+"crown_radius": 1.6,
+"genus": "ash"
+},
+{
+"x": -699.42,
+"z": 1056.12,
+"height": 8.7,
+"crown_radius": 2.3,
+"genus": "lime"
+},
+{
+"x": -682.52,
+"z": 1092.86,
+"height": 7.7,
+"crown_radius": 2.0,
+"genus": "birch"
+},
+{
+"x": -667.6,
+"z": 1038.02,
+"height": 8.2,
+"crown_radius": 2.5,
+"genus": "maple"
+},
+{
+"x": -620.03,
+"z": 1022.5,
+"height": 8.8,
+"crown_radius": 2.8,
+"genus": "birch"
+},
+{
+"x": -649.68,
+"z": 1055.92,
+"height": 8.5,
+"crown_radius": 2.2,
+"genus": "birch"
+},
+{
+"x": -761.58,
+"z": 1096.66,
+"height": 6.4,
+"crown_radius": 1.9,
+"genus": "birch"
+},
+{
+"x": -669.71,
+"z": 1012.31,
+"height": 6.3,
+"crown_radius": 2.0,
+"genus": "maple"
+},
+{
+"x": -636.78,
+"z": 1121.38,
+"height": 10.4,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -704.35,
+"z": 1084.32,
+"height": 8.8,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -677.23,
+"z": 998.18,
+"height": 11.0,
+"crown_radius": 3.2,
+"genus": "ash"
+},
+{
+"x": -676.05,
+"z": 1127.95,
+"height": 8.2,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -756.52,
+"z": 1085.22,
+"height": 8.6,
+"crown_radius": 2.5,
+"genus": "hawthorn"
+},
+{
+"x": -673.28,
+"z": 1037.93,
+"height": 8.3,
+"crown_radius": 2.4,
+"genus": "birch"
+},
+{
+"x": -691.08,
+"z": 1040.92,
+"height": 9.5,
+"crown_radius": 3.1,
+"genus": "birch"
+},
+{
+"x": -657.53,
+"z": 1113.0,
+"height": 11.1,
+"crown_radius": 3.2,
+"genus": "maple"
+},
+{
+"x": -638.99,
+"z": 1127.02,
+"height": 6.7,
+"crown_radius": 1.8,
+"genus": "lime"
+},
+{
+"x": -684.9,
+"z": 1087.3,
+"height": 8.3,
+"crown_radius": 2.4,
+"genus": "maple"
+},
+{
+"x": -690.82,
+"z": 1023.9,
+"height": 9.4,
+"crown_radius": 2.7,
+"genus": "hawthorn"
+},
+{
+"x": -680.41,
+"z": 1011.27,
+"height": 10.5,
+"crown_radius": 3.3,
+"genus": "birch"
+},
+{
+"x": -684.22,
+"z": 1106.85,
+"height": 7.5,
+"crown_radius": 1.9,
+"genus": "maple"
+},
+{
+"x": -655.43,
+"z": 1052.95,
+"height": 7.5,
+"crown_radius": 1.9,
+"genus": "ash"
+},
+{
+"x": -653.7,
+"z": 1077.5,
+"height": 10.4,
+"crown_radius": 3.1,
+"genus": "hawthorn"
+},
+{
+"x": -616.04,
+"z": 1049.85,
+"height": 6.2,
+"crown_radius": 1.5,
+"genus": "ash"
+},
+{
+"x": -758.64,
+"z": 1093.04,
+"height": 10.5,
+"crown_radius": 2.6,
+"genus": "oak"
+},
+{
+"x": -703.52,
+"z": 1079.95,
+"height": 7.4,
+"crown_radius": 2.3,
+"genus": "hawthorn"
+},
+{
+"x": -632.15,
+"z": 1055.96,
+"height": 6.6,
+"crown_radius": 1.8,
+"genus": "maple"
+},
+{
+"x": -673.58,
+"z": 1144.25,
+"height": 11.1,
+"crown_radius": 3.1,
+"genus": "ash"
+},
+{
+"x": -714.08,
+"z": 1042.01,
+"height": 8.6,
+"crown_radius": 2.7,
+"genus": "maple"
+},
+{
+"x": -633.05,
+"z": 1098.11,
+"height": 9.8,
+"crown_radius": 3.0,
+"genus": "hawthorn"
+},
+{
+"x": -640.05,
+"z": 1069.07,
+"height": 10.5,
+"crown_radius": 3.3,
+"genus": "birch"
+},
+{
+"x": -642.1,
+"z": 1093.47,
+"height": 9.3,
+"crown_radius": 2.7,
+"genus": "hawthorn"
+},
+{
+"x": -732.62,
+"z": 1040.97,
+"height": 9.4,
+"crown_radius": 2.5,
+"genus": "ash"
+},
+{
+"x": -664.57,
+"z": 1044.42,
+"height": 9.4,
+"crown_radius": 3.0,
+"genus": "ash"
+},
+{
+"x": -666.71,
+"z": 1139.42,
+"height": 7.6,
+"crown_radius": 2.2,
+"genus": "maple"
+},
+{
+"x": -633.05,
+"z": 1130.22,
+"height": 8.7,
+"crown_radius": 2.6,
+"genus": "maple"
+},
+{
+"x": -664.72,
+"z": 1101.15,
+"height": 7.4,
+"crown_radius": 2.3,
+"genus": "lime"
+},
+{
+"x": -732.13,
+"z": 1094.12,
+"height": 6.1,
+"crown_radius": 1.7,
+"genus": "maple"
+},
+{
+"x": -714.83,
+"z": 1067.38,
+"height": 11.1,
+"crown_radius": 2.9,
+"genus": "ash"
+},
+{
+"x": -653.68,
+"z": 1141.01,
+"height": 9.1,
+"crown_radius": 2.6,
+"genus": "birch"
+},
+{
+"x": -647.26,
+"z": 1104.45,
+"height": 10.8,
+"crown_radius": 3.4,
+"genus": "ash"
+},
+{
+"x": -615.36,
+"z": 1087.52,
+"height": 10.8,
+"crown_radius": 3.4,
+"genus": "maple"
+},
+{
+"x": -639.66,
+"z": 1054.82,
+"height": 9.1,
+"crown_radius": 2.7,
+"genus": "ash"
+},
+{
+"x": -632.05,
+"z": 1065.99,
+"height": 9.3,
+"crown_radius": 2.8,
+"genus": "maple"
+},
+{
+"x": -661.66,
+"z": 1138.25,
+"height": 11.0,
+"crown_radius": 2.7,
+"genus": "birch"
+},
+{
+"x": -658.54,
+"z": 1095.6,
+"height": 8.0,
+"crown_radius": 2.2,
+"genus": "ash"
+}
+]
+}

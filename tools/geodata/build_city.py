@@ -881,8 +881,10 @@ def stage_index(a, tiles, cells) -> None:
     import bus_lines
 
     if bus_lines.RAW.exists():
-        S.atomic_write(CITY_DIR / "bus-lines.json", json.dumps(bus_lines.build(bus_lines.load_elements(bus_lines.RAW), frame.area_local()),
-                                                              ensure_ascii=False, separators=(",", ":")))
+        els = bus_lines.load_elements(bus_lines.RAW)
+        S.atomic_write(CITY_DIR / "bus-lines.json", json.dumps(bus_lines.build(els, frame.area_local()), ensure_ascii=False, separators=(",", ":")))
+        # the harbour buses 991 / 992 (js/harbour-bus.js)
+        S.atomic_write(CITY_DIR / "ferry-lines.json", json.dumps(bus_lines.build_ferries(els, frame.area_local()), ensure_ascii=False, separators=(",", ":")))
     total = sum(e["bytes"] for e in idx_tiles.values())
     index = {"version": T.VERSION, "generated": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "tileSize": frame.TILE_SIZE,
              "frame": {"epsg": 25832, "origin": list(frame.ORIGIN), "axes": "x=east, z=south, y=up", "bbox": bbox},
@@ -892,6 +894,7 @@ def stage_index(a, tiles, cells) -> None:
                       "lakes": "../city/lakes.json" if (CITY_DIR / "lakes.json").exists() else None,
                       "map": "../city/map.json",
                       "busLines": "../city/bus-lines.json" if (CITY_DIR / "bus-lines.json").exists() else None,
+                      "ferryLines": "../city/ferry-lines.json" if (CITY_DIR / "ferry-lines.json").exists() else None,
                       "nightlife": "../city/nightlife.json" if (CITY_DIR / "nightlife.json").exists() else None,
                       # street addresses for the building info panel (tools/geodata/addresses.py, run after the tiles)
                       "addresses": "../city/addresses.json" if (CITY_DIR / "addresses.json").exists() else None},
@@ -947,6 +950,11 @@ def main(argv=None):
             import city_layers
 
             getattr(city_layers, f"stage_{s}")(a, tiles, cells)
+            if s == "furniture":
+                import park_trees
+
+                for tid, n in park_trees.apply(TILES_DIR, write=lambda path, txt: S.atomic_write(path, txt)):
+                    log(f"[park trees] {tid}: {n} traced")
         elif s in ("entrances", "vegetation", "lod2"):
             import city_layers2
 
