@@ -3,7 +3,7 @@ name = "cph-lod2"
 version = "0.1.0"
 description = "LoD2 roof pipeline for the Copenhagen twin (DHM Punktsky -> roofer -> twin-local meshes)"
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26", "mapbox-earcut>=1.0.1"]
+dependencies = ["numpy>=1.26", "mapbox-earcut>=1.0.1", "laspy[lazrs]>=2.5", "requests>=2.31"]
 
 [dependency-groups]
 dev = ["pytest>=8"]

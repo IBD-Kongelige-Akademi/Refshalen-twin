@@ -65,6 +65,21 @@ python3 tools/hosting/build_packs.py --out data-packs --offline --no-overrides
 Result: observed wall and roof tones for the nine cells, 3,186 facade atlases (53 MB webp), measured window grids on 3,559 walls;
 the packed data is 52 files, 55 MB.
 
+LoD2 roofs with [roofer](https://github.com/3DBAG/roofer) 1.1.0-beta.1 (Docker image `3dgi/roofer`, from Docker Hub) from the DHM
+Punktsky (scanned 2019-04-07): `tools/lod2/prep.py` and `run.py` are restored from the Copenhagen twin, reading the tiled buildings and
+cropping with laspy when PDAL is missing.
+
+```sh
+uv run --project tools/lod2 python tools/lod2/fetch.py        # 1 km LAZ tiles of the district + neighbours (Datafordeler key)
+uv run --project tools/lod2 python tools/lod2/prep.py         # per cell: footprints, class 2+6 crop, roofer.toml -> data/raw/lod2-out/<cell>/
+uv run --project tools/lod2 python tools/lod2/run.py --workers 1 --jobs-per-tile 2
+uv run tools/geodata/build_city.py --stage lod2 --stage canopies --force furniture --stage furniture
+uv run tools/geodata/far_lod.py && uv run tools/geodata/build_city.py --stage index --stage report
+```
+
+Result: 4,772 of 5,819 buildings (82 %) with a measured LoD2.2 roof and walls (median fit 0.88 m); 1,038 rejected by the quality gate
+(no usable points, footprint not covered, 108 built after the 2019 scan) keep the extruded roof. 12 minutes of roofer on two cores.
+
 Run locally with the packed data: `python tools/hosting/serve_range.py --port 8010`, then http://127.0.0.1:8010/?data=./data-packs
 
 ## Content
@@ -78,7 +93,6 @@ Run locally with the packed data: `python tools/hosting/serve_range.py --port 80
 
 ## Not done yet
 
-- **No LoD2 roofs**: the Aalborg roofs came from Ramboll's CityJSON; Copenhagen needs another LoD2 source (or roofs from the DHM point cloud).
 - 2,032 of the 5,820 footprints have no BBR record through `bbruuid` (Holmen, the Navy, many in Frederiksstaden): they get default use and
   year. A spatial join to BBR's building points would recover most.
 - The tile list's land share (`city_tiles.py`) is wrong for the larger box (the OSM-API coastline is cut at the request edges); nothing

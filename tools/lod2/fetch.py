@@ -80,9 +80,19 @@ def scan_meta(tid: str) -> dict:
     meta_path = common.RAW_DIR / f"PUNKTSKY_1km_{tid}.meta.json"
     if meta_path.exists():
         return json.loads(meta_path.read_text())
-    out = subprocess.run(["pdal", "info", "--stats", "--dimensions", "GpsTime", str(common.tile_file(tid))],
-                         capture_output=True, text=True, check=True).stdout
-    stat = json.loads(out)["stats"]["statistic"][0]
+    if shutil.which("pdal"):
+        out = subprocess.run(["pdal", "info", "--stats", "--dimensions", "GpsTime", str(common.tile_file(tid))],
+                             capture_output=True, text=True, check=True).stdout
+        stat = json.loads(out)["stats"]["statistic"][0]
+    else:  # no PDAL: laspy (chunked, so a 1 km tile never sits in memory whole)
+        import laspy
+
+        n, lo, hi, tot = 0, float("inf"), float("-inf"), 0.0
+        with laspy.open(str(common.tile_file(tid))) as f:
+            for ch in f.chunk_iterator(5_000_000):
+                g = ch.gps_time
+                n += len(g); lo = min(lo, float(g.min())); hi = max(hi, float(g.max())); tot += float(g.sum())
+        stat = {"count": n, "minimum": lo, "maximum": hi, "average": tot / max(n, 1)}
     meta = {"tile": tid, "count": stat["count"], "gps_min": stat["minimum"], "gps_max": stat["maximum"],
             "scan_date_min": common.gps_to_date(stat["minimum"]), "scan_date_max": common.gps_to_date(stat["maximum"]),
             "scan_date": common.gps_to_date(stat["average"])}
