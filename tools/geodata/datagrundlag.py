@@ -184,6 +184,21 @@ def parquet_src(con, url: str) -> str:
     return name
 
 
+def _point(v):
+    """BBR byg404Koordinat ('POINT(E N)' in EPSG:25832, or WKB) -> [E, N] or None."""
+    if v is None:
+        return None
+    if isinstance(v, (bytes, bytearray)):
+        from shapely import wkb
+        g = wkb.loads(bytes(v))
+        return [round(g.x, 2), round(g.y, 2)]
+    t = str(v).strip().upper()
+    if t.startswith("POINT"):
+        e, n = t[t.index("(") + 1:t.index(")")].split()[:2]
+        return [round(float(e), 2), round(float(n), 2)]
+    return None
+
+
 def fetch_bbr_bygning(kommunekode: str, force: bool = False) -> dict:
     """BBR bygning of one kommune, {id_lokalid: {use, year, wall, roof, storeys, status, wall_code, roof_code}}, from the
     GeoParquet with DuckDB. Column names are matched by their BBR field number (the mirror spells them with æ/ø/å)."""
@@ -202,10 +217,13 @@ def fetch_bbr_bygning(kommunekode: str, force: bool = False) -> dict:
         return next(c for c in cols if c.startswith(prefix))
 
     pick = {"use": col("byg021"), "year": col("byg026"), "wall_code": col("byg032"), "roof_code": col("byg033"),
-            "storeys": col("byg054"), "status": "status"}
-    tbl = dset.to_table(columns=["id_lokalid", *pick.values()], filter=ds.field("kommunekode") == kommunekode.zfill(4))
+            "storeys": col("byg054"), "status": "status", "xy": col("byg404"), "area": col("byg041")}
+    tbl = dset.to_table(columns=["id_lokalid", *pick.values(), "registreringtil", "virkningtil"],
+                        filter=ds.field("kommunekode") == kommunekode.zfill(4))
     data = [tbl.column(c).to_pylist() for c in ["id_lokalid", *pick.values()]]
-    rows = list(zip(*data))
+    # the file holds the bitemporal history: keep the current version of each building (no end of registration or validity)
+    cur = [not (r or v) for r, v in zip(tbl.column("registreringtil").to_pylist(), tbl.column("virkningtil").to_pylist())]
+    rows = [r for r, ok in zip(zip(*data), cur) if ok]
 
     def num(v):
         v = str(v if v is not None else "").strip()
@@ -217,7 +235,8 @@ def fetch_bbr_bygning(kommunekode: str, force: bool = False) -> dict:
         storeys = num(rec["storeys"])
         out[r[0].lower()] = {"use": num(rec["use"]), "year": num(rec["year"]) or None, "storeys": storeys if storeys and storeys > 0 else None,
                              "wall": WALL_TEXT.get((rec["wall_code"] or "").strip()), "roof": ROOF_TEXT.get((rec["roof_code"] or "").strip()),
-                             "wall_code": rec["wall_code"] or None, "roof_code": rec["roof_code"] or None, "status": rec["status"]}
+                             "wall_code": rec["wall_code"] or None, "roof_code": rec["roof_code"] or None, "status": rec["status"],
+                             "xy": _point(rec.get("xy")), "area": num(rec.get("area"))}
     _write(p, json.dumps(out, ensure_ascii=False, separators=(",", ":")))
     record_snapshot("bbr", "bygning", date, kommunekode=kommunekode, records=len(out))
     log(f"[datagrundlag] bbr.bygning ({date}) kommune {kommunekode}: {len(out)} records")

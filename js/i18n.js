@@ -20,7 +20,7 @@ const DA = {
   'The park by the opera': 'Parken ved operaen',
   'Operaparken: the new park behind the opera house, with its glasshouse café.': 'Operaparken: den nye park bag operahuset med drivhuscaféen.',
   'The new swimming hall': 'Den nye svømmehal',
-  'KAI on Papirøen, the new swimming hall by the harbour (still under construction in the map data).': 'KAI på Papirøen, den nye svømmehal ved havnen (stadig under opførelse i kortdataene).',
+  'KAI on Papirøen, the new swimming hall by Kengo Kuma: brick peaks floating on a glass ground floor, built from the drawings.': 'KAI på Papirøen, Kengo Kumas nye svømmehal: teglbjerge, der svæver over en stueetage i glas, bygget ud fra tegningerne.',
   'Or drive the Plusbus: the 24.7 m articulated electric bus.': 'Eller kør Plusbussen: den 24,7 m lange leddelte elbus.',
   "Refshaleøen · street food · start": "Refshaleøen · streetfood · start",
   "Holmen · the opera house": "Holmen · operahuset",

@@ -1,0 +1,67 @@
+{
+ "out": "/home/claude/packs",
+ "files": 53,
+ "bytes": 60580598,
+ "manifestBytes": 4435,
+ "folders": {
+  "a": {
+   "files": 30,
+   "bytes": 48721429,
+   "largest": 5876777
+  },
+  "c": {
+   "files": 2,
+   "bytes": 943290,
+   "largest": 702886
+  },
+  "d": {
+   "files": 9,
+   "bytes": 2420287,
+   "largest": 487504
+  },
+  "t": {
+   "files": 9,
+   "bytes": 8008416,
+   "largest": 2627128
+  },
+  "x": {
+   "files": 2,
+   "bytes": 482741,
+   "largest": 457684
+  }
+ },
+ "tiles": 30,
+ "atlasesMissing": 0,
+ "chunkCap": 1048576,
+ "groups": [
+  {
+   "name": "core",
+   "layers": [
+    "buildings",
+    "appearance",
+    "terrain",
+    "lod2",
+    "roads",
+    "streets",
+    "water",
+    "structures",
+    "lod2.bin"
+   ],
+   "block": 2
+  },
+  {
+   "name": "detail",
+   "layers": [
+    "surfaces",
+    "vegetation",
+    "furniture",
+    "entrances",
+    "groundfloor",
+    "overrides",
+    "windows"
+   ],
+   "block": 2
+  }
+ ],
+ "seconds": 5
+}

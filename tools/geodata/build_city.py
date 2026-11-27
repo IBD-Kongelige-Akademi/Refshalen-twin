@@ -309,8 +309,15 @@ def merge_building_features(tiles: dict) -> tuple[list, dict]:
     gd = _load_json(DG.cache_path("geodanmark", "bygning"))["features"]
     bbr = _load_json(DG.cache_path("bbr", "bygning", f"_{KOMMUNE}"))
     feats = []
-    outside = no_bbr = 0
+    outside = no_bbr = spatial = 0
     status = Counter()
+    used = {(f["properties"].get("bbruuid") or "").lower() for f in gd}
+    # BBR buildings no footprint names, by their coordinate (byg404): the fallback join for footprints without a bbruuid match
+    from shapely import STRtree
+    from shapely.geometry import Point, shape
+    free = [(k, v) for k, v in bbr.items() if v.get("xy") and k not in used and v.get("status") in ("6", "3", "7")]
+    pts = [Point(*v["xy"]) for _, v in free]
+    tree = STRtree(pts) if pts else None
     for f in gd:
         p = f["properties"]
         fot = p.get("id_lokalid")
@@ -322,6 +329,14 @@ def merge_building_features(tiles: dict) -> tuple[list, dict]:
             continue
         uuid = (p.get("bbruuid") or "").lower()
         b = bbr.get(uuid)
+        join = "bbruuid" if b else None
+        if b is None and tree is not None:
+            poly = shape(f["geometry"])
+            hits = [free[i] for i in tree.query(poly, predicate="contains")]
+            if hits:  # the BBR building whose point lies in the footprint; of several, the largest built-up area, then the one built ("6")
+                uuid, b = max(hits, key=lambda kv: (kv[1].get("status") == "6", kv[1].get("area") or 0))
+                join = "byg404-in-footprint" if len(hits) == 1 else f"byg404-in-footprint-of-{len(hits)}"
+                spatial += 1
         if b is None:
             no_bbr += 1
         else:
@@ -329,9 +344,39 @@ def merge_building_features(tiles: dict) -> tuple[list, dict]:
         props = {"fot_id": fot, "bygningid": uuid if b else None, "bygningstype": p.get("bygningstype"),
                  "bygningensanvendelsekode": b["use"] if b else None, "opfoerelselsaar": b["year"] if b else None,
                  "ydervaeggensmateriale": b["wall"] if b else None, "tagdaekningsmateriale": b["roof"] if b else None,
-                 "antaletager": b["storeys"] if b else None}
+                 "antaletager": b["storeys"] if b else None, "bbr_join": join}
         feats.append({"type": "Feature", "geometry": f["geometry"], "properties": props})
-    stats = {"geodanmark_in_tiles": len(feats), "geodanmark_without_bbr": no_bbr, "geodanmark_total": len(gd),
+    # GeoDanmark often splits one BBR building into several footprints and names the BBR building on one of them only (a karré in
+    # Frederiksstaden, a hall with its annexes on Holmen): a footprint still without BBR takes the record of the footprint it shares the
+    # longest wall with, if that wall is at least 2 m (repeated, so a chain of parts reaches the named one)
+    shapes = [shape(f["geometry"]) for f in feats]
+    stree = STRtree(shapes)
+    keys = ("bygningid", "bygningensanvendelsekode", "opfoerelselsaar", "ydervaeggensmateriale", "tagdaekningsmateriale", "antaletager")
+    neighbour = 0
+    for _ in range(4):
+        changed = 0
+        for i, f in enumerate(feats):
+            if f["properties"]["bygningid"]:
+                continue
+            best, best_len = None, 2.0
+            g = shapes[i]
+            for j in stree.query(g.buffer(0.3)):
+                if j == i or not feats[j]["properties"]["bygningid"]:
+                    continue
+                shared = g.buffer(0.3).intersection(shapes[j].boundary).length
+                if shared > best_len:
+                    best, best_len = j, shared
+            if best is not None:
+                src = feats[best]["properties"]
+                f["properties"].update({k: src[k] for k in keys})
+                f["properties"]["bbr_join"] = "neighbour-part"
+                changed += 1
+        neighbour += changed
+        if not changed:
+            break
+    no_bbr -= neighbour
+    stats = {"geodanmark_in_tiles": len(feats), "geodanmark_without_bbr": no_bbr, "bbr_joined_by_point": spatial,
+             "bbr_from_neighbour_part": neighbour, "geodanmark_total": len(gd),
              "geodanmark_outside_tiles": outside, "bbr_records": len(bbr), "bbr_status": dict(status)}
     return feats, stats
 
@@ -492,6 +537,54 @@ def build_lakes_citywide(geo: dict, tiles: dict) -> None:
 
 # ------------------------------------------------------------------------------------------------------------ cells
 
+def dhm_from_laz(core):
+    """DSM + DTM 1 m over core grown by DHM_MARGIN rasterised from the DHM Punktsky 1 km LAZ tiles (tools/lod2/fetch.py, data/raw/lod2/):
+    the fallback when the WCS refuses (DSM = highest return per metre, DTM = mean ground (class 2) per metre, gaps filled from the
+    nearest cell). Returns (dsm, dtm, transform) or None when a tile is missing."""
+    import laspy
+    import numpy as np
+    from rasterio.transform import from_origin
+    from scipy import ndimage
+
+    e0, n0, e1, n1 = core
+    x0, y0, x1, y1 = e0 - DHM_MARGIN, n0 - DHM_MARGIN, e1 + DHM_MARGIN, n1 + DHM_MARGIN
+    W, H = int(round(x1 - x0)), int(round(y1 - y0))
+    dsm = np.full((H, W), -np.inf, "float32")
+    gs = np.zeros((H, W), "float64")
+    gn = np.zeros((H, W), "int32")
+    for ek in range(int(x0 // 1000), int((x1 - 1e-6) // 1000) + 1):
+        for nk in range(int(y0 // 1000), int((y1 - 1e-6) // 1000) + 1):
+            f = DATA / "raw" / "lod2" / f"PUNKTSKY_1km_{nk}_{ek}.laz"
+            if not f.exists():
+                continue  # beyond the fetched tiles (open water at the edge): filled from the nearest cell
+            with laspy.open(str(f)) as fh:
+                for ch in fh.chunk_iterator(5_000_000):
+                    x, y, z, c = np.asarray(ch.x), np.asarray(ch.y), np.asarray(ch.z, "float32"), np.asarray(ch.classification)
+                    m = (x >= x0) & (x < x1) & (y >= y0) & (y < y1) & (c != 7) & (c != 18)
+                    if not m.any():
+                        continue
+                    col = (x[m] - x0).astype(int)
+                    row = (y1 - y[m]).astype(int)
+                    row = np.clip(row, 0, H - 1)
+                    col = np.clip(col, 0, W - 1)
+                    np.maximum.at(dsm, (row, col), z[m])
+                    g = c[m] == 2
+                    np.add.at(gs, (row[g], col[g]), z[m][g])
+                    np.add.at(gn, (row[g], col[g]), 1)
+    dtm = np.where(gn > 0, gs / np.maximum(gn, 1), np.nan).astype("float32")
+
+    def fill(a, bad):
+        if bad.all():
+            return np.zeros_like(a)
+        idx = ndimage.distance_transform_edt(bad, return_distances=False, return_indices=True)
+        return a[tuple(idx)]
+
+    dtm = fill(dtm, np.isnan(dtm))
+    dsm = fill(dsm, ~np.isfinite(dsm))
+    dsm = np.maximum(dsm, dtm)
+    return dsm, dtm, from_origin(x0, y1, 1.0, 1.0)
+
+
 def dhm_cell(work: Path, core, token: str):
     """DSM + DTM 1 m for the cell core grown by DHM_MARGIN: 2x2 WCS requests of <= 800 m per coverage, cached as GeoTIFFs
     in the cell folder (deleted by the caller). Returns ({'dsm': Raster, 'dtm': Raster}, (dtm array, transform))."""
@@ -502,6 +595,12 @@ def dhm_cell(work: Path, core, token: str):
     import dhm
 
     e0, n0, e1, n1 = core
+    if os.environ.get("DHM_SOURCE") == "laz":  # the WCS refuses (or is not wanted): rasterise the point cloud instead
+        r = dhm_from_laz(core)
+        if r is None:
+            raise RuntimeError("DHM_SOURCE=laz but a Punktsky tile is missing (tools/lod2/fetch.py)")
+        dsm, dtm_arr, t = r
+        return {"dsm": dhm.Raster(dsm, t, None), "dtm": dhm.Raster(dtm_arr, t, None)}, (dtm_arr.astype("float64"), t)
     x0, y0, x1, y1 = e0 - DHM_MARGIN, n0 - DHM_MARGIN, e1 + DHM_MARGIN, n1 + DHM_MARGIN
     nx = ny = 2
     sx, sy = (x1 - x0) / nx, (y1 - y0) / ny

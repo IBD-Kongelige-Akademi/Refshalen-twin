@@ -4,7 +4,7 @@ A walkable, drivable and bikeable real-time 3D twin of **Refshaleøen, Holmen an
 
 Forked from [askonring/aalborg-twin](https://github.com/askonring/aalborg-twin) (Andreas' Aalborg twin) at `a8ef36f`; what changed for Copenhagen is in [docs/refshaleoen.md](docs/refshaleoen.md).
 
-**Run it locally:** `python tools/hosting/serve_range.py --port 8010` (Windows: `py ...`), then open http://127.0.0.1:8010/?data=./data-packs (the packed data in `data-packs/`, not in git; without `?data=` it reads the unpacked `data/`). The Aalborg README follows below; its commands work the same here.
+**Run it locally:** `python tools/hosting/serve_range.py --port 8010` (Windows: `py ...`), then open http://127.0.0.1:8010/ (it reads the packed data in `site-data/`; `?data=./data` reads an unpacked build). The Aalborg README follows below; its commands work the same here.
 
 ---
 

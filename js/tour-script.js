@@ -123,7 +123,7 @@ const TOUR_STOPS = [
     title: 'KAI',
     sub: 'The new swimming hall',
     beats: [
-      { express: true, hold: 8, caption: 'KAI on Papirøen, the new swimming hall by the harbour (still under construction in the map data).', do: [...GOLDEN, { mode: 'person' }, { camera: 'kai' }] }
+      { express: true, hold: 8, caption: 'KAI on Papirøen, the new swimming hall by Kengo Kuma: brick peaks floating on a glass ground floor, built from the drawings.', do: [...GOLDEN, { mode: 'person' }, { camera: 'kai' }] }
     ]
   },
   {

@@ -12,7 +12,7 @@
 //   unpacked  tiles/<id>/<layer>.json, tiles/index.json, city/*, tex-look/*.webp, tex/*.jpg: the repo's ./data (local dev)
 // packsWanted() decides whether the packed layout is tried first (it falls back to the unpacked one when the base has no manifest).
 
-export const BUILD_DATA_BASE = './data';
+export const BUILD_DATA_BASE = './site-data'; // the packed data in the repository (tools/hosting/build_packs.py --out site-data); ?data=./data reads the unpacked build
 
 const trim = (s) => String(s).replace(/\/+$/, '');
 

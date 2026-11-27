@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { resolveDataBase, dataUrl, isRemoteBase, BUILD_DATA_BASE } from '../js/data-config.js';
 import { openTileStore, tilesUrl } from '../js/tile-store.js';
 
-test('default data base is the local ./data, a trailing slash is ignored', () => {
-  assert.equal(BUILD_DATA_BASE, './data');
+test('default data base is the packed ./site-data, a trailing slash is ignored', () => {
+  assert.equal(BUILD_DATA_BASE, './site-data');
   assert.equal(resolveDataBase('', './data'), './data');
   assert.equal(resolveDataBase('?hooks', './data/'), './data');
   assert.equal(dataUrl('tex-look/a.webp', './data'), './data/tex-look/a.webp');
@@ -17,8 +17,8 @@ test('?data= overrides the build default', () => {
   assert.ok(!isRemoteBase('./data'));
 });
 
-test('without a page the tile directory is ./data/tiles', () => {
-  assert.equal(tilesUrl(), './data/tiles');
+test('without a page the tile directory is ./site-data/tiles', () => {
+  assert.equal(tilesUrl(), './site-data/tiles');
 });
 
 test('a remote tile store fetches index and layers under its base, city files via the index, cacheable', async () => {

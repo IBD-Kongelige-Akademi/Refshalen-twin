@@ -31,5 +31,5 @@ data/overrides/
 # wrangler (tools/hosting/upload_packs.py) local cache
 .wrangler/
 
-# packed data for local use (tools/hosting/build_packs.py): open the app with ?data=./data-packs
+# packed data: site-data/ is committed (.github/workflows/pages.yml publishes it with the site); data-packs/ was the earlier local copy
 data-packs/

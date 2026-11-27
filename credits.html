@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Aalborg Twin – Kreditering</title>
+  <title>Refshaleøen Twin – Kreditering</title>
   <style>
     :root { --bg: #ffffff; --ink: #06182e; --muted: #4f5d6e; --line: #d8e2ec; --accent: #009df0; --link: #0077c0; }
     @media (prefers-color-scheme: dark) { :root { --bg: #051529; --ink: #ffffff; --muted: #9db0c6; --line: #16314f; --link: #5cc4ff; } }
@@ -30,8 +30,8 @@
 <main>
 <div class="lang-bar"><button id="lang-toggle" type="button" lang="en">English</button></div>
 <div data-lang="en" lang="en" hidden>
-  <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – credits</h1></header>
-  <p class="muted">A playable model of central Aalborg built from open Danish geodata, sponsored by Ramboll. <a class="back" href="./">← Back to the city</a></p>
+  <header><h1>Refshaleøen Twin – credits</h1></header>
+  <p class="muted">A playable model of Refshaleøen, Holmen and Frederiksstaden in Copenhagen, built from open Danish geodata at Det Kongelige Akademi, on Andreas' Aalborg Twin. <a class="back" href="./">← Back to the city</a></p>
 
   <h2>Software</h2>
   <ul>
@@ -52,44 +52,18 @@
   <p class="muted">Vector data read through <a href="https://datagrundlag.dk/om/">datagrundlag.dk</a> (MapCentia's mirror of the public data).</p>
   <ul>
     <li>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, Open Database License (ODbL): roads, traffic signals, lamps, water, parks, bridges, railways, nightlife venues and bus lines.</li>
-    <li>LoD2 roof shapes: CityJSON building model by Ramboll, made with <a href="https://github.com/geoflow3d/geoflow-bundle">Geoflow</a> (MIT).</li>
+    <li>LoD2 roof shapes: reconstructed from the DHM point cloud (scan 2019) with <a href="https://github.com/3DBAG/roofer">roofer</a> (3DBAG, MIT/Apache).</li>
+    <li>Aalborg Twin by Andreas (askonring/aalborg-twin, MIT): the project this one is forked from.</li>
   </ul>
 
   <h2>Landmark buildings</h2>
-  <p>Six buildings are modelled by hand. Placement and footprints come from GeoDanmark Bygning, and colours and measurements from Skråfoto 2021 (both above).
-    The drawings named below are from Aalborg Kommune's building archive (byggesagsarkiv) on <a href="https://weblager.dk">weblager.dk</a>; only measurements taken from them are in the models.</p>
-
-  <h3>Aalborg Kongres &amp; Kultur Center</h3>
+  <h3>Bygning 147, Refshalevej 147</h3>
   <ul>
-    <li>Roof levels, eaves and ridges from the DHM point cloud.</li>
-    <li>Reference photos (not used as textures): Leonhard Lenz, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres-_og_Kulturcenter_2022-08-16_01.jpg">CC0</a>; Drlady, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center_01.jpg">CC BY-SA 4.0</a>; Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center,_seen_from_Prinsensgade,_Photo_1,Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+    <li>Rhino model and facade photographs by Anders Hermund, Det Kongelige Akademi.</li>
   </ul>
-
-  <h3>Musikkens Hus</h3>
+  <h3>KAI, Vandkulturhuset Papirøen</h3>
   <ul>
-    <li>Roof levels from the DHM point cloud and surface model.</li>
-    <li>Reference photo (not used as a texture): Marc Søgaard, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Musikkens_Hus_-_front.JPG">CC BY-SA 3.0</a>.</li>
-  </ul>
-
-  <h3>Utzon Center</h3>
-  <ul>
-    <li>Roof levels from the Skråfoto surface model.</li>
-    <li>Reference photos for the brick infill and lanterns (not used as textures): Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Utzon_Center,_Eastern_side,_Aalborg.jpg">CC BY-SA 3.0</a>.</li>
-  </ul>
-
-  <h3>Budolfi Domkirke</h3>
-  <ul>
-    <li>Drawings from the building archive: <em>Sankt Budolfi – Aalborg Domkirke, hovedrenovering 1. afsnit</em>, Arkitekter Dall &amp; Lindhardtsen A/S, 2000 (after the survey of 1986, Brøgger arkitektfirma), and <em>Budolfi Kirke: opmaaling af spiret</em>, 1934.</li>
-  </ul>
-
-  <h3>Ansgars Kirke</h3>
-  <ul>
-    <li>Drawings from the building archive: <em>Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg</em>, facade drawings, 1925.</li>
-  </ul>
-
-  <h3>Hotel Det Hvide Hus</h3>
-  <ul>
-    <li>Drawings from the building archive: <em>Hotel ved Kilden, Aalborg</em>, K. Friis og E. Moltke Nielsen, arkitekter, 1967; <em>Hotel Hvide Hus: udskiftning af facadepartier</em>, Jørgen Braad A/S, 2005; <em>opholdsterrasse mod Kildeparken</em>, Peter Sørensen, landskabsarkitekt, 2002.</li>
+    <li>Built from measurements read off the published plans and sections (Kengo Kuma &amp; Associates, Cornelius Vöge, Søren Jensen; executing architect Vilhelm Lauritzen Arkitekter). The drawings themselves are not part of the model; windows and textures are indicative.</li>
   </ul>
 
   <h2>Licence</h2>
@@ -97,8 +71,8 @@
 </div>
 
 <div data-lang="da" lang="da">
-  <header><span class="mark" role="img" aria-label="Ramboll"></span><h1>Aalborg Twin – kreditering</h1></header>
-  <p class="muted">En spilbar model af det centrale Aalborg bygget af åbne danske geodata, sponsoreret af Ramboll. <a class="back" href="./">← Tilbage til byen</a></p>
+  <header><h1>Refshaleøen Twin – kreditering</h1></header>
+  <p class="muted">En spilbar model af Refshaleøen, Holmen og Frederiksstaden i København, bygget af åbne danske geodata på Det Kongelige Akademi, oven på Andreas' Aalborg Twin. <a class="back" href="./">← Tilbage til byen</a></p>
 
   <h2>Software</h2>
   <ul>
@@ -119,44 +93,18 @@
   <p class="muted">Vektordata hentet via <a href="https://datagrundlag.dk/om/">datagrundlag.dk</a> (MapCentias spejling af de offentlige data).</p>
   <ul>
     <li>© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-bidragydere</a>, Open Database License (ODbL): veje, lyssignaler, lygter, vand, parker, broer, jernbaner, nattelivssteder og buslinjer.</li>
-    <li>LoD2-tagformer: CityJSON-bygningsmodel fra Ramboll, lavet med <a href="https://github.com/geoflow3d/geoflow-bundle">Geoflow</a> (MIT).</li>
+    <li>LoD2-tagformer: rekonstrueret fra DHM-punktskyen (scanning 2019) med <a href="https://github.com/3DBAG/roofer">roofer</a> (3DBAG, MIT/Apache).</li>
+    <li>Aalborg Twin af Andreas (askonring/aalborg-twin, MIT): projektet, som dette er forgrenet fra.</li>
   </ul>
 
   <h2>Vartegn</h2>
-  <p>Seks bygninger er modelleret i hånden. Placering og omrids kommer fra GeoDanmark Bygning, og farver og mål fra Skråfoto 2021 (begge ovenfor).
-    Tegningerne nævnt nedenfor er fra Aalborg Kommunes byggesagsarkiv på <a href="https://weblager.dk">weblager.dk</a>; kun mål taget fra dem indgår i modellerne.</p>
-
-  <h3>Aalborg Kongres &amp; Kultur Center</h3>
+  <h3>Bygning 147, Refshalevej 147</h3>
   <ul>
-    <li>Tagniveauer, tagfødder og kip fra DHM-punktskyen.</li>
-    <li>Referencefotos (ikke brugt som teksturer): Leonhard Lenz, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres-_og_Kulturcenter_2022-08-16_01.jpg">CC0</a>; Drlady, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center_01.jpg">CC BY-SA 4.0</a>; Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Aalborg_Kongres_%26_Kultur_Center,_seen_from_Prinsensgade,_Photo_1,Aalborg.jpg">CC BY-SA 3.0</a>.</li>
+    <li>Rhino-model og facadefotos af Anders Hermund, Det Kongelige Akademi.</li>
   </ul>
-
-  <h3>Musikkens Hus</h3>
+  <h3>KAI, Vandkulturhuset Papirøen</h3>
   <ul>
-    <li>Tagniveauer fra DHM-punktskyen og overflademodellen.</li>
-    <li>Referencefoto (ikke brugt som tekstur): Marc Søgaard, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Musikkens_Hus_-_front.JPG">CC BY-SA 3.0</a>.</li>
-  </ul>
-
-  <h3>Utzon Center</h3>
-  <ul>
-    <li>Tagniveauer fra Skråfotos overflademodel.</li>
-    <li>Referencefotos af murstensudfyldningen og lanternerne (ikke brugt som teksturer): Liberaler Humanist, Wikimedia Commons, <a href="https://commons.wikimedia.org/wiki/File:Utzon_Center,_Eastern_side,_Aalborg.jpg">CC BY-SA 3.0</a>.</li>
-  </ul>
-
-  <h3>Budolfi Domkirke</h3>
-  <ul>
-    <li>Tegninger fra byggesagsarkivet: <em>Sankt Budolfi – Aalborg Domkirke, hovedrenovering 1. afsnit</em>, Arkitekter Dall &amp; Lindhardtsen A/S, 2000 (efter opmålingen fra 1986, Brøgger arkitektfirma), og <em>Budolfi Kirke: opmaaling af spiret</em>, 1934.</li>
-  </ul>
-
-  <h3>Ansgars Kirke</h3>
-  <ul>
-    <li>Tegninger fra byggesagsarkivet: <em>Kirke til Budolfi Sogns sydvestre del / Ny Sognekirke, Aalborg</em>, facadetegninger, 1925.</li>
-  </ul>
-
-  <h3>Hotel Det Hvide Hus</h3>
-  <ul>
-    <li>Tegninger fra byggesagsarkivet: <em>Hotel ved Kilden, Aalborg</em>, K. Friis og E. Moltke Nielsen, arkitekter, 1967; <em>Hotel Hvide Hus: udskiftning af facadepartier</em>, Jørgen Braad A/S, 2005; <em>opholdsterrasse mod Kildeparken</em>, Peter Sørensen, landskabsarkitekt, 2002.</li>
+    <li>Bygget ud fra mål aflæst på de offentliggjorte planer og snit (Kengo Kuma &amp; Associates, Cornelius Vöge, Søren Jensen; udførende arkitekt Vilhelm Lauritzen Arkitekter). Tegningerne indgår ikke i modellen; vinduer og teksturer er vejledende.</li>
   </ul>
 
   <h2>Licens</h2>
@@ -173,7 +121,7 @@
       lang = next === 'en' ? 'en' : 'da';
       document.documentElement.lang = lang;
       document.querySelectorAll('[data-lang]').forEach(function (el) { el.hidden = el.getAttribute('data-lang') !== lang; });
-      document.title = lang === 'da' ? 'Aalborg Twin – Kreditering' : 'Aalborg Twin – Credits';
+      document.title = lang === 'da' ? 'Refshaleøen Twin – Kreditering' : 'Refshaleøen Twin – Credits';
       var btn = document.getElementById('lang-toggle');
       btn.textContent = lang === 'da' ? 'English' : 'Dansk';
       btn.lang = lang === 'da' ? 'en' : 'da';

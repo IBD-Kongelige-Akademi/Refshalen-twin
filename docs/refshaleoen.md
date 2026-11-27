@@ -39,7 +39,7 @@ uv run tools/geodata/build_city.py --osm-source api --stage fetch2 --stage surfa
 uv run --no-project --with pyproj python -X utf8 tools/geodata/nightlife.py
 uv run tools/geodata/far_lod.py
 uv run tools/geodata/build_city.py --stage index --stage report
-python3 tools/hosting/build_packs.py --out data-packs --no-atlases --offline --no-overrides   # optional: 22 files instead of ~330
+python3 tools/hosting/build_packs.py --out site-data --no-atlases --offline --no-overrides   # optional: 22 files instead of ~330
 ```
 
 `vegetation` downloads the DHM point cloud (Datafordeler key) and takes ~25 min for the nine cells.
@@ -59,7 +59,7 @@ uv run tools/geodata/appearance_city_final.py register
 uv run tools/geodata/appearance_city_atlas.py atlas all --workers 3
 uv run --with pillow --with numpy --with scipy python tools/geodata/facade_layout.py run all --workers 4
 uv run tools/geodata/far_lod.py && uv run tools/geodata/build_city.py --stage index --stage report
-python3 tools/hosting/build_packs.py --out data-packs --offline --no-overrides
+python3 tools/hosting/build_packs.py --out site-data --offline --no-overrides
 ```
 
 Result: observed wall and roof tones for the nine cells, 3,186 facade atlases (53 MB webp), measured window grids on 3,559 walls;
@@ -80,7 +80,7 @@ uv run tools/geodata/far_lod.py && uv run tools/geodata/build_city.py --stage in
 Result: 4,772 of 5,819 buildings (82 %) with a measured LoD2.2 roof and walls (median fit 0.88 m); 1,038 rejected by the quality gate
 (no usable points, footprint not covered, 108 built after the 2019 scan) keep the extruded roof. 12 minutes of roofer on two cores.
 
-Run locally with the packed data: `python tools/hosting/serve_range.py --port 8010`, then http://127.0.0.1:8010/?data=./data-packs
+Run locally with the packed data: `python tools/hosting/serve_range.py --port 8010`, then http://127.0.0.1:8010/?data=./site-data
 
 ## Content
 
@@ -93,8 +93,12 @@ Run locally with the packed data: `python tools/hosting/serve_range.py --port 80
 
 ## Not done yet
 
-- 2,032 of the 5,820 footprints have no BBR record through `bbruuid` (Holmen, the Navy, many in Frederiksstaden): they get default use and
-  year. A spatial join to BBR's building points would recover most.
+- BBR: GeoDanmark names a BBR building through `bbruuid` on 3,788 of the 5,820 footprints. `build_city.merge_building_features` now also
+  joins a BBR building whose coordinate (byg404) lies inside an unnamed footprint (9) and gives a footprint still without BBR the record
+  of the footprint it shares the longest wall (>= 2 m) with (1,175: GeoDanmark splits one BBR building into several parts). 848 remain
+  without BBR (most have no BBR building at all: sheds, pontoons, the Navy's).
+- `DHM_SOURCE=laz` makes the cells stage rasterise DSM and DTM from the Punktsky tiles instead of the WCS (when Dataforsyningen refuses the
+  token). The point cloud is from 2019, so buildings built since come out flat: the published data keeps the WCS heights.
 - The tile list's land share (`city_tiles.py`) is wrong for the larger box (the OSM-API coastline is cut at the request edges); nothing
   else reads it.
 - credits.html, the start-screen copy and the docs of the Aalborg phases still describe Aalborg.
