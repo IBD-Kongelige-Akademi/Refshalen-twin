@@ -87,7 +87,7 @@ test('the tour starts and ends at AKKC and every stop has a location and a sceni
 test('Express takes about 2 minutes and Full about 6', () => {
   const express = tourDuration('express');
   const full = tourDuration('full');
-  assert.ok(express >= 100 && express <= 140, `express ${express.toFixed(0)} s`);
+  assert.ok(express >= 100 && express <= 150, `express ${express.toFixed(0)} s`);
   assert.ok(full >= 240 && full <= 420, `full ${full.toFixed(0)} s`);
 });
 

@@ -1,8 +1,8 @@
 {
  "out": "site-data",
- "files": 54,
- "bytes": 60633620,
- "manifestBytes": 4582,
+ "files": 55,
+ "bytes": 60850646,
+ "manifestBytes": 4785,
  "folders": {
   "a": {
    "files": 30,
@@ -11,13 +11,13 @@
   },
   "c": {
    "files": 2,
-   "bytes": 945038,
-   "largest": 704634
+   "bytes": 945039,
+   "largest": 704635
   },
   "d": {
    "files": 9,
-   "bytes": 2426623,
-   "largest": 487504
+   "bytes": 2428457,
+   "largest": 487703
   },
   "t": {
    "files": 9,
@@ -25,9 +25,9 @@
    "largest": 2627128
   },
   "x": {
-   "files": 3,
-   "bytes": 527532,
-   "largest": 457684
+   "files": 4,
+   "bytes": 742520,
+   "largest": 463127
   }
  },
  "tiles": 30,
@@ -63,5 +63,5 @@
    "block": 2
   }
  ],
- "seconds": 2
+ "seconds": 3
 }

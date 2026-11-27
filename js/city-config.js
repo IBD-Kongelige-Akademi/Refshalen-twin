@@ -73,7 +73,8 @@ const TELEPORT_LOCATIONS = {
   marmorkirken: { name: 'Marmorkirken', sub: 'Frederiksstaden · from Amalienborg', x: -1260.0, z: 683.0, heading: -1.96, pin: { x: -1364.6, z: 640.1 } },
   operaparken: { name: 'Operaparken', sub: 'Holmen · the park by the opera', x: -618.1, z: 1107.7, heading: -0.78, pin: { x: -640.0, z: 1130.0 } },
   kai: { name: 'KAI', sub: 'Papirøen · the new swimming hall', x: -833.1, z: 1221.8, heading: 2.17, pin: { x: -800.0, z: 1199.0 } },
-  banchina: { name: 'La Banchina', sub: 'Refshaleøen · harbour bath', x: -48.3, z: 49.5, heading: -0.28, pin: { x: -57.0, z: 80.0 } }
+  banchina: { name: 'La Banchina', sub: 'Refshaleøen · harbour bath', x: -48.3, z: 49.5, heading: -0.28, pin: { x: -57.0, z: 80.0 } },
+  bygning147: { name: 'Bygning 147', sub: 'Refshaleøen · Refshalevej 147', x: -16.4, z: 122.2, heading: 2.86, pin: { x: -13.4, z: 47.1 } }
 };
 
 function isTypingInField(event) {

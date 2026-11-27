@@ -68,7 +68,7 @@ test('the Refshaleøen frame matches docs/cph-geodata-schema.md', async () => {
   const back = toEtrs(p.x, p.z, p.y);
   assert.ok(Math.abs(back.e - (e0 + 100)) < 1e-9 && Math.abs(back.n - (n0 + 40)) < 1e-9 && Math.abs(back.h - (h0 + 3)) < 1e-9);
   assert.deepEqual([ISLAND_BOUNDS.minX, ISLAND_BOUNDS.minZ, ISLAND_BOUNDS.maxX, ISLAND_BOUNDS.maxZ], [-2000, -1000, 1000, 1500]);
-  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['reffen', 'operaen', 'akademiet', 'mastekranen', 'bw', 'cc', 'marmorkirken', 'operaparken', 'kai', 'banchina']);
+  assert.deepEqual(Object.keys(TELEPORT_LOCATIONS), ['reffen', 'operaen', 'akademiet', 'mastekranen', 'bw', 'cc', 'marmorkirken', 'operaparken', 'kai', 'banchina', 'bygning147']);
 });
 
 test('the city config is the Refshaleøen one', async () => {

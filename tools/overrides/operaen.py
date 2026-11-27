@@ -34,6 +34,7 @@ COVERS = [GDK_ID, 'gdk:1064798125', 'gdk:1064733266', 'gdk:1064803639', 'gdk:106
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_OUT = Path.home() / '.local/share/cph-twin/overrides' / SET
 
+LENS_BOTTOM, LENS_TOP, LENS_WAIST, LENS_ROWS = 4.0, 2.2, 0.55, 14  # m pushed back at the plaza / under the roof; widest point
 FOYER_DEPTH = 30.0             # m from the foyer curve's apex back to where the straight side walls start (level 0)
 TOWER_U = (0.395, 0.593)       # the fly tower along the house, foyer apex (0) .. east facade (1) (level 0: the main stage)
 TOWER_V = (0.315, 0.685)       # across the roof (west elevation: ~33 of ~90 m, centred)
@@ -43,7 +44,7 @@ ROOF_DEPTH = 2.2               # m: the roof's depth over the house
 
 STONE = (0.74, 0.70, 0.62)     # the pale Jura-like stone of the side walls
 WINDOW = (0.10, 0.12, 0.14)
-GLASS = (0.26, 0.33, 0.37)
+GLASS = (0.52, 0.58, 0.61)    # the silvery, banded glass of the foyer
 STEEL = (0.30, 0.31, 0.32)
 ROOF_TOP = (0.62, 0.63, 0.63)
 SOFFIT = (0.86, 0.82, 0.72)    # the warm, lit underside
@@ -102,6 +103,33 @@ def min_rect(pts):
     return U, V, u0, u1, v0, v1
 
 
+def smooth_foyer(ring, U, V, apex, n=48, power=2.6):
+    """The GeoDanmark outline steps along the foyer (the measured line follows mullions and canopies); the glass is one smooth lens.
+    The run of outline vertices in front of FOYER_DEPTH is replaced by a superellipse arc from its first to its last vertex through the apex."""
+    pu = ring @ U
+    inside = pu < apex + FOYER_DEPTH
+    m = len(ring)
+    # rotate the ring so the foyer run is contiguous and starts at index 1 (the vertex before it at 0)
+    start = next(i for i in range(m) if inside[i] and not inside[i - 1])
+    ring = np.roll(ring, -(start - 1), axis=0)
+    inside = np.roll(inside, -(start - 1))
+    k = 1
+    while k < m and inside[k]:
+        k += 1
+    a, b = ring[0], ring[k]                  # the stone corners either side of the foyer
+    ua, va, ub, vb = a @ U, a @ V, b @ U, b @ V
+    vc, hv = (va + vb) / 2, abs(vb - va) / 2
+    base = (ua + ub) / 2
+    arc = []
+    for j in range(1, n):
+        th = np.pi * j / n
+        c, sn = np.cos(th), np.sin(th)
+        v = vc + (va - vc) * np.sign(c) * abs(c) ** (2 / power) if va > vc else vc - (vc - va) * np.sign(c) * abs(c) ** (2 / power)
+        u = base - (base - apex) * abs(sn) ** (2 / power)
+        arc.append(u * U + v * V)
+    return np.vstack([ring[:1], np.array(arc), ring[k:]])
+
+
 def build(ring, U, V, box, ground, low, roof_top, tower_top):
     m = Model()
     u0, u1, v0, v1 = box
@@ -127,9 +155,13 @@ def build(ring, U, V, box, ground, low, roof_top, tower_top):
     # ---- the house: the GeoDanmark outline, walls up under the soffit; the foyer curve is glass
     pu, pv = ring @ U, ring @ V
     apex, east = pu.min(), pu.max()
+    ring = smooth_foyer(ring, U, V, apex)
+    pu, pv = ring @ U, ring @ V
     rs = np.random.default_rng(553)
     n = len(ring)
     cen = np.array([np.mean(pu), np.mean(pv)])
+    lc = (apex + FOYER_DEPTH + 6.0, (pv.min() + pv.max()) / 2)
+    lens_c = np.array([lc[0] * U[0] + lc[1] * V[0], lc[0] * U[1] + lc[1] * V[1]])
     for i in range(n):
         a, b = ring[i], ring[(i + 1) % n]
         L = np.linalg.norm(b - a)
@@ -144,15 +176,33 @@ def build(ring, U, V, box, ground, low, roof_top, tower_top):
         hint = (nrm[0], 0, nrm[1])
         foyer = max(ua, ub) < apex + FOYER_DEPTH
         if foyer:
-            m.poly('glass', [(a[0], low, a[1]), (b[0], low, b[1]), (b[0], under, b[1]), (a[0], under, a[1])], hint, color=rgb(GLASS))
-            # the steel grid: a mullion at every vertex of the curve, transoms every 3.2 m
-            p = a + nrm * 0.06
-            w = t * 0.07
-            m.poly('steel', [(p[0] - w[0], low, p[1] - w[1]), (p[0] + w[0], low, p[1] + w[1]), (p[0] + w[0], under, p[1] + w[1]),
-                             (p[0] - w[0], under, p[1] - w[1])], hint, color=rgb(STEEL))
-            for y in np.arange(ground + 3.2, under - 0.5, 3.2):
-                q0, q1 = a + nrm * 0.06, b + nrm * 0.06
-                m.poly('steel', [(q0[0], y, q0[1]), (q1[0], y, q1[1]), (q1[0], y + 0.12, q1[1]), (q0[0], y + 0.12, q0[1])], hint, color=rgb(STEEL))
+            # the glass lens: every point of the curve is pushed back from the plan line by a profile over the height (photos: widest a
+            # little above mid-height, drawn in at the plaza and under the roof), the push fading out where the curve meets the stone
+            prof = lambda t: -LENS_BOTTOM * ((t - LENS_WAIST) / LENS_WAIST) ** 2 if t < LENS_WAIST else -LENS_TOP * ((t - LENS_WAIST) / (1 - LENS_WAIST)) ** 2
+            ends = apex + FOYER_DEPTH
+            fade = lambda u: float(np.clip((ends - u) / 8.0, 0.0, 1.0))
+            cc = lens_c
+            def at(pt, u, t):
+                d = pt - cc
+                d = d / np.linalg.norm(d)
+                q = pt + d * prof(t) * fade(u)
+                return (q[0], low + (under - low) * t, q[1])
+            ts = np.linspace(0, 1, LENS_ROWS + 1)
+            for k in range(LENS_ROWS):
+                t0_, t1_ = ts[k], ts[k + 1]
+                m.poly('glass', [at(a, ua, t0_), at(b, ub, t0_), at(b, ub, t1_), at(a, ua, t1_)], hint, color=rgb(GLASS))
+            # horizontal bands every ~1.3 m (the facade's strong lines) and a mullion at every vertex of the curve
+            nb = int((under - low) / 1.3)
+            for k in range(1, nb):
+                t_ = k / nb
+                pa, pb = np.array(at(a, ua, t_)), np.array(at(b, ub, t_))
+                off = np.array([nrm[0], 0, nrm[1]]) * 0.08
+                m.poly('steel', [pa + off, pb + off, pb + off + (0, 0.16, 0), pa + off + (0, 0.16, 0)], hint, color=rgb(STEEL))
+            for k in range(LENS_ROWS):
+                pa, pb = np.array(at(a, ua, ts[k])), np.array(at(a, ua, ts[k + 1]))
+                w = np.array([t[0], 0, t[1]]) * 0.06
+                off = np.array([nrm[0], 0, nrm[1]]) * 0.06
+                m.poly('steel', [pa - w + off, pa + w + off, pb + w + off, pb - w + off], hint, color=rgb(STEEL))
             continue
         m.poly('stone', [(a[0], low, a[1]), (b[0], low, b[1]), (b[0], under, b[1]), (a[0], under, a[1])], hint, color=rgb((1, 1, 1)))
         # ribbon glazing: one continuous band per 4.5 m storey, stopped 0.8 m short of the corners; not on the short jogs

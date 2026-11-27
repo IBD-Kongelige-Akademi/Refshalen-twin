@@ -84,6 +84,14 @@ const TOUR_STOPS = [
     ]
   },
   {
+    id: 'bygning147',
+    title: 'Bygning 147',
+    sub: 'B&W office building',
+    beats: [
+      { express: true, hold: 8, caption: 'Bygning 147 on Refshalevej, the 1955 B&W office building, here as Anders Hermund\'s Rhino model.', do: [...GOLDEN, { mode: 'person' }, { avatar: 'man' }, { camera: 'bygning147' }] }
+    ]
+  },
+  {
     id: 'mastekranen',
     title: 'Mastekranen',
     sub: 'Nyholm · the mast crane',

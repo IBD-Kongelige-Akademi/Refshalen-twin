@@ -19,6 +19,7 @@ const CAMERA_PRESETS = [
   { id: 'operaparken', name: 'Operaparken', short: 'Operaparken', category: 'scenic', fov: 56 },
   { id: 'kai', name: 'KAI', short: 'KAI', category: 'scenic', fov: 56 },
   { id: 'banchina', name: 'La Banchina', short: 'Banchina',   category: 'scenic', fov: 56 },
+  { id: 'bygning147', name: 'Bygning 147', short: 'Bygning 147', category: 'scenic', fov: 56 },
   { id: 'drone',       name: 'Auto-Director Aerial',     short: 'Director',    category: 'scenic', fov: 50 }
 ];
 
@@ -34,7 +35,8 @@ const SCENIC_VIEWS = {
   marmorkirken: { back: 30, up: 6, ahead: 110, lookY: 30, sway: 2 },
   operaparken: { back: 20, up: 6, ahead: 35, lookY: 4, sway: 3 },
   kai: { back: 20, up: 6, ahead: 45, lookY: 8, sway: 3 },
-  banchina: { back: 15, up: 4, ahead: 60, lookY: 2, sway: 2 }
+  banchina: { back: 15, up: 4, ahead: 60, lookY: 2, sway: 2 },
+  bygning147: { back: 10, up: 3, ahead: 70, lookY: 9, sway: 1.5 }
 };
 
 // Degrees the chase & action cameras widen their field of view by per m/s, and at most (reached at 40 m/s, a little
@@ -320,7 +322,8 @@ class CameraSystem {
       case 'marmorkirken':
       case 'operaparken':
       case 'kai':
-      case 'banchina': {
+      case 'banchina':
+      case 'bygning147': {
         const view = SCENIC_VIEWS[this.activePresetId];
         const loc = TELEPORT_LOCATIONS[this.activePresetId];
         const sway = Math.sin(elapsed * 0.24) * view.sway;

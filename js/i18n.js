@@ -29,6 +29,9 @@ const DA = {
   "Refshaleøen · the shipyard halls": "Refshaleøen · værftshallerne",
   "Refshaleøen · art hall": "Refshaleøen · kunsthal",
   "Refshaleøen · harbour bath": "Refshaleøen · havnebad",
+  "Refshaleøen · Refshalevej 147": "Refshaleøen · Refshalevej 147",
+  "B&W office building": "B&Ws kontorbygning",
+  "Bygning 147 on Refshalevej, the 1955 B&W office building, here as Anders Hermund's Rhino model.": "Bygning 147 på Refshalevej, B&Ws kontorbygning fra 1955, her som Anders Hermunds Rhino-model.",
   "Welcome to Refshaleøen: the old B&W shipyard island and Holmen as a digital twin, built from open Danish map data.": "Velkommen til Refshaleøen: den gamle B&W-værftsø og Holmen som digital tvilling, bygget af åbne danske kortdata.",
   "Drive it: cars on the real street network, here up Refshalevej.": "Kør i den: biler på det rigtige vejnet, her op ad Refshalevej.",
   "Reffen, the street food market on the old shipyard quay.": "Reffen, streetfood-markedet på den gamle værftskaj.",
@@ -449,7 +452,7 @@ const DA = {
 
 // Text that reads the same in Danish: names, brands and units (kept here so tests can tell "same on purpose" from "missed")
 const KEEP = new Set([
-  'Marmorkirken', 'Operaparken', 'KAI', 'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina',
+  'Marmorkirken', 'Operaparken', 'KAI', 'Reffen', 'Operaen', 'Det Kongelige Akademi', 'Akademiet', 'Mastekranen', 'B&W Hallerne', 'Copenhagen Contemporary', 'La Banchina', 'Bygning 147',
   'Refshaleøen Twin', 'Ramboll', 'Det Kongelige Akademi · Refshaleøen', 'three.js · WebGPU · TSL ·', 'fps', 'km/h',
   'Refshaleøen Kongres & Kultur Center', 'Kongres & Kultur Center', 'Budolfi Domkirke', 'Jomfru Ane Gade', 'Utzon Center',
   'Musikkens Hus', 'Karolinelund', 'Hotel Det Hvide Hus', 'Plusbus', 'Drone', 'Bus', 'Skateboard', 'Skateboarder', 'Gamepad',
