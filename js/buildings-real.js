@@ -7,7 +7,7 @@ import { buildingSteps, ringCentre, wallArrays as wallTyped, roofArrays as roofT
 import { describeAppearance, calibrationOn } from './appearance.js';
 import { createPhotoMaterial } from './facade-photo-material.js';
 import { WINDOW, FACADE_CORNER_PIER } from './facade-style.js';
-import { texRequested, lookFile, estimateTextureBytes, createPhotoBudget } from './facade-lod.js';
+import { texRequested, lookFile, estimateTextureBytes, createPhotoBudget, PHOTO_KEEPS_CLOSE } from './facade-lod.js';
 import { createContext as createGroundContext } from './groundfloor.js';
 import { createEntranceIndex, createDoorAccumulator, addDoors } from './entrances.js';
 import { CPH_FRAME } from './city-config.js';
@@ -828,7 +828,7 @@ async function buildRealBuildings(scene, geo, { heroLoader = null, withInfoPanel
     else batchBuildingCells(root, leaves, pickables);
 
     const neon = { group: null, panels: [], update() {}, stats: { panels: 0 } }; // upstream's Irma sign; no neon signs in Refshaleøen yet
-    texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget, closeFade: level !== 'photo' }) : null; // joins the shared budget itself
+    texManager = tex ? createTexManager(root, texCandidates, { budget: photoBudget, closeFade: level !== 'photo' && !PHOTO_KEEPS_CLOSE }) : null; // joins the shared budget itself
     const raycaster = new THREE.Raycaster();
     const ndc = new THREE.Vector2();
     panel = withInfoPanel && typeof document !== 'undefined' ? createInfoPanel() : null;

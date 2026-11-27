@@ -35,6 +35,9 @@ const PHOTO = {
 // The photo-only building level (js/buildings-real.js BUILDING_LEVELS 'photo'): no procedural facade to hand over to up close, so the photo
 // stays in all the way to the wall and a building is never too near to hold its atlas
 const PHOTO_UP_CLOSE = { ...PHOTO, close0: 0, close1: 0.5, closeMargin: 0 };
+// Refshaleøen: the photo stays in up close at every building level. The 45-80 m crossfade into the procedural facade read as two facades
+// laid over each other while walking towards a building (the photo and the generated windows at once), so the photo is kept instead.
+const PHOTO_KEEPS_CLOSE = true;
 
 /** Shares a small synchronous cold-photo draw budget across every pass in one animation frame. */
 function createPhotoDrawBudget({ now = () => performance.now(), budgetMs = 4 } = {}) {
@@ -593,4 +596,4 @@ function createPhotoBudget({ interval = 350, select = selectPhotoSet, p = PHOTO 
   };
 }
 
-export { PHOTO, PHOTO_UP_CLOSE, photoFade, texRequested, selectPhotoSet, wallDistance, densityScale, quantiseStep, pixelMetres, createPhotoBudget, createPhotoDrawBudget, createPhotoRenderCallback, applyPhotoPlan, makePhotoRoom, createPhotoStats, logPhoto, photoReservation, lookFile, estimateTextureBytes, scaledTextureSize };
+export { PHOTO, PHOTO_UP_CLOSE, PHOTO_KEEPS_CLOSE, photoFade, texRequested, selectPhotoSet, wallDistance, densityScale, quantiseStep, pixelMetres, createPhotoBudget, createPhotoDrawBudget, createPhotoRenderCallback, applyPhotoPlan, makePhotoRoom, createPhotoStats, logPhoto, photoReservation, lookFile, estimateTextureBytes, scaledTextureSize };

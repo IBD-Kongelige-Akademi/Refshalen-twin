@@ -1790,7 +1790,7 @@ function createLoftedBusMaterial(s = BUS_SPEC, { player = false } = {}) {
   const interior = mix(mix(color(0x3d3934), color(0x15161a), smoothstep(0.42, 1.1, p.y)), color(0xc9a227), pole);
   body = mix(body, interior, doorway);
 
-  const col = mix(mix(mix(body, color(0x1b1f24), isTrim), color(L?.roof ?? 0xc9ced3), isPod), color(0x424549), isBellows);
+  const col = mix(mix(mix(body, color(0x1b1f24), isTrim), color(L?.roof ?? 0xe8b800), isPod), color(0x424549), isBellows);
 
   const mat = new THREE.MeshStandardNodeMaterial();
   mat.colorNode = mix(col, color(0x000000), isSign);

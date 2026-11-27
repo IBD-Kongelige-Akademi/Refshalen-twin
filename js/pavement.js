@@ -178,6 +178,7 @@ class Bucket {
 
 /** Measured lawn polygons (data/cph-vegetation.json) lie this far over the register ground. */
 export const GRASS_LIFT = 0.002;
+const LAWN_EDGE = 3; // m: pavement this close to a measured lawn is cut into smaller triangles, so the cut follows the lawn's edge
 
 const hash01 = (n) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };
 
@@ -230,7 +231,16 @@ export function buildPavementBuckets(geo, surfacesDoc, { roads, y, groundY, skip
   // (a gravel park path, tools/geodata/city_paths.py, does not repave a pavement it meets)
   const index = createSurfaceIndex((surfacesDoc?.surfaces || []).filter((s) => !s.path));
   const buckets = new Map();
-  const maxEdge = (x, z) => (nearCycle && nearCycle(x, z) ? 2.5 : 6);
+  // measured lawns (DHM/CIR, not OSM) win over the pavement polygons they lie in: the pavement sits 0.2 m over the ground, so a lawn under
+  // it showed its grass blades through the slabs (a plaza-sized derived sidewalk over a lawn, e.g. north of the opera). Pavement triangles
+  // whose centre is on such a lawn are left out, cut finer near the lawn's edge.
+  const lawns = createSurfaceIndex((surfacesDoc?.surfaces || []).filter((s) => s.cls === 'grass' && !s.src?.[0]?.startsWith('osm') && !s.path));
+  const onLawn = lawns.count ? (x, z) => lawns.classAt(x, z) !== null : () => false;
+  const nearLawn = lawns.count
+    ? (x, z) => onLawn(x, z) || onLawn(x + LAWN_EDGE, z) || onLawn(x - LAWN_EDGE, z) || onLawn(x, z + LAWN_EDGE) || onLawn(x, z - LAWN_EDGE)
+    : () => false;
+  const maxEdge = (x, z) => ((nearCycle && nearCycle(x, z)) || nearLawn(x, z) ? 2.5 : 6);
+  const paveSkip = (x, z) => (skip && skip(x, z)) || onLawn(x, z);
   const groundEdge = terrain && !terrain.flat ? 6 : 12; // register polygons follow the terrain: shorter edges
   let i = 0;
   const sidewalks = ownList(geo, 'sidewalks');
@@ -238,7 +248,7 @@ export function buildPavementBuckets(geo, surfacesDoc, { roads, y, groundY, skip
     if (!s.ring || s.ring.length < 6) continue;
     const fallback = sidewalkClass(s.ring);
     tessellateFramed(s.ring, {
-      frame, y, seed: hash01(++i), skip, maxEdge, buckets, terrain,
+      frame, y, seed: hash01(++i), skip: paveSkip, maxEdge, buckets, terrain,
       classOf: (x, z) => {
         const c = index.classAt(x, z);
         return c && c !== 'other' && c !== 'grass' && c !== 'asphalt_road' ? c : fallback;

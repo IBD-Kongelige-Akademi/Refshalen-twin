@@ -1,6 +1,6 @@
 import * as THREE from 'three/webgpu';
 import { BUILDING_LEVELS, attachBuildingClicks, buildRealBuildings, createBuildingMaterials, createInfoPanel } from './buildings-real.js';
-import { PHOTO, PHOTO_UP_CLOSE, texRequested, createPhotoBudget } from './facade-lod.js';
+import { PHOTO, PHOTO_UP_CLOSE, PHOTO_KEEPS_CLOSE, texRequested, createPhotoBudget } from './facade-lod.js';
 import { createSharedSlicer } from './yield-frame.js';
 import { createOverrideBudget, createOverrideBudgetLease, overridesMode, wantsReadmit } from './detail-overrides.js';
 
@@ -42,7 +42,7 @@ export function createBuildingsLayer(scene, { terrain = null, lod2 = null, obser
   const shared = createBuildingMaterials();
   const slice = createSharedSlicer(5);
   const photoBudget = tex ? createPhotoBudget() : null; // one residency plan for the photo walls of every tile
-  const photoPolicy = () => photoBudget?.setParams?.(level === 'photo' ? PHOTO_UP_CLOSE : PHOTO); // the photo-only level keeps photos up close
+  const photoPolicy = () => photoBudget?.setParams?.(level === 'photo' || PHOTO_KEEPS_CLOSE ? PHOTO_UP_CLOSE : PHOTO); // the photo-only level keeps photos up close
   photoPolicy();
   const ovMode = overridesMode();
   const overrideBudget = ovMode === 'off' ? null : createOverrideBudget();
